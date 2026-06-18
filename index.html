@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GitHub Readme Stats · EdgeOne</title>
+    <meta name="description" content="基于 EdgeOne Pages Go Cloud Functions 部署的 GitHub Readme Stats 卡片生成工具，支持动态统计、最常使用语言、仓库卡片及 WakaTime 数据可视化展示。" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+      :root {
+        --bg: #070913;
+        --bg-gradient: radial-gradient(circle at 50% 0%, #0d162f 0%, #070913 70%);
+        --panel: rgba(13, 20, 38, 0.45);
+        --panel-border: rgba(255, 255, 255, 0.08);
+        --panel-hover: rgba(19, 29, 56, 0.6);
+        --text: #f3f4f6;
+        --muted: #9ca3af;
+        --accent: #3b82f6;
+        --accent-glow: rgba(59, 130, 246, 0.15);
+        --accent-hover: #60a5fa;
+        --ok: #10b981;
+        --ok-glow: rgba(16, 185, 129, 0.2);
+        --code-bg: #030712;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg-gradient);
+        color: var(--text);
+        font-family: 'Inter', "PingFang SC", "Microsoft YaHei", sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        overflow-x: hidden;
+      }
+
+      /* Grid Line Pattern Overlay */
+      body::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 600px;
+        background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        background-position: center top;
+        mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
+        -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
+        z-index: -1;
+        pointer-events: none;
+      }
+
+      main {
+        width: min(1200px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 60px 0 80px;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 48px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--ok-glow);
+        background: rgba(16, 185, 129, 0.08);
+        color: var(--ok);
+        border-radius: 99px;
+        padding: 6px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        animation: pulse 2s infinite alternate;
+      }
+
+      .badge::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 8px currentColor;
+      }
+
+      h1 {
+        font-family: 'Outfit', sans-serif;
+        font-size: clamp(32px, 5vw, 56px);
+        font-weight: 800;
+        line-height: 1.1;
+        background: linear-gradient(135deg, #ffffff 40%, #a5b4fc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: -1px;
+      }
+
+      .lead {
+        max-width: 640px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.6;
+        margin-top: 8px;
+      }
+
+      .dashboard {
+        display: grid;
+        grid-template-columns: 420px minmax(0, 1fr);
+        gap: 32px;
+        align-items: start;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        padding: 28px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      }
+
+      h2 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      h2::before {
+        content: "";
+        width: 4px;
+        height: 16px;
+        background: var(--accent);
+        border-radius: 2px;
+        box-shadow: 0 0 10px var(--accent);
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--muted);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .input-control {
+        width: 100%;
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        padding: 10px 14px;
+        font-size: 14px;
+        font-family: inherit;
+        transition: all 0.2s ease;
+      }
+
+      .input-control:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .checkbox-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-top: 8px;
+      }
+
+      .checkbox-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        color: var(--muted);
+        user-select: none;
+      }
+
+      .checkbox-control input {
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border: 1px solid var(--panel-border);
+        border-radius: 4px;
+        background: rgba(3, 7, 18, 0.5);
+        cursor: pointer;
+        display: grid;
+        place-content: center;
+        transition: all 0.15s ease;
+      }
+
+      .checkbox-control input:checked {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .checkbox-control input:checked::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        background: white;
+        clip-path: polygon(28% 38%, 41% 53%, 75% 24%, 86% 34%, 40% 78%, 18% 50%);
+      }
+
+      .checkbox-control:hover color {
+        color: var(--text);
+      }
+
+      /* Preview Panel styling */
+      .preview-pane {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .preview-box {
+        background: rgba(3, 7, 18, 0.3);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 40px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 280px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Grid for preview layout card sizes */
+      #preview-image {
+        max-width: 100%;
+        height: auto;
+        border-radius: 6px;
+        z-index: 1;
+        transition: opacity 0.2s ease;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Spinner Loader */
+      .loader {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.05);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        display: none;
+        z-index: 2;
+      }
+
+      .preview-box.loading #preview-image {
+        opacity: 0.3;
+      }
+
+      .preview-box.loading .loader {
+        display: block;
+      }
+
+      /* Code Block Output */
+      .output-box {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .code-container {
+        position: relative;
+        border-radius: 8px;
+        background: var(--code-bg);
+        border: 1px solid var(--panel-border);
+        overflow: hidden;
+      }
+
+      .code-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.02);
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--panel-border);
+      }
+
+      .code-header span {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .copy-btn {
+        background: transparent;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .copy-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
+      }
+
+      .copy-btn.copied {
+        color: var(--ok);
+      }
+
+      pre {
+        padding: 16px;
+        overflow-x: auto;
+      }
+
+      code {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 13.5px;
+        color: #e5e7eb;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+
+      /* Endpoint docs section */
+      .docs-section {
+        margin-top: 48px;
+      }
+
+      .docs-toggle {
+        width: 100%;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        padding: 18px 24px;
+        border-radius: 12px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-family: 'Outfit', sans-serif;
+        font-size: 16px;
+        font-weight: 600;
+        transition: background 0.2s;
+      }
+
+      .docs-toggle:hover {
+        background: var(--panel-hover);
+      }
+
+      .docs-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s cubic-bezier(0, 1, 0, 1);
+      }
+
+      .docs-content.open {
+        max-height: 2000px;
+        transition: max-height 0.5s ease-in;
+      }
+
+      .endpoint-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 16px;
+        padding: 24px 0;
+      }
+
+      .endpoint-card {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        transition: transform 0.2s, border-color 0.2s;
+      }
+
+      .endpoint-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(59, 130, 246, 0.4);
+        background: var(--panel-hover);
+      }
+
+      .endpoint-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .endpoint-path {
+        font-family: monospace;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .endpoint-method {
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--accent);
+        background: var(--accent-glow);
+        padding: 3px 6px;
+        border-radius: 4px;
+      }
+
+      .endpoint-desc {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      .endpoint-link {
+        align-self: flex-start;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .endpoint-link:hover {
+        color: var(--accent-hover);
+      }
+
+      footer {
+        width: 100%;
+        border-top: 1px solid var(--panel-border);
+        padding: 24px 0;
+        background: rgba(3, 7, 18, 0.4);
+        margin-top: auto;
+      }
+
+      .footer-content {
+        width: min(1200px, calc(100% - 32px));
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .footer-links {
+        display: flex;
+        gap: 20px;
+      }
+
+      .footer-links a {
+        color: var(--muted);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+
+      .footer-links a:hover {
+        color: var(--text);
+      }
+
+      /* Animations */
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+        70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+      }
+
+      /* Responsive */
+      @media (max-width: 960px) {
+        .dashboard {
+          grid-template-columns: 1fr;
+        }
+        main {
+          padding: 40px 0 60px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .checkbox-grid {
+          grid-template-columns: 1fr;
+        }
+        .preview-box {
+          padding: 20px;
+        }
+        .footer-content {
+          flex-direction: column;
+          gap: 12px;
+          text-align: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="badge">Go Cloud Functions</span>
+        <h1>GitHub Readme Stats · EdgeOne</h1>
+        <p class="lead">
+          在 Tencent EdgeOne Pages Edge 边缘侧极致加速的统计卡片生成器，提供极速响应的动态 SVG 数据渲染服务。
+        </p>
+      </header>
+
+      <div class="dashboard">
+        <!-- Configuration Card -->
+        <section class="card">
+          <h2>配置面板</h2>
+          
+          <div class="form-group">
+            <label for="username">GitHub 用户名</label>
+            <input type="text" id="username" class="input-control" value="Mintimate" placeholder="输入您的用户名" />
+          </div>
+
+          <div class="form-group">
+            <label for="card-type">卡片类型</label>
+            <select id="card-type" class="input-control">
+              <option value="stats">GitHub 综合统计卡</option>
+              <option value="top-langs">常用语言占比卡</option>
+              <option value="repo">仓库卡片 (Pin)</option>
+              <option value="gist">Gist 卡片</option>
+              <option value="wakatime">WakaTime 统计卡</option>
+            </select>
+          </div>
+
+          <!-- Dynamic Repo Card fields -->
+          <div class="form-group" id="repo-field" style="display: none;">
+            <label for="repo-name">仓库名称</label>
+            <input type="text" id="repo-name" class="input-control" value="github-readme-stats-eo" placeholder="输入仓库名" />
+          </div>
+
+          <!-- Dynamic Gist Card fields -->
+          <div class="form-group" id="gist-field" style="display: none;">
+            <label for="gist-id">Gist ID</label>
+            <input type="text" id="gist-id" class="input-control" value="bbfce31e0217a3689c8d961a356cb10d" placeholder="输入 Gist ID" />
+          </div>
+
+          <div class="form-group">
+            <label for="theme">卡片主题</label>
+            <select id="theme" class="input-control">
+              <option value="default">Default (明亮蓝色)</option>
+              <option value="dark">Dark (暗黑质感)</option>
+              <option value="radical">Radical (极客粉蓝)</option>
+              <option value="synthwave">Synthwave (赛博朋克)</option>
+              <option value="transparent">Transparent (半透明无背景)</option>
+            </select>
+          </div>
+
+          <!-- Layout field (only for top-langs & wakatime) -->
+          <div class="form-group" id="layout-field" style="display: none;">
+            <label for="layout">展示布局</label>
+            <select id="layout" class="input-control">
+              <option value="compact">Compact (紧凑列表)</option>
+              <option value="normal">Normal (进度条)</option>
+              <option value="donut">Donut (环形图)</option>
+              <option value="donut-vertical">Donut Vertical (垂直环图)</option>
+              <option value="pie">Pie (饼图)</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="langs-count-field" style="display: none;">
+            <label for="langs-count">展示语言数量</label>
+            <input type="number" id="langs-count" class="input-control" value="6" min="1" max="20" />
+          </div>
+
+          <div class="form-group">
+            <label for="custom-title">自定义标题</label>
+            <input type="text" id="custom-title" class="input-control" value="" placeholder="默认标题" />
+          </div>
+
+          <div class="form-group">
+            <label>展示选项</label>
+            <div class="checkbox-grid">
+              <label class="checkbox-control" id="opt-show-icons">
+                <input type="checkbox" id="show-icons" checked />
+                <span>显示图标</span>
+              </label>
+              <label class="checkbox-control" id="opt-hide-border">
+                <input type="checkbox" id="hide-border" />
+                <span>隐藏边框</span>
+              </label>
+              <label class="checkbox-control" id="opt-hide-progress">
+                <input type="checkbox" id="hide-progress" />
+                <span>隐藏进度条</span>
+              </label>
+              <label class="checkbox-control" id="opt-text-bold">
+                <input type="checkbox" id="text-bold" checked />
+                <span>粗体文本</span>
+              </label>
+              <label class="checkbox-control" id="opt-show-owner" style="display: none;">
+                <input type="checkbox" id="show-owner" />
+                <span>显示拥有者</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- Preview & Output Pane -->
+        <section class="preview-pane">
+          <div class="card">
+            <h2>实时预览</h2>
+            <div class="preview-box" id="preview-box">
+              <div class="loader"></div>
+              <img id="preview-image" alt="Realtime preview" />
+            </div>
+          </div>
+
+          <div class="card output-box">
+            <h2>获取代码</h2>
+            
+            <div class="code-container">
+              <div class="code-header">
+                <span>Markdown 引用</span>
+                <button class="copy-btn" id="copy-markdown-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  复制
+                </button>
+              </div>
+              <pre><code id="markdown-code"></code></pre>
+            </div>
+
+            <div class="code-container">
+              <div class="code-header">
+                <span>直链 URL</span>
+                <button class="copy-btn" id="copy-url-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                  复制
+                </button>
+              </div>
+              <pre><code id="raw-url"></code></pre>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Toggleable Reference API Docs -->
+      <section class="docs-section">
+        <button class="docs-toggle" id="docs-toggle">
+          <span>查看所有底层 API 参考</span>
+          <svg id="docs-toggle-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transform: rotate(0deg); transition: transform 0.2s;"><path d="M6 9l6 6 6-6"></path></svg>
+        </button>
+        <div class="docs-content" id="docs-content">
+          <div class="endpoint-grid" id="endpoint-grid"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-content">
+        <span>Powered by Tencent EdgeOne Pages · 极速边缘节点</span>
+        <div class="footer-links">
+          <a href="https://github.com/Mintimate/github-readme-stats-eo" target="_blank" rel="noreferrer">GitHub 仓库</a>
+          <a href="https://github.com/anuraghazra/github-readme-stats" target="_blank" rel="noreferrer">Upstream 原版</a>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      const baseUrl = window.location.origin;
+
+      const endpoints = [
+        { path: "/api", label: "GitHub 综合统计卡", query: "?username=Mintimate&show_icons=true", desc: "渲染用户的 Github 各项状态指标（Star、提交、PR、Issue等）。" },
+        { path: "/api/top-langs", label: "常用语言占比卡", query: "?username=Mintimate&layout=compact", desc: "展示用户使用最多的编程语言比例，支持多种图形及排版。" },
+        { path: "/api/pin", label: "仓库卡片 (Pin)", query: "?username=Mintimate&repo=github-readme-stats-eo", desc: "突出展示某个指定的开源软件仓库的信息卡片。" },
+        { path: "/api/gist", label: "Gist 详情卡片", query: "?id=bbfce31e0217a3689c8d961a356cb10d", desc: "获取并优雅展示指定 Gist 代码片段的状态。" },
+        { path: "/api/wakatime", label: "WakaTime 统计卡", query: "?username=ffflabs&layout=compact", desc: "挂载 WakaTime 开发者时长报告，生成占比与编码时间图。" },
+        { path: "/api/status/up", label: "PAT 可用性检查", query: "?type=json", desc: "调试专用接口，用来检测后台 GitHub Token (PAT) 的有效性。" }
+      ];
+
+      // Draw API Table
+      document.getElementById("endpoint-grid").innerHTML = endpoints
+        .map(function(ep) {
+          const url = baseUrl + ep.path + ep.query;
+          return '<div class="endpoint-card"><div class="endpoint-title"><span class="endpoint-path">' + ep.path + '</span><span class="endpoint-method">GET</span></div><p class="endpoint-desc">' + ep.label + ' — ' + ep.desc + '</p><a href="' + url + '" class="endpoint-link" target="_blank" rel="noreferrer">在新标签页打开 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div>';
+        })
+        .join("");
+
+      // Toggle Doc
+      const docsToggle = document.getElementById("docs-toggle");
+      const docsContent = document.getElementById("docs-content");
+      const docsArrow = document.getElementById("docs-toggle-arrow");
+      docsToggle.addEventListener("click", () => {
+        const isOpen = docsContent.classList.toggle("open");
+        docsArrow.style.transform = isOpen ? "rotate(180deg)" : "rotate(0deg)";
+      });
+
+      // Config form logic
+      const elUsername = document.getElementById("username");
+      const elCardType = document.getElementById("card-type");
+      const elTheme = document.getElementById("theme");
+      
+      // Supported themes from upstream github-readme-stats
+      const themes = [
+        { value: "default", name: "Default (明亮蓝色)" },
+        { value: "default_repocard", name: "Default Repocard" },
+        { value: "transparent", name: "Transparent (透明无背景)" },
+        { value: "shadow_red", name: "Shadow Red" },
+        { value: "shadow_green", name: "Shadow Green" },
+        { value: "shadow_blue", name: "Shadow Blue" },
+        { value: "dark", name: "Dark (暗黑质感)" },
+        { value: "radical", name: "Radical (极客粉蓝)" },
+        { value: "merko", name: "Merko" },
+        { value: "gruvbox", name: "Gruvbox" },
+        { value: "gruvbox_light", name: "Gruvbox Light" },
+        { value: "tokyonight", name: "Tokyonight" },
+        { value: "onedark", name: "Onedark" },
+        { value: "cobalt", name: "Cobalt" },
+        { value: "synthwave", name: "Synthwave (赛博朋克)" },
+        { value: "highcontrast", name: "High Contrast" },
+        { value: "dracula", name: "Dracula" },
+        { value: "prussian", name: "Prussian" },
+        { value: "monokai", name: "Monokai" },
+        { value: "vue", name: "Vue" },
+        { value: "vue-dark", name: "Vue Dark" },
+        { value: "shades-of-purple", name: "Shades of Purple" },
+        { value: "nightowl", name: "Nightowl" },
+        { value: "buefy", name: "Buefy" },
+        { value: "blue-green", name: "Blue Green" },
+        { value: "algolia", name: "Algolia" },
+        { value: "great-gatsby", name: "Great Gatsby" },
+        { value: "darcula", name: "Darcula" },
+        { value: "bear", name: "Bear" },
+        { value: "solarized-dark", name: "Solarized Dark" },
+        { value: "solarized-light", name: "Solarized Light" },
+        { value: "chartreuse-dark", name: "Chartreuse Dark" },
+        { value: "nord", name: "Nord" },
+        { value: "gotham", name: "Gotham" },
+        { value: "material-palenight", name: "Material Palenight" },
+        { value: "graywhite", name: "Graywhite" },
+        { value: "vision-friendly-dark", name: "Vision Friendly Dark" },
+        { value: "ayu-mirage", name: "Ayu Mirage" },
+        { value: "midnight-purple", name: "Midnight Purple" },
+        { value: "calm", name: "Calm" },
+        { value: "flag-india", name: "Flag India" },
+        { value: "omni", name: "Omni" },
+        { value: "react", name: "React" },
+        { value: "jolly", name: "Jolly" },
+        { value: "maroongold", name: "Maroongold" },
+        { value: "yeblu", name: "Yeblu" },
+        { value: "blueberry", name: "Blueberry" },
+        { value: "slateorange", name: "Slateorange" },
+        { value: "kacho_ga", name: "Kacho Ga" },
+        { value: "outrun", name: "Outrun" },
+        { value: "ocean_dark", name: "Ocean Dark" },
+        { value: "city_lights", name: "City Lights" },
+        { value: "github_dark", name: "Github Dark" },
+        { value: "github_dark_dimmed", name: "Github Dark Dimmed" },
+        { value: "discord_old_blurple", name: "Discord Old Blurple" },
+        { value: "aura_dark", name: "Aura Dark" },
+        { value: "panda", name: "Panda" },
+        { value: "noctis_minimus", name: "Noctis Minimus" },
+        { value: "cobalt2", name: "Cobalt2" },
+        { value: "swift", name: "Swift" },
+        { value: "aura", name: "Aura" },
+        { value: "apprentice", name: "Apprentice" },
+        { value: "moltack", name: "Moltack" },
+        { value: "codeSTACKr", name: "CodeSTACKr" },
+        { value: "rose_pine", name: "Rose Pine" },
+        { value: "catppuccin_latte", name: "Catppuccin Latte" },
+        { value: "catppuccin_mocha", name: "Catppuccin Mocha" },
+        { value: "date_night", name: "Date Night" },
+        { value: "one_dark_pro", name: "One Dark Pro" },
+        { value: "rose", name: "Rose" },
+        { value: "holi", name: "Holi" },
+        { value: "neon", name: "Neon" },
+        { value: "blue_navy", name: "Blue Navy" },
+        { value: "calm_pink", name: "Calm Pink" },
+        { value: "ambient_gradient", name: "Ambient Gradient (渐变配色)" }
+      ];
+
+      // Populate theme options dynamically
+      elTheme.innerHTML = "";
+      themes.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t.value;
+        opt.textContent = t.name;
+        if (t.value === "dark") {
+          opt.selected = true;
+        }
+        elTheme.appendChild(opt);
+      });
+      const elLayout = document.getElementById("layout");
+      const elLangsCount = document.getElementById("langs-count");
+      const elCustomTitle = document.getElementById("custom-title");
+      const elRepoName = document.getElementById("repo-name");
+      const elGistId = document.getElementById("gist-id");
+
+      // Checkboxes
+      const elShowIcons = document.getElementById("show-icons");
+      const elHideBorder = document.getElementById("hide-border");
+      const elHideProgress = document.getElementById("hide-progress");
+      const elTextBold = document.getElementById("text-bold");
+      const elShowOwner = document.getElementById("show-owner");
+
+      // Field sections
+      const elLayoutField = document.getElementById("layout-field");
+      const elLangsCountField = document.getElementById("langs-count-field");
+      const elRepoField = document.getElementById("repo-field");
+      const elGistField = document.getElementById("gist-field");
+
+      // Checkbox visual targets
+      const optShowIcons = document.getElementById("opt-show-icons");
+      const optHideProgress = document.getElementById("opt-hide-progress");
+      const optTextBold = document.getElementById("opt-text-bold");
+      const optShowOwner = document.getElementById("opt-show-owner");
+
+      // Output DOM
+      const previewBox = document.getElementById("preview-box");
+      const previewImage = document.getElementById("preview-image");
+      const markdownCode = document.getElementById("markdown-code");
+      const rawUrl = document.getElementById("raw-url");
+
+      function updateFieldsVisibility() {
+        const cardType = elCardType.value;
+        
+        // Hide all conditional areas first
+        elLayoutField.style.display = "none";
+        elLangsCountField.style.display = "none";
+        elRepoField.style.display = "none";
+        elGistField.style.display = "none";
+
+        optShowIcons.style.display = "none";
+        optHideProgress.style.display = "none";
+        optTextBold.style.display = "none";
+        optShowOwner.style.display = "none";
+
+        if (cardType === "stats") {
+          optShowIcons.style.display = "flex";
+          optTextBold.style.display = "flex";
+        } else if (cardType === "top-langs") {
+          elLayoutField.style.display = "block";
+          elLangsCountField.style.display = "block";
+          optHideProgress.style.display = "flex";
+        } else if (cardType === "repo") {
+          elRepoField.style.display = "block";
+          optShowOwner.style.display = "flex";
+        } else if (cardType === "gist") {
+          elGistField.style.display = "block";
+          optShowOwner.style.display = "flex";
+        } else if (cardType === "wakatime") {
+          elLayoutField.style.display = "block";
+          elLangsCountField.style.display = "block";
+          optHideProgress.style.display = "flex";
+        }
+      }
+
+      function buildURL() {
+        const username = elUsername.value.trim() || "Mintimate";
+        const cardType = elCardType.value;
+        const theme = elTheme.value;
+        const customTitle = elCustomTitle.value.trim();
+
+        let apiPath = "/api";
+        const params = new URLSearchParams();
+
+        if (cardType === "stats") {
+          apiPath = "/api";
+          params.set("username", username);
+          if (elShowIcons.checked) params.set("show_icons", "true");
+          if (!elTextBold.checked) params.set("text_bold", "false");
+        } else if (cardType === "top-langs") {
+          apiPath = "/api/top-langs";
+          params.set("username", username);
+          params.set("layout", elLayout.value);
+          params.set("langs_count", elLangsCount.value);
+          if (elHideProgress.checked) params.set("hide_progress", "true");
+        } else if (cardType === "repo") {
+          apiPath = "/api/pin";
+          params.set("username", username);
+          params.set("repo", elRepoName.value.trim() || "github-readme-stats-eo");
+          if (elShowOwner.checked) params.set("show_owner", "true");
+        } else if (cardType === "gist") {
+          apiPath = "/api/gist";
+          params.set("id", elGistId.value.trim() || "bbfce31e0217a3689c8d961a356cb10d");
+          if (elShowOwner.checked) params.set("show_owner", "true");
+        } else if (cardType === "wakatime") {
+          apiPath = "/api/wakatime";
+          params.set("username", username);
+          params.set("layout", elLayout.value === "compact" ? "compact" : "normal");
+          params.set("langs_count", elLangsCount.value);
+          if (elHideProgress.checked) params.set("hide_progress", "true");
+        }
+
+        // Common configurations
+        if (theme !== "default") {
+          params.set("theme", theme);
+        }
+        if (elHideBorder.checked) {
+          params.set("hide_border", "true");
+        }
+        if (customTitle) {
+          params.set("custom_title", customTitle);
+        }
+
+        const queryStr = params.toString() ? "?" + params.toString() : "";
+        return baseUrl + apiPath + queryStr;
+      }
+
+      function updatePreview() {
+        const fullUrl = buildURL();
+        previewBox.classList.add("loading");
+        previewImage.src = fullUrl;
+
+        // Code update
+        const cardNameMap = {
+          stats: "GitHub Stats",
+          "top-langs": "Top Languages",
+          repo: "Pinned Repo",
+          gist: "Gist Card",
+          wakatime: "WakaTime Stats"
+        };
+        const activeName = cardNameMap[elCardType.value] || "Card";
+
+        markdownCode.textContent = "![" + activeName + "](" + fullUrl + ")";
+        rawUrl.textContent = fullUrl;
+      }
+
+      // Hide loading spinner when image successfully loads or fails
+      previewImage.addEventListener("load", () => {
+        previewBox.classList.remove("loading");
+      });
+      previewImage.addEventListener("error", () => {
+        previewBox.classList.remove("loading");
+      });
+
+      // Bind events to trigger visual updates
+      [elUsername, elRepoName, elGistId, elLangsCount, elCustomTitle].forEach(input => {
+        input.addEventListener("input", updatePreview);
+      });
+      [elCardType, elTheme, elLayout].forEach(select => {
+        select.addEventListener("change", () => {
+          if (select === elCardType) {
+            updateFieldsVisibility();
+          }
+          updatePreview();
+        });
+      });
+      [elShowIcons, elHideBorder, elHideProgress, elTextBold, elShowOwner].forEach(checkbox => {
+        checkbox.addEventListener("change", updatePreview);
+      });
+
+      // Copy features
+      function bindCopyBtn(btnId, codeId) {
+        const btn = document.getElementById(btnId);
+        btn.addEventListener("click", () => {
+          const text = document.getElementById(codeId).textContent;
+          navigator.clipboard.writeText(text).then(() => {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"></path></svg> 已复制!';
+            btn.classList.add("copied");
+            setTimeout(() => {
+              btn.innerHTML = originalHTML;
+              btn.classList.remove("copied");
+            }, 2000);
+          }).catch(err => {
+            console.error("Failed to copy text: ", err);
+          });
+        });
+      }
+
+      bindCopyBtn("copy-markdown-btn", "markdown-code");
+      bindCopyBtn("copy-url-btn", "raw-url");
+
+      // Initial execution
+      updateFieldsVisibility();
+      updatePreview();
+    </script>
+  </body>
+</html>

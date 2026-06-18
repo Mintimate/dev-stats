@@ -3,34 +3,33 @@
     "command": "",
     "output": "."
   },
-  "routes": [
-    {
-      "source": "/",
-      "destination": "https://github.com/anuraghazra/github-readme-stats"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/api/*",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "image/svg+xml"
-        },
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        }
-      ]
-    }
-  ],
+  "routes": [],
+  "headers": [],
   "caches": [
     {
-      "source": "/api/*",
+      "source": "/api",
+      "cacheTtl": 86400
+    },
+    {
+      "source": "/api/top-langs",
+      "cacheTtl": 518400
+    },
+    {
+      "source": "/api/pin",
+      "cacheTtl": 864000
+    },
+    {
+      "source": "/api/gist",
+      "cacheTtl": 172800
+    },
+    {
+      "source": "/api/wakatime",
       "cacheTtl": 86400
     }
   ],
-  "nodeFunctionsConfig": {
-    "maxDuration": 30
+  "cloudFunctions": {
+    "go": {
+      "maxDuration": 30
+    }
   }
 }

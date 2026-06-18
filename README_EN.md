@@ -4,13 +4,14 @@ English | [简体中文](README.md)
 
 This project is based on the core code of [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats), adapted for deployment on [Tencent EdgeOne Pages](https://pages.edgeone.ai).
 
-The original project is deployed on Vercel. This version is specifically optimized for EdgeOne Pages Node Functions environment, providing the same API interfaces and features.
+The original project is deployed on Vercel. This version is adapted for EdgeOne Pages Cloud Functions and now includes a Go runtime implementation while keeping the same API interfaces and features.
 
 ## Features
 
 - **Dynamic Statistics Cards**: Display GitHub data (commits, PRs, stars, etc.)
 - **Multiple Themes**: Support for custom colors and layouts
-- **EdgeOne Pages Optimized**: Perfectly adapted for EdgeOne Pages deployment environment
+- **EdgeOne Pages Optimized**: Adapted for EdgeOne Pages Cloud Functions and platform caching
+- **Go Cloud Functions**: Adds a Go runtime entrypoint with fewer runtime dependencies
 - **Original API Compatible**: Maintains the same query parameters and usage as the original project
 
 ## Quick Start
@@ -55,17 +56,39 @@ This project requires the following environment variables to be configured in Ed
 
 > **Note**: EdgeOne Pages loads environment variables after deployment. After changing environment variables, you need to trigger a new deployment for the changes to take effect.
 
-## Known Limitations
+## Cache Strategy
 
-EdgeOne Pages entry nodes do not support per-request caching, and card API requests will go directly to the origin by default. It is recommended to add another layer of CDN (such as EdgeOne CDN / Cloudflare) in front of your custom domain to cache static responses, reducing GitHub API rate pressure (and request count limits).
+This project returns `Cache-Control` headers from the functions and configures Pages caching for the main card endpoints in `edgeone.json`:
 
-For example: I use EdgeOne site acceleration with EdgeOne Pages to achieve caching:
+- `/api`: cached for 1 day by default
+- `/api/top-langs`: cached for 6 days by default
+- `/api/pin`: cached for 10 days by default
+- `/api/gist`: cached for 2 days by default
+- `/api/wakatime`: cached for 1 day by default
+
+Status endpoints are not configured for platform caching, so PAT health and availability checks do not get cached for too long. High-traffic public instances can still place EdgeOne CDN / Cloudflare or another CDN layer in front of the custom domain for more cache control, purge support, and observability.
+
+For example: I use EdgeOne site acceleration in front of EdgeOne Pages for extra CDN cache control:
 
 ![Configure origin site as EdgeOne Pages](./docs/static/CdnOriginToCdnConfig.webp)
 
 Corresponding cache rules:
 
 ![Configured origin rules](./docs/static/OriginRulesConfig.webp)
+
+## Go Cloud Functions
+
+The Go entrypoint lives in `cloud-functions/[[default]].go` and uses EdgeOne Pages Cloud Functions Handler mode as a single catch-all file for `/`, `/api`, and `/api/*`. It currently covers:
+
+- `/api` - GitHub Stats Card
+- `/api/top-langs` - Top Languages Card
+- `/api/pin` - Repository Pin Card
+- `/api/gist` - Gist Card
+- `/api/wakatime` - WakaTime Stats Card
+- `/api/status/up` - PAT availability check
+- `/api/status/pat-info` - PAT status details
+
+Go Cloud Functions is now the primary implementation, and Node Functions have been removed. The current Go version prioritizes core data and SVG output while continuing to match common themes, layouts, and display parameters from the original project.
 
 ## Get GitHub Token (Classic)
 
