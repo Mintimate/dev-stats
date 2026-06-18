@@ -11,6 +11,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"sort"
@@ -32,11 +33,17 @@ type cachePolicy struct {
 }
 
 var cachePolicies = map[string]cachePolicy{
-	"stats":    {Default: 24 * 60 * 60, Min: 12 * 60 * 60, Max: 2 * 24 * 60 * 60},
-	"topLangs": {Default: 6 * 24 * 60 * 60, Min: 2 * 24 * 60 * 60, Max: 10 * 24 * 60 * 60},
-	"pin":      {Default: 10 * 24 * 60 * 60, Min: 24 * 60 * 60, Max: 10 * 24 * 60 * 60},
-	"gist":     {Default: 2 * 24 * 60 * 60, Min: 24 * 60 * 60, Max: 10 * 24 * 60 * 60},
-	"wakatime": {Default: 24 * 60 * 60, Min: 12 * 60 * 60, Max: 2 * 24 * 60 * 60},
+	"stats":                {Default: 24 * 60 * 60, Min: 12 * 60 * 60, Max: 2 * 24 * 60 * 60},
+	"topLangs":             {Default: 6 * 24 * 60 * 60, Min: 2 * 24 * 60 * 60, Max: 10 * 24 * 60 * 60},
+	"pin":                  {Default: 10 * 24 * 60 * 60, Min: 24 * 60 * 60, Max: 10 * 24 * 60 * 60},
+	"gist":                 {Default: 2 * 24 * 60 * 60, Min: 24 * 60 * 60, Max: 10 * 24 * 60 * 60},
+	"wakatime":             {Default: 24 * 60 * 60, Min: 12 * 60 * 60, Max: 2 * 24 * 60 * 60},
+	"streak":               {Default: 12 * 60 * 60, Min: 60 * 60, Max: 2 * 24 * 60 * 60},
+	"profileSummary":       {Default: 24 * 60 * 60, Min: 6 * 60 * 60, Max: 3 * 24 * 60 * 60},
+	"contributionCalendar": {Default: 12 * 60 * 60, Min: 60 * 60, Max: 2 * 24 * 60 * 60},
+	"recentActivity":       {Default: 60 * 60, Min: 5 * 60, Max: 12 * 60 * 60},
+	"repoLanguages":        {Default: 24 * 60 * 60, Min: 6 * 60 * 60, Max: 3 * 24 * 60 * 60},
+	"organization":         {Default: 24 * 60 * 60, Min: 6 * 60 * 60, Max: 3 * 24 * 60 * 60},
 }
 
 type graphQLResponse struct {
@@ -106,6 +113,72 @@ type wakatimeLanguage struct {
 	Text    string  `json:"text"`
 }
 
+type contributionDay struct {
+	Date  string
+	Count int
+}
+
+type streakData struct {
+	Name           string
+	Current        int
+	CurrentStart   string
+	CurrentEnd     string
+	Longest        int
+	LongestStart   string
+	LongestEnd     string
+	Total          int
+	FirstDate      string
+	LastDate       string
+	ContributionDays int
+}
+
+type profileSummaryData struct {
+	Name          string
+	Login         string
+	AvatarURL     string
+	Followers     int
+	Following     int
+	Repositories  int
+	Gists         int
+	TotalStars    int
+	TotalForks    int
+	TotalCommits  int
+	TotalPRs      int
+	TotalIssues   int
+	ActiveYears   []int
+	MemberSince   string
+}
+
+type activityItem struct {
+	Type       string
+	Repo       string
+	Title      string
+	Action     string
+	CreatedAt  string
+	URL        string
+}
+
+type repoLanguagesData struct {
+	Name          string
+	NameWithOwner string
+	TotalSize     int
+	Languages     []languageStat
+}
+
+type organizationData struct {
+	Name          string
+	Login         string
+	AvatarURL     string
+	Description   string
+	Repositories  int
+	Members       int
+	TotalStars    int
+	TotalForks    int
+	TotalIssues   int
+	TopRepository string
+	TopRepoStars  int
+}
+
 func Handler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
 		writeHomePage(w, r)
@@ -124,6 +197,18 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		handleGist(w, r)
 	case "/wakatime":
 		handleWakatime(w, r)
+	case "/streak":
+		handleStreak(w, r)
+	case "/profile-summary":
+		handleProfileSummary(w, r)
+	case "/contribution-calendar":
+		handleContributionCalendar(w, r)
+	case "/recent-activity":
+		handleRecentActivity(w, r)
+	case "/repo-languages":
+		handleRepoLanguages(w, r)
+	case "/org":
+		handleOrganization(w, r)
 	case "/status/up":
 		handleStatusUp(w, r)
 	case "/status/pat-info":
@@ -194,7 +279,6 @@ func writeHomePage(w http.ResponseWriter, r *http.Request) {
 </html>`, html.EscapeString(baseURL))
 }
 
-
 func normalizeAPIPath(path string) string {
 	if strings.HasPrefix(path, "/api") {
 		path = strings.TrimPrefix(path, "/api")
@@ -244,7 +328,7 @@ func handleTopLangs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cacheSeconds := resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["topLangs"])
-	writeSVG(w, cacheSeconds, renderTopLangsCard(langs, cardOptionsFromQuery(q), parseIntDefault(q.Get("langs_count"), 5), parseCSV(q.Get("hide"))))
+	writeSVG(w, cacheSeconds, renderTopLangsCard(langs, cardOptionsFromQuery(q), parseIntDefault(q.Get("langs_count"), 0), parseCSV(q.Get("hide"))))
 }
 
 func handlePin(w http.ResponseWriter, r *http.Request) {
@@ -302,6 +386,102 @@ func handleWakatime(w http.ResponseWriter, r *http.Request) {
 
 	cacheSeconds := resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["wakatime"])
 	writeSVG(w, cacheSeconds, renderWakatimeCard(data, cardOptionsFromQuery(q), parseIntDefault(q.Get("langs_count"), 5), parseCSV(q.Get("hide"))))
+}
+
+func handleStreak(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	username := q.Get("username")
+	if username == "" {
+		writeSVGError(w, "Missing username", "Use /api/streak?username=USERNAME")
+		return
+	}
+	client := newGitHubClient()
+	name, days, err := client.fetchContributionCalendar(r.Context(), username)
+	if err != nil {
+		writeSVGError(w, err.Error(), "GitHub API request failed")
+		return
+	}
+	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["streak"]), renderStreakCard(calculateStreak(name, days), cardOptionsFromQuery(q)))
+}
+
+func handleProfileSummary(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	username := q.Get("username")
+	if username == "" {
+		writeSVGError(w, "Missing username", "Use /api/profile-summary?username=USERNAME")
+		return
+	}
+	client := newGitHubClient()
+	data, err := client.fetchProfileSummary(r.Context(), username)
+	if err != nil {
+		writeSVGError(w, err.Error(), "GitHub API request failed")
+		return
+	}
+	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["profileSummary"]), renderProfileSummaryCard(data, cardOptionsFromQuery(q)))
+}
+
+func handleContributionCalendar(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	username := q.Get("username")
+	if username == "" {
+		writeSVGError(w, "Missing username", "Use /api/contribution-calendar?username=USERNAME")
+		return
+	}
+	client := newGitHubClient()
+	name, days, err := client.fetchContributionCalendar(r.Context(), username)
+	if err != nil {
+		writeSVGError(w, err.Error(), "GitHub API request failed")
+		return
+	}
+	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["contributionCalendar"]), renderContributionCalendarCard(name, days, cardOptionsFromQuery(q)))
+}
+
+func handleRecentActivity(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	username := q.Get("username")
+	if username == "" {
+		writeSVGError(w, "Missing username", "Use /api/recent-activity?username=USERNAME")
+		return
+	}
+	client := newGitHubClient()
+	items, err := client.fetchRecentActivity(r.Context(), username, parseIntDefault(q.Get("activity_count"), 5))
+	if err != nil {
+		writeSVGError(w, err.Error(), "GitHub API request failed")
+		return
+	}
+	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["recentActivity"]), renderRecentActivityCard(username, items, cardOptionsFromQuery(q)))
+}
+
+func handleRepoLanguages(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	username, repo := q.Get("username"), q.Get("repo")
+	if username == "" || repo == "" {
+		writeSVGError(w, "Missing username or repo", "Use /api/repo-languages?username=USERNAME&repo=REPO")
+		return
+	}
+	client := newGitHubClient()
+	data, err := client.fetchRepoLanguages(r.Context(), username, repo, parseIntDefault(q.Get("langs_count"), 6))
+	if err != nil {
+		writeSVGError(w, err.Error(), "GitHub API request failed")
+		return
+	}
+	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["repoLanguages"]), renderRepoLanguagesCard(data, cardOptionsFromQuery(q)))
+}
+
+func handleOrganization(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	org := q.Get("org")
+	if org == "" {
+		writeSVGError(w, "Missing organization", "Use /api/org?org=ORGANIZATION")
+		return
+	}
+	client := newGitHubClient()
+	data, err := client.fetchOrganization(r.Context(), org)
+	if err != nil {
+		writeSVGError(w, err.Error(), "GitHub API request failed")
+		return
+	}
+	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["organization"]), renderOrganizationCard(data, cardOptionsFromQuery(q)))
 }
 
 func handleStatusUp(w http.ResponseWriter, r *http.Request) {
@@ -966,6 +1146,7 @@ type cardOptions struct {
 	ShowIcons       bool
 	TextBold        bool
 	HideProgress    bool
+	HideRank        bool
 	DisableAnim     bool
 	CustomTitle     string
 	Theme           string
@@ -993,81 +1174,81 @@ type themeColors struct {
 }
 
 var builtinThemes = map[string]themeColors{
-	"default": {Title: "2f80ed", Icon: "4c71f2", Text: "434d58", Bg: "fffefe", Border: "e4e2e2"},
-	"default_repocard": {Title: "2f80ed", Icon: "586069", Text: "434d58", Bg: "fffefe", Border: ""},
-	"transparent": {Title: "006AFF", Icon: "0579C3", Text: "417E87", Bg: "ffffff00", Border: ""},
-	"shadow_red": {Title: "9A0000", Icon: "4F0000", Text: "444", Bg: "ffffff00", Border: "4F0000"},
-	"shadow_green": {Title: "007A00", Icon: "003D00", Text: "444", Bg: "ffffff00", Border: "003D00"},
-	"shadow_blue": {Title: "00779A", Icon: "004450", Text: "444", Bg: "ffffff00", Border: "004490"},
-	"dark": {Title: "fff", Icon: "79ff97", Text: "9f9f9f", Bg: "151515", Border: ""},
-	"radical": {Title: "fe428e", Icon: "f8d847", Text: "a9fef7", Bg: "141321", Border: ""},
-	"merko": {Title: "abd200", Icon: "b7d364", Text: "68b587", Bg: "0a0f0b", Border: ""},
-	"gruvbox": {Title: "fabd2f", Icon: "fe8019", Text: "8ec07c", Bg: "282828", Border: ""},
-	"gruvbox_light": {Title: "b57614", Icon: "af3a03", Text: "427b58", Bg: "fbf1c7", Border: ""},
-	"tokyonight": {Title: "70a5fd", Icon: "bf91f3", Text: "38bdae", Bg: "1a1b27", Border: ""},
-	"onedark": {Title: "e4bf7a", Icon: "8eb573", Text: "df6d74", Bg: "282c34", Border: ""},
-	"cobalt": {Title: "e683d9", Icon: "0480ef", Text: "75eeb2", Bg: "193549", Border: ""},
-	"synthwave": {Title: "e2e9ec", Icon: "ef8539", Text: "e5289e", Bg: "2b213a", Border: ""},
-	"highcontrast": {Title: "e7f216", Icon: "00ffff", Text: "fff", Bg: "000", Border: ""},
-	"dracula": {Title: "ff6e96", Icon: "79dafa", Text: "f8f8f2", Bg: "282a36", Border: ""},
-	"prussian": {Title: "bddfff", Icon: "38a0ff", Text: "6e93b5", Bg: "172f45", Border: ""},
-	"monokai": {Title: "eb1f6a", Icon: "e28905", Text: "f1f1eb", Bg: "272822", Border: ""},
-	"vue": {Title: "41b883", Icon: "41b883", Text: "273849", Bg: "fffefe", Border: ""},
-	"vue-dark": {Title: "41b883", Icon: "41b883", Text: "fffefe", Bg: "273849", Border: ""},
-	"shades-of-purple": {Title: "fad000", Icon: "b362ff", Text: "a599e9", Bg: "2d2b55", Border: ""},
-	"nightowl": {Title: "c792ea", Icon: "ffeb95", Text: "7fdbca", Bg: "011627", Border: ""},
-	"buefy": {Title: "7957d5", Icon: "ff3860", Text: "363636", Bg: "ffffff", Border: ""},
-	"blue-green": {Title: "2f97c1", Icon: "f5b700", Text: "0cf574", Bg: "040f0f", Border: ""},
-	"algolia": {Title: "00AEFF", Icon: "2DDE98", Text: "FFFFFF", Bg: "050F2C", Border: ""},
-	"great-gatsby": {Title: "ffa726", Icon: "ffb74d", Text: "ffd95b", Bg: "000000", Border: ""},
-	"darcula": {Title: "BA5F17", Icon: "84628F", Text: "BEBEBE", Bg: "242424", Border: ""},
-	"bear": {Title: "e03c8a", Icon: "00AEFF", Text: "bcb28d", Bg: "1f2023", Border: ""},
-	"solarized-dark": {Title: "268bd2", Icon: "b58900", Text: "859900", Bg: "002b36", Border: ""},
-	"solarized-light": {Title: "268bd2", Icon: "b58900", Text: "859900", Bg: "fdf6e3", Border: ""},
-	"chartreuse-dark": {Title: "7fff00", Icon: "00AEFF", Text: "fff", Bg: "000", Border: ""},
-	"nord": {Title: "81a1c1", Icon: "88c0d0", Text: "d8dee9", Bg: "2e3440", Border: ""},
-	"gotham": {Title: "2aa889", Icon: "599cab", Text: "99d1ce", Bg: "0c1014", Border: ""},
-	"material-palenight": {Title: "c792ea", Icon: "89ddff", Text: "a6accd", Bg: "292d3e", Border: ""},
-	"graywhite": {Title: "24292e", Icon: "24292e", Text: "24292e", Bg: "ffffff", Border: ""},
+	"default":              {Title: "2f80ed", Icon: "4c71f2", Text: "434d58", Bg: "fffefe", Border: "e4e2e2"},
+	"default_repocard":     {Title: "2f80ed", Icon: "586069", Text: "434d58", Bg: "fffefe", Border: ""},
+	"transparent":          {Title: "006AFF", Icon: "0579C3", Text: "417E87", Bg: "ffffff00", Border: ""},
+	"shadow_red":           {Title: "9A0000", Icon: "4F0000", Text: "444", Bg: "ffffff00", Border: "4F0000"},
+	"shadow_green":         {Title: "007A00", Icon: "003D00", Text: "444", Bg: "ffffff00", Border: "003D00"},
+	"shadow_blue":          {Title: "00779A", Icon: "004450", Text: "444", Bg: "ffffff00", Border: "004490"},
+	"dark":                 {Title: "fff", Icon: "79ff97", Text: "9f9f9f", Bg: "151515", Border: ""},
+	"radical":              {Title: "fe428e", Icon: "f8d847", Text: "a9fef7", Bg: "141321", Border: ""},
+	"merko":                {Title: "abd200", Icon: "b7d364", Text: "68b587", Bg: "0a0f0b", Border: ""},
+	"gruvbox":              {Title: "fabd2f", Icon: "fe8019", Text: "8ec07c", Bg: "282828", Border: ""},
+	"gruvbox_light":        {Title: "b57614", Icon: "af3a03", Text: "427b58", Bg: "fbf1c7", Border: ""},
+	"tokyonight":           {Title: "70a5fd", Icon: "bf91f3", Text: "38bdae", Bg: "1a1b27", Border: ""},
+	"onedark":              {Title: "e4bf7a", Icon: "8eb573", Text: "df6d74", Bg: "282c34", Border: ""},
+	"cobalt":               {Title: "e683d9", Icon: "0480ef", Text: "75eeb2", Bg: "193549", Border: ""},
+	"synthwave":            {Title: "e2e9ec", Icon: "ef8539", Text: "e5289e", Bg: "2b213a", Border: ""},
+	"highcontrast":         {Title: "e7f216", Icon: "00ffff", Text: "fff", Bg: "000", Border: ""},
+	"dracula":              {Title: "ff6e96", Icon: "79dafa", Text: "f8f8f2", Bg: "282a36", Border: ""},
+	"prussian":             {Title: "bddfff", Icon: "38a0ff", Text: "6e93b5", Bg: "172f45", Border: ""},
+	"monokai":              {Title: "eb1f6a", Icon: "e28905", Text: "f1f1eb", Bg: "272822", Border: ""},
+	"vue":                  {Title: "41b883", Icon: "41b883", Text: "273849", Bg: "fffefe", Border: ""},
+	"vue-dark":             {Title: "41b883", Icon: "41b883", Text: "fffefe", Bg: "273849", Border: ""},
+	"shades-of-purple":     {Title: "fad000", Icon: "b362ff", Text: "a599e9", Bg: "2d2b55", Border: ""},
+	"nightowl":             {Title: "c792ea", Icon: "ffeb95", Text: "7fdbca", Bg: "011627", Border: ""},
+	"buefy":                {Title: "7957d5", Icon: "ff3860", Text: "363636", Bg: "ffffff", Border: ""},
+	"blue-green":           {Title: "2f97c1", Icon: "f5b700", Text: "0cf574", Bg: "040f0f", Border: ""},
+	"algolia":              {Title: "00AEFF", Icon: "2DDE98", Text: "FFFFFF", Bg: "050F2C", Border: ""},
+	"great-gatsby":         {Title: "ffa726", Icon: "ffb74d", Text: "ffd95b", Bg: "000000", Border: ""},
+	"darcula":              {Title: "BA5F17", Icon: "84628F", Text: "BEBEBE", Bg: "242424", Border: ""},
+	"bear":                 {Title: "e03c8a", Icon: "00AEFF", Text: "bcb28d", Bg: "1f2023", Border: ""},
+	"solarized-dark":       {Title: "268bd2", Icon: "b58900", Text: "859900", Bg: "002b36", Border: ""},
+	"solarized-light":      {Title: "268bd2", Icon: "b58900", Text: "859900", Bg: "fdf6e3", Border: ""},
+	"chartreuse-dark":      {Title: "7fff00", Icon: "00AEFF", Text: "fff", Bg: "000", Border: ""},
+	"nord":                 {Title: "81a1c1", Icon: "88c0d0", Text: "d8dee9", Bg: "2e3440", Border: ""},
+	"gotham":               {Title: "2aa889", Icon: "599cab", Text: "99d1ce", Bg: "0c1014", Border: ""},
+	"material-palenight":   {Title: "c792ea", Icon: "89ddff", Text: "a6accd", Bg: "292d3e", Border: ""},
+	"graywhite":            {Title: "24292e", Icon: "24292e", Text: "24292e", Bg: "ffffff", Border: ""},
 	"vision-friendly-dark": {Title: "ffb000", Icon: "785ef0", Text: "ffffff", Bg: "000000", Border: ""},
-	"ayu-mirage": {Title: "f4cd7c", Icon: "73d0ff", Text: "c7c8c2", Bg: "1f2430", Border: ""},
-	"midnight-purple": {Title: "9745f5", Icon: "9f4bff", Text: "ffffff", Bg: "000000", Border: ""},
-	"calm": {Title: "e07a5f", Icon: "edae49", Text: "ebcfb2", Bg: "373f51", Border: ""},
-	"flag-india": {Title: "ff8f1c", Icon: "250E62", Text: "509E2F", Bg: "ffffff", Border: ""},
-	"omni": {Title: "FF79C6", Icon: "e7de79", Text: "E1E1E6", Bg: "191622", Border: ""},
-	"react": {Title: "61dafb", Icon: "61dafb", Text: "ffffff", Bg: "20232a", Border: ""},
-	"jolly": {Title: "ff64da", Icon: "a960ff", Text: "ffffff", Bg: "291B3E", Border: ""},
-	"maroongold": {Title: "F7EF8A", Icon: "F7EF8A", Text: "E0AA3E", Bg: "260000", Border: ""},
-	"yeblu": {Title: "ffff00", Icon: "ffff00", Text: "ffffff", Bg: "002046", Border: ""},
-	"blueberry": {Title: "82aaff", Icon: "89ddff", Text: "27e8a7", Bg: "242938", Border: ""},
-	"slateorange": {Title: "faa627", Icon: "faa627", Text: "ffffff", Bg: "36393f", Border: ""},
-	"kacho_ga": {Title: "bf4a3f", Icon: "a64833", Text: "d9c8a9", Bg: "402b23", Border: ""},
-	"outrun": {Title: "ffcc00", Icon: "ff1aff", Text: "8080ff", Bg: "141439", Border: ""},
-	"ocean_dark": {Title: "8957B2", Icon: "FFFFFF", Text: "92D534", Bg: "151A28", Border: ""},
-	"city_lights": {Title: "5D8CB3", Icon: "4798FF", Text: "718CA1", Bg: "1D252C", Border: ""},
-	"github_dark": {Title: "58A6FF", Icon: "1F6FEB", Text: "C3D1D9", Bg: "0D1117", Border: ""},
-	"github_dark_dimmed": {Title: "539bf5", Icon: "539bf5", Text: "ADBAC7", Bg: "24292F", Border: "373E47"},
-	"discord_old_blurple": {Title: "7289DA", Icon: "7289DA", Text: "FFFFFF", Bg: "2C2F33", Border: ""},
-	"aura_dark": {Title: "ff7372", Icon: "6cffd0", Text: "dbdbdb", Bg: "252334", Border: ""},
-	"panda": {Title: "19f9d899", Icon: "19f9d899", Text: "FF75B5", Bg: "31353a", Border: ""},
-	"noctis_minimus": {Title: "d3b692", Icon: "72b7c0", Text: "c5cdd3", Bg: "1b2932", Border: ""},
-	"cobalt2": {Title: "ffc600", Icon: "ffffff", Text: "0088ff", Bg: "193549", Border: ""},
-	"swift": {Title: "000000", Icon: "f05237", Text: "000000", Bg: "f7f7f7", Border: ""},
-	"aura": {Title: "a277ff", Icon: "ffca85", Text: "61ffca", Bg: "15141b", Border: ""},
-	"apprentice": {Title: "ffffff", Icon: "ffffaf", Text: "bcbcbc", Bg: "262626", Border: ""},
-	"moltack": {Title: "86092C", Icon: "86092C", Text: "574038", Bg: "F5E1C0", Border: ""},
-	"codeSTACKr": {Title: "ff652f", Icon: "FFE400", Text: "ffffff", Bg: "09131B", Border: "0c1a25"},
-	"rose_pine": {Title: "9ccfd8", Icon: "ebbcba", Text: "e0def4", Bg: "191724", Border: ""},
-	"catppuccin_latte": {Title: "137980", Icon: "8839ef", Text: "4c4f69", Bg: "eff1f5", Border: ""},
-	"catppuccin_mocha": {Title: "94e2d5", Icon: "cba6f7", Text: "cdd6f4", Bg: "1e1e2e", Border: ""},
-	"date_night": {Title: "DA7885", Icon: "BB8470", Text: "E1B2A2", Bg: "170F0C", Border: "170F0C"},
-	"one_dark_pro": {Title: "61AFEF", Icon: "C678DD", Text: "E5C06E", Bg: "23272E", Border: "3B4048"},
-	"rose": {Title: "8d192b", Icon: "B71F36", Text: "862931", Bg: "e9d8d4", Border: "e9d8d4"},
-	"holi": {Title: "5FABEE", Icon: "5FABEE", Text: "D6E7FF", Bg: "030314", Border: "85A4C0"},
-	"neon": {Title: "00EAD3", Icon: "00EAD3", Text: "FF449F", Bg: "000000", Border: "ffffff"},
-	"blue_navy": {Title: "82AAFF", Icon: "82AAFF", Text: "82AAFF", Bg: "000000", Border: "ffffff"},
-	"calm_pink": {Title: "e07a5f", Icon: "ebcfb2", Text: "edae49", Bg: "2b2d40", Border: "e1bc29"},
-	"ambient_gradient": {Title: "ffffff", Icon: "ffffff", Text: "ffffff", Bg: "35,4158d0,c850c0,ffcc70", Border: ""},
+	"ayu-mirage":           {Title: "f4cd7c", Icon: "73d0ff", Text: "c7c8c2", Bg: "1f2430", Border: ""},
+	"midnight-purple":      {Title: "9745f5", Icon: "9f4bff", Text: "ffffff", Bg: "000000", Border: ""},
+	"calm":                 {Title: "e07a5f", Icon: "edae49", Text: "ebcfb2", Bg: "373f51", Border: ""},
+	"flag-india":           {Title: "ff8f1c", Icon: "250E62", Text: "509E2F", Bg: "ffffff", Border: ""},
+	"omni":                 {Title: "FF79C6", Icon: "e7de79", Text: "E1E1E6", Bg: "191622", Border: ""},
+	"react":                {Title: "61dafb", Icon: "61dafb", Text: "ffffff", Bg: "20232a", Border: ""},
+	"jolly":                {Title: "ff64da", Icon: "a960ff", Text: "ffffff", Bg: "291B3E", Border: ""},
+	"maroongold":           {Title: "F7EF8A", Icon: "F7EF8A", Text: "E0AA3E", Bg: "260000", Border: ""},
+	"yeblu":                {Title: "ffff00", Icon: "ffff00", Text: "ffffff", Bg: "002046", Border: ""},
+	"blueberry":            {Title: "82aaff", Icon: "89ddff", Text: "27e8a7", Bg: "242938", Border: ""},
+	"slateorange":          {Title: "faa627", Icon: "faa627", Text: "ffffff", Bg: "36393f", Border: ""},
+	"kacho_ga":             {Title: "bf4a3f", Icon: "a64833", Text: "d9c8a9", Bg: "402b23", Border: ""},
+	"outrun":               {Title: "ffcc00", Icon: "ff1aff", Text: "8080ff", Bg: "141439", Border: ""},
+	"ocean_dark":           {Title: "8957B2", Icon: "FFFFFF", Text: "92D534", Bg: "151A28", Border: ""},
+	"city_lights":          {Title: "5D8CB3", Icon: "4798FF", Text: "718CA1", Bg: "1D252C", Border: ""},
+	"github_dark":          {Title: "58A6FF", Icon: "1F6FEB", Text: "C3D1D9", Bg: "0D1117", Border: ""},
+	"github_dark_dimmed":   {Title: "539bf5", Icon: "539bf5", Text: "ADBAC7", Bg: "24292F", Border: "373E47"},
+	"discord_old_blurple":  {Title: "7289DA", Icon: "7289DA", Text: "FFFFFF", Bg: "2C2F33", Border: ""},
+	"aura_dark":            {Title: "ff7372", Icon: "6cffd0", Text: "dbdbdb", Bg: "252334", Border: ""},
+	"panda":                {Title: "19f9d899", Icon: "19f9d899", Text: "FF75B5", Bg: "31353a", Border: ""},
+	"noctis_minimus":       {Title: "d3b692", Icon: "72b7c0", Text: "c5cdd3", Bg: "1b2932", Border: ""},
+	"cobalt2":              {Title: "ffc600", Icon: "ffffff", Text: "0088ff", Bg: "193549", Border: ""},
+	"swift":                {Title: "000000", Icon: "f05237", Text: "000000", Bg: "f7f7f7", Border: ""},
+	"aura":                 {Title: "a277ff", Icon: "ffca85", Text: "61ffca", Bg: "15141b", Border: ""},
+	"apprentice":           {Title: "ffffff", Icon: "ffffaf", Text: "bcbcbc", Bg: "262626", Border: ""},
+	"moltack":              {Title: "86092C", Icon: "86092C", Text: "574038", Bg: "F5E1C0", Border: ""},
+	"codeSTACKr":           {Title: "ff652f", Icon: "FFE400", Text: "ffffff", Bg: "09131B", Border: "0c1a25"},
+	"rose_pine":            {Title: "9ccfd8", Icon: "ebbcba", Text: "e0def4", Bg: "191724", Border: ""},
+	"catppuccin_latte":     {Title: "137980", Icon: "8839ef", Text: "4c4f69", Bg: "eff1f5", Border: ""},
+	"catppuccin_mocha":     {Title: "94e2d5", Icon: "cba6f7", Text: "cdd6f4", Bg: "1e1e2e", Border: ""},
+	"date_night":           {Title: "DA7885", Icon: "BB8470", Text: "E1B2A2", Bg: "170F0C", Border: "170F0C"},
+	"one_dark_pro":         {Title: "61AFEF", Icon: "C678DD", Text: "E5C06E", Bg: "23272E", Border: "3B4048"},
+	"rose":                 {Title: "8d192b", Icon: "B71F36", Text: "862931", Bg: "e9d8d4", Border: "e9d8d4"},
+	"holi":                 {Title: "5FABEE", Icon: "5FABEE", Text: "D6E7FF", Bg: "030314", Border: "85A4C0"},
+	"neon":                 {Title: "00EAD3", Icon: "00EAD3", Text: "FF449F", Bg: "000000", Border: "ffffff"},
+	"blue_navy":            {Title: "82AAFF", Icon: "82AAFF", Text: "82AAFF", Bg: "000000", Border: "ffffff"},
+	"calm_pink":            {Title: "e07a5f", Icon: "ebcfb2", Text: "edae49", Bg: "2b2d40", Border: "e1bc29"},
+	"ambient_gradient":     {Title: "ffffff", Icon: "ffffff", Text: "ffffff", Bg: "35,4158d0,c850c0,ffcc70", Border: ""},
 }
 
 func cardOptionsFromQuery(q map[string][]string) cardOptions {
@@ -1106,6 +1287,7 @@ func cardOptionsFromQuery(q map[string][]string) cardOptions {
 		ShowIcons:       parseBool(get("show_icons")),
 		TextBold:        get("text_bold") == "" || parseBool(get("text_bold")),
 		HideProgress:    parseBool(get("hide_progress")),
+		HideRank:        parseBool(get("hide_rank")),
 		DisableAnim:     parseBool(get("disable_animations")),
 		CustomTitle:     get("custom_title"),
 		Theme:           themeName,
@@ -1131,7 +1313,11 @@ func renderStatsCard(data statsData, opts cardOptions) string {
 	}
 	width := opts.CardWidth
 	if width < 287 {
-		width = 495
+		if opts.HideRank {
+			width = 287
+		} else {
+			width = 450
+		}
 	}
 	lineHeight := opts.LineHeight
 	if lineHeight < 18 {
@@ -1166,6 +1352,14 @@ func renderStatsCard(data statsData, opts cardOptions) string {
 			icon  string
 		}{"prs_merged_percentage", "Merged PRs Percentage", fmt.Sprintf("%.1f%%", data.MergedPRsPercentage), svgIconPRs})
 	}
+	if showSet["reviews"] {
+		stats = append(stats, struct {
+			key   string
+			label string
+			value string
+			icon  string
+		}{"reviews", "Reviews", formatNumberWithOptions(data.TotalReviews, opts), svgIconPRs})
+	}
 	if showSet["discussions_started"] {
 		stats = append(stats, struct {
 			key   string
@@ -1190,9 +1384,12 @@ func renderStatsCard(data statsData, opts cardOptions) string {
 		}
 		rows = append(rows, statRow(stat.label, stat.value, stat.icon, 58+len(rows)*lineHeight, opts))
 	}
-	rankX := width - 95
-	rank := renderRank(opts, data.RankLevel, data.RankPercentile, rankX, 96)
-	height := max(150, 55+len(rows)*lineHeight+35)
+	rank := ""
+	if !opts.HideRank {
+		rankX := width - 105
+		rank = renderRank(opts, data.RankLevel, data.RankPercentile, rankX, 75)
+	}
+	height := max(150, 45+(len(rows)+1)*lineHeight)
 	return cardSVG(width, height, opts, title, strings.Join(rows, ""), rank)
 }
 
@@ -1277,7 +1474,7 @@ func applyTheme(opts cardOptions, name string) cardOptions {
 
 func renderTopLangsCard(langs []languageStat, opts cardOptions, count int, hide []string) string {
 	if count <= 0 || count > 20 {
-		if opts.Layout == "compact" || opts.Layout == "pie" || opts.Layout == "donut-vertical" {
+		if opts.Layout == "compact" || opts.Layout == "pie" || opts.Layout == "donut-vertical" || opts.HideProgress {
 			count = 6
 		} else {
 			count = 5
@@ -1288,45 +1485,76 @@ func renderTopLangsCard(langs []languageStat, opts cardOptions, count int, hide 
 	if title == "" {
 		title = "Most Used Languages"
 	}
+	if len(filtered) == 0 {
+		width := opts.CardWidth
+		if width < 280 {
+			width = 300
+		}
+		height := 90
+		y := 66
+		if opts.HideTitle {
+			height = 60
+			y = 36
+		}
+		return cardSVG(width, height, opts, title, fmt.Sprintf(`<text x="25" y="%d" class="stat bold">No languages data</text>`, y), "")
+	}
 	switch opts.Layout {
 	case "compact":
 		return renderCompactLangs(filtered, total, opts, title)
 	case "donut", "donut-vertical", "pie":
 		return renderDonutLangs(filtered, total, opts, title)
 	default:
+		if opts.HideProgress {
+			return renderCompactLangs(filtered, total, opts, title)
+		}
 		return renderNormalLangs(filtered, total, opts, title)
 	}
 }
 
 func renderNormalLangs(filtered []languageStat, total float64, opts cardOptions, title string) string {
+	width := opts.CardWidth
+	if width < 280 {
+		width = 300
+	}
+	contentWidth := float64(width - 95)
+	contentOffset := 0
+	if opts.HideTitle {
+		contentOffset = -30
+	}
 	rows := strings.Builder{}
 	for i, lang := range filtered {
 		percent := percentOf(lang.Size, total)
-		y := 55 + i*45
-		barWidth := 300.0
+		y := 55 + contentOffset + i*40
 		display := langDisplayValue(lang.Size, percent, opts.StatsFormat)
 		progress := ""
 		if !opts.HideProgress {
-			progress = fmt.Sprintf(`<text x="305" y="32" class="muted">%s</text><rect x="0" y="24" width="300" height="8" rx="5" fill="#ddd" opacity=".35"/><rect x="0" y="24" width="%.1f" height="8" rx="5" fill="%s"/>`, html.EscapeString(display), barWidth*percent/100, lang.Color)
+			progress = fmt.Sprintf(`<text x="%.1f" y="34" class="lang-name">%s</text><rect x="0" y="25" width="%.1f" height="8" rx="5" fill="#ddd" opacity=".35"/><rect x="0" y="25" width="%.1f" height="8" rx="5" fill="%s"/>`, contentWidth+10, html.EscapeString(display), contentWidth, contentWidth*percent/100, lang.Color)
 		}
 		rows.WriteString(fmt.Sprintf(`<g transform="translate(25,%d)"><text class="lang-name" x="0" y="15">%s</text>%s</g>`, y, html.EscapeString(lang.Name), progress))
 	}
-	height := max(120, 60+len(filtered)*45+15)
-	return cardSVG(495, height, opts, title, rows.String(), "")
+	height := 45 + (len(filtered)+1)*40
+	if opts.HideTitle {
+		height -= 30
+	}
+	return cardSVG(width, max(90, height), opts, title, rows.String(), "")
 }
 
 func renderCompactLangs(filtered []languageStat, total float64, opts cardOptions, title string) string {
 	width := opts.CardWidth
-	if width < 300 {
-		width = 350
+	if width < 280 {
+		width = 300
+	}
+	contentOffset := 0
+	if opts.HideTitle {
+		contentOffset = -30
 	}
 	rows := strings.Builder{}
 	for i, lang := range filtered {
 		percent := percentOf(lang.Size, total)
 		col := i % 2
 		row := i / 2
-		x := 25 + col*150
-		y := 65 + row*25
+		x := 25 + col*((width-50)/2)
+		y := 65 + contentOffset + row*25
 		label := lang.Name
 		if !opts.HideProgress {
 			label = fmt.Sprintf("%s %.2f%%", label, percent)
@@ -1334,17 +1562,28 @@ func renderCompactLangs(filtered []languageStat, total float64, opts cardOptions
 		rows.WriteString(fmt.Sprintf(`<g transform="translate(%d,%d)"><circle cx="5" cy="6" r="5" fill="%s"/><text x="17" y="10" class="lang-name">%s</text></g>`, x, y, lang.Color, html.EscapeString(label)))
 	}
 	height := max(90, 90+((len(filtered)+1)/2)*25)
+	if opts.HideTitle {
+		height -= 30
+	}
 	return cardSVG(width, height, opts, title, rows.String(), "")
 }
 
 func renderDonutLangs(filtered []languageStat, total float64, opts cardOptions, title string) string {
 	legend := strings.Builder{}
+	contentOffset := 0
+	if opts.HideTitle {
+		contentOffset = -30
+	}
 	width := 467
-	cx, cy, r := 340.0, 125.0, 62.0
+	cx, cy, r := 340.0, 125.0+float64(contentOffset), 62.0
 	isVertical := opts.Layout == "donut-vertical" || opts.Layout == "pie"
 	if isVertical {
 		width = 300
-		cx, cy = 150.0, 110.0
+		cx, cy = 150.0, 155.0+float64(contentOffset)
+		r = 80
+		if opts.Layout == "pie" {
+			r = 90
+		}
 	}
 	chart := strings.Builder{}
 	start := -90.0
@@ -1354,14 +1593,18 @@ func renderDonutLangs(filtered []languageStat, total float64, opts cardOptions, 
 			col := i % 2
 			row := i / 2
 			x := 25 + col*135
-			y := 190 + row*22
+			y := 275 + contentOffset + row*25
 			legend.WriteString(fmt.Sprintf(`<g transform="translate(%d,%d)"><circle cx="5" cy="6" r="5" fill="%s"/><text x="17" y="10" class="lang-name">%s %.2f%%</text></g>`, x, y, lang.Color, html.EscapeString(lang.Name), percent))
 		} else {
-			y := 70 + i*32
+			y := 55 + contentOffset + i*32
 			legend.WriteString(fmt.Sprintf(`<g transform="translate(25,%d)"><circle cx="5" cy="6" r="5" fill="%s"/><text x="22" y="11" class="lang-name">%s %.2f%%</text></g>`, y, lang.Color, html.EscapeString(lang.Name), percent))
 		}
 		if opts.Layout == "pie" {
-			chart.WriteString(pieSlice(cx, cy, r, start, start+percent*3.6, lang.Color))
+			if len(filtered) == 1 {
+				chart.WriteString(fmt.Sprintf(`<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>`, cx, cy, r, lang.Color))
+			} else {
+				chart.WriteString(pieSlice(cx, cy, r, start, start+percent*3.6, lang.Color))
+			}
 		} else {
 			chart.WriteString(donutArc(cx, cy, r, start, start+percent*3.6, lang.Color))
 		}
@@ -1374,9 +1617,12 @@ func renderDonutLangs(filtered []languageStat, total float64, opts cardOptions, 
 		}
 		chart.WriteString(fmt.Sprintf(`<circle cx="%.1f" cy="%.1f" r="38" fill="%s"/>`, cx, cy, innerBg))
 	}
-	height := 245
+	height := 215 + max(len(filtered)-5, 0)*32
 	if isVertical {
-		height = 315
+		height = 300 + ((len(filtered)+1)/2)*25
+	}
+	if opts.HideTitle {
+		height -= 30
 	}
 	return cardSVG(width, height, opts, title, legend.String()+chart.String(), "")
 }

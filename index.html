@@ -4,18 +4,28 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>GitHub Readme Stats · EdgeOne</title>
-    <meta name="description" content="基于 EdgeOne Pages Go Cloud Functions 部署的 GitHub Readme Stats 卡片生成工具，支持动态统计、最常使用语言、仓库卡片及 WakaTime 数据可视化展示。" />
+    <meta
+      name="description"
+      content="基于 EdgeOne Pages Go Cloud Functions 部署的 GitHub Readme Stats 卡片生成工具，支持动态统计、最常使用语言、仓库卡片及 WakaTime 数据可视化展示。"
+    />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    
+
     <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
 
     <style>
       :root {
         --bg: #070913;
-        --bg-gradient: radial-gradient(circle at 50% 0%, #0d162f 0%, #070913 70%);
+        --bg-gradient: radial-gradient(
+          circle at 50% 0%,
+          #0d162f 0%,
+          #070913 70%
+        );
         --panel: rgba(13, 20, 38, 0.45);
         --panel-border: rgba(255, 255, 255, 0.08);
         --panel-hover: rgba(19, 29, 56, 0.6);
@@ -38,7 +48,7 @@
       body {
         background: var(--bg-gradient);
         color: var(--text);
-        font-family: 'Inter', "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
         min-height: 100vh;
         display: flex;
         flex-direction: column;
@@ -49,30 +59,39 @@
       /* Grid Line Pattern Overlay */
       body::before {
         content: "";
-        position: absolute;
+        position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 600px;
-        background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-                          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
         background-size: 40px 40px;
         background-position: center top;
-        mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
-        -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
+        mask-image: linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, 1),
+          rgba(0, 0, 0, 0)
+        );
+        -webkit-mask-image: linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, 1),
+          rgba(0, 0, 0, 0)
+        );
         z-index: -1;
         pointer-events: none;
       }
 
       main {
-        width: min(1200px, calc(100% - 32px));
+        width: min(1320px, calc(100% - 40px));
         margin: 0 auto;
-        padding: 60px 0 80px;
+        padding: 48px 0 72px;
       }
 
       header {
         text-align: center;
-        margin-bottom: 48px;
+        margin-bottom: 36px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -105,7 +124,7 @@
       }
 
       h1 {
-        font-family: 'Outfit', sans-serif;
+        font-family: "Outfit", sans-serif;
         font-size: clamp(32px, 5vw, 56px);
         font-weight: 800;
         line-height: 1.1;
@@ -125,23 +144,23 @@
 
       .dashboard {
         display: grid;
-        grid-template-columns: 420px minmax(0, 1fr);
-        gap: 32px;
+        grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
+        gap: 24px;
         align-items: start;
       }
 
       .card {
         background: var(--panel);
         border: 1px solid var(--panel-border);
-        border-radius: 16px;
+        border-radius: 18px;
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
-        padding: 28px;
+        padding: 24px;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
       }
 
       h2 {
-        font-family: 'Outfit', sans-serif;
+        font-family: "Outfit", sans-serif;
         font-size: 20px;
         font-weight: 600;
         margin-bottom: 20px;
@@ -231,10 +250,17 @@
         width: 8px;
         height: 8px;
         background: white;
-        clip-path: polygon(28% 38%, 41% 53%, 75% 24%, 86% 34%, 40% 78%, 18% 50%);
+        clip-path: polygon(
+          28% 38%,
+          41% 53%,
+          75% 24%,
+          86% 34%,
+          40% 78%,
+          18% 50%
+        );
       }
 
-      .checkbox-control:hover color {
+      .checkbox-control:hover {
         color: var(--text);
       }
 
@@ -249,18 +275,70 @@
         background: rgba(3, 7, 18, 0.3);
         border: 1px solid var(--panel-border);
         border-radius: 16px;
-        padding: 40px;
+        padding: 32px;
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 280px;
+        min-height: 360px;
         position: relative;
         overflow: hidden;
+      }
+
+      .preview-box::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+          linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.025) 1px,
+            transparent 1px
+          );
+        background-size: 28px 28px;
+        mask-image: radial-gradient(circle at center, black, transparent 78%);
+        pointer-events: none;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+
+      .section-heading h2 {
+        margin-bottom: 0;
+      }
+
+      .preview-status {
+        color: var(--muted);
+        font:
+          500 12px "SFMono-Regular",
+          Consolas,
+          monospace;
+        white-space: nowrap;
+      }
+
+      .preview-error {
+        display: none;
+        max-width: 360px;
+        color: #fca5a5;
+        font-size: 14px;
+        line-height: 1.6;
+        text-align: center;
+        z-index: 2;
+      }
+
+      .preview-box.has-error .preview-error {
+        display: block;
       }
 
       /* Grid for preview layout card sizes */
       #preview-image {
         max-width: 100%;
+        max-height: 520px;
         height: auto;
         border-radius: 6px;
         z-index: 1;
@@ -283,6 +361,10 @@
 
       .preview-box.loading #preview-image {
         opacity: 0.3;
+      }
+
+      .preview-box.has-error #preview-image {
+        display: none;
       }
 
       .preview-box.loading .loader {
@@ -348,10 +430,12 @@
       pre {
         padding: 16px;
         overflow-x: auto;
+        max-height: 180px;
       }
 
       code {
-        font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
         font-size: 13.5px;
         color: #e5e7eb;
         line-height: 1.5;
@@ -375,7 +459,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        font-family: 'Outfit', sans-serif;
+        font-family: "Outfit", sans-serif;
         font-size: 16px;
         font-weight: 600;
         transition: background 0.2s;
@@ -411,7 +495,9 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
-        transition: transform 0.2s, border-color 0.2s;
+        transition:
+          transform 0.2s,
+          border-color 0.2s;
       }
 
       .endpoint-card:hover {
@@ -498,17 +584,31 @@
 
       /* Animations */
       @keyframes spin {
-        to { transform: rotate(360deg); }
+        to {
+          transform: rotate(360deg);
+        }
       }
 
       @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-        70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        0% {
+          box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+        }
+        70% {
+          box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+        }
       }
 
       /* Responsive */
-      @media (max-width: 960px) {
+      @media (max-width: 1080px) {
+        .dashboard {
+          grid-template-columns: 350px minmax(0, 1fr);
+        }
+      }
+
+      @media (max-width: 860px) {
         .dashboard {
           grid-template-columns: 1fr;
         }
@@ -518,16 +618,43 @@
       }
 
       @media (max-width: 480px) {
+        main {
+          width: min(100% - 20px, 1320px);
+          padding-top: 28px;
+        }
+        header {
+          margin-bottom: 28px;
+        }
+        .card {
+          padding: 18px;
+          border-radius: 14px;
+        }
         .checkbox-grid {
           grid-template-columns: 1fr;
         }
         .preview-box {
-          padding: 20px;
+          min-height: 240px;
+          padding: 16px;
+        }
+        .section-heading {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 6px;
         }
         .footer-content {
           flex-direction: column;
           gap: 12px;
           text-align: center;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          scroll-behavior: auto !important;
         }
       }
     </style>
@@ -538,7 +665,8 @@
         <span class="badge">Go Cloud Functions</span>
         <h1>GitHub Readme Stats · EdgeOne</h1>
         <p class="lead">
-          在 Tencent EdgeOne Pages Edge 边缘侧极致加速的统计卡片生成器，提供极速响应的动态 SVG 数据渲染服务。
+          在 Tencent EdgeOne Pages Edge
+          边缘侧极致加速的统计卡片生成器，提供极速响应的动态 SVG 数据渲染服务。
         </p>
       </header>
 
@@ -546,10 +674,16 @@
         <!-- Configuration Card -->
         <section class="card">
           <h2>配置面板</h2>
-          
+
           <div class="form-group">
             <label for="username">GitHub 用户名</label>
-            <input type="text" id="username" class="input-control" value="Mintimate" placeholder="输入您的用户名" />
+            <input
+              type="text"
+              id="username"
+              class="input-control"
+              value="Mintimate"
+              placeholder="输入您的用户名"
+            />
           </div>
 
           <div class="form-group">
@@ -564,15 +698,27 @@
           </div>
 
           <!-- Dynamic Repo Card fields -->
-          <div class="form-group" id="repo-field" style="display: none;">
+          <div class="form-group" id="repo-field" style="display: none">
             <label for="repo-name">仓库名称</label>
-            <input type="text" id="repo-name" class="input-control" value="github-readme-stats-eo" placeholder="输入仓库名" />
+            <input
+              type="text"
+              id="repo-name"
+              class="input-control"
+              value="github-readme-stats-eo"
+              placeholder="输入仓库名"
+            />
           </div>
 
           <!-- Dynamic Gist Card fields -->
-          <div class="form-group" id="gist-field" style="display: none;">
+          <div class="form-group" id="gist-field" style="display: none">
             <label for="gist-id">Gist ID</label>
-            <input type="text" id="gist-id" class="input-control" value="bbfce31e0217a3689c8d961a356cb10d" placeholder="输入 Gist ID" />
+            <input
+              type="text"
+              id="gist-id"
+              class="input-control"
+              value="bbfce31e0217a3689c8d961a356cb10d"
+              placeholder="输入 Gist ID"
+            />
           </div>
 
           <div class="form-group">
@@ -587,7 +733,7 @@
           </div>
 
           <!-- Layout field (only for top-langs & wakatime) -->
-          <div class="form-group" id="layout-field" style="display: none;">
+          <div class="form-group" id="layout-field" style="display: none">
             <label for="layout">展示布局</label>
             <select id="layout" class="input-control">
               <option value="compact">Compact (紧凑列表)</option>
@@ -598,14 +744,27 @@
             </select>
           </div>
 
-          <div class="form-group" id="langs-count-field" style="display: none;">
+          <div class="form-group" id="langs-count-field" style="display: none">
             <label for="langs-count">展示语言数量</label>
-            <input type="number" id="langs-count" class="input-control" value="6" min="1" max="20" />
+            <input
+              type="number"
+              id="langs-count"
+              class="input-control"
+              value="6"
+              min="1"
+              max="20"
+            />
           </div>
 
           <div class="form-group">
             <label for="custom-title">自定义标题</label>
-            <input type="text" id="custom-title" class="input-control" value="" placeholder="默认标题" />
+            <input
+              type="text"
+              id="custom-title"
+              class="input-control"
+              value=""
+              placeholder="默认标题"
+            />
           </div>
 
           <div class="form-group">
@@ -627,7 +786,11 @@
                 <input type="checkbox" id="text-bold" checked />
                 <span>粗体文本</span>
               </label>
-              <label class="checkbox-control" id="opt-show-owner" style="display: none;">
+              <label
+                class="checkbox-control"
+                id="opt-show-owner"
+                style="display: none"
+              >
                 <input type="checkbox" id="show-owner" />
                 <span>显示拥有者</span>
               </label>
@@ -638,21 +801,51 @@
         <!-- Preview & Output Pane -->
         <section class="preview-pane">
           <div class="card">
-            <h2>实时预览</h2>
+            <div class="section-heading">
+              <h2>实时预览</h2>
+              <span
+                class="preview-status"
+                id="preview-status"
+                aria-live="polite"
+                >准备加载</span
+              >
+            </div>
             <div class="preview-box" id="preview-box">
               <div class="loader"></div>
               <img id="preview-image" alt="Realtime preview" />
+              <p class="preview-error" id="preview-error">
+                卡片加载失败，请检查用户名或接口参数。
+              </p>
             </div>
           </div>
 
           <div class="card output-box">
             <h2>获取代码</h2>
-            
+
             <div class="code-container">
               <div class="code-header">
                 <span>Markdown 引用</span>
                 <button class="copy-btn" id="copy-markdown-btn">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <rect
+                      x="9"
+                      y="9"
+                      width="13"
+                      height="13"
+                      rx="2"
+                      ry="2"
+                    ></rect>
+                    <path
+                      d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                    ></path>
+                  </svg>
                   复制
                 </button>
               </div>
@@ -663,7 +856,21 @@
               <div class="code-header">
                 <span>直链 URL</span>
                 <button class="copy-btn" id="copy-url-btn">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"
+                    ></path>
+                    <path
+                      d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
+                    ></path>
+                  </svg>
                   复制
                 </button>
               </div>
@@ -677,7 +884,18 @@
       <section class="docs-section">
         <button class="docs-toggle" id="docs-toggle">
           <span>查看所有底层 API 参考</span>
-          <svg id="docs-toggle-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transform: rotate(0deg); transition: transform 0.2s;"><path d="M6 9l6 6 6-6"></path></svg>
+          <svg
+            id="docs-toggle-arrow"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            style="transform: rotate(0deg); transition: transform 0.2s"
+          >
+            <path d="M6 9l6 6 6-6"></path>
+          </svg>
         </button>
         <div class="docs-content" id="docs-content">
           <div class="endpoint-grid" id="endpoint-grid"></div>
@@ -689,8 +907,18 @@
       <div class="footer-content">
         <span>Powered by Tencent EdgeOne Pages · 极速边缘节点</span>
         <div class="footer-links">
-          <a href="https://github.com/Mintimate/github-readme-stats-eo" target="_blank" rel="noreferrer">GitHub 仓库</a>
-          <a href="https://github.com/anuraghazra/github-readme-stats" target="_blank" rel="noreferrer">Upstream 原版</a>
+          <a
+            href="https://github.com/Mintimate/github-readme-stats-eo"
+            target="_blank"
+            rel="noreferrer"
+            >GitHub 仓库</a
+          >
+          <a
+            href="https://github.com/anuraghazra/github-readme-stats"
+            target="_blank"
+            rel="noreferrer"
+            >Upstream 原版</a
+          >
         </div>
       </div>
     </footer>
@@ -699,19 +927,59 @@
       const baseUrl = window.location.origin;
 
       const endpoints = [
-        { path: "/api", label: "GitHub 综合统计卡", query: "?username=Mintimate&show_icons=true", desc: "渲染用户的 Github 各项状态指标（Star、提交、PR、Issue等）。" },
-        { path: "/api/top-langs", label: "常用语言占比卡", query: "?username=Mintimate&layout=compact", desc: "展示用户使用最多的编程语言比例，支持多种图形及排版。" },
-        { path: "/api/pin", label: "仓库卡片 (Pin)", query: "?username=Mintimate&repo=github-readme-stats-eo", desc: "突出展示某个指定的开源软件仓库的信息卡片。" },
-        { path: "/api/gist", label: "Gist 详情卡片", query: "?id=bbfce31e0217a3689c8d961a356cb10d", desc: "获取并优雅展示指定 Gist 代码片段的状态。" },
-        { path: "/api/wakatime", label: "WakaTime 统计卡", query: "?username=ffflabs&layout=compact", desc: "挂载 WakaTime 开发者时长报告，生成占比与编码时间图。" },
-        { path: "/api/status/up", label: "PAT 可用性检查", query: "?type=json", desc: "调试专用接口，用来检测后台 GitHub Token (PAT) 的有效性。" }
+        {
+          path: "/api",
+          label: "GitHub 综合统计卡",
+          query: "?username=Mintimate&show_icons=true",
+          desc: "渲染用户的 Github 各项状态指标（Star、提交、PR、Issue等）。",
+        },
+        {
+          path: "/api/top-langs",
+          label: "常用语言占比卡",
+          query: "?username=Mintimate&layout=compact",
+          desc: "展示用户使用最多的编程语言比例，支持多种图形及排版。",
+        },
+        {
+          path: "/api/pin",
+          label: "仓库卡片 (Pin)",
+          query: "?username=Mintimate&repo=github-readme-stats-eo",
+          desc: "突出展示某个指定的开源软件仓库的信息卡片。",
+        },
+        {
+          path: "/api/gist",
+          label: "Gist 详情卡片",
+          query: "?id=bbfce31e0217a3689c8d961a356cb10d",
+          desc: "获取并优雅展示指定 Gist 代码片段的状态。",
+        },
+        {
+          path: "/api/wakatime",
+          label: "WakaTime 统计卡",
+          query: "?username=ffflabs&layout=compact",
+          desc: "挂载 WakaTime 开发者时长报告，生成占比与编码时间图。",
+        },
+        {
+          path: "/api/status/up",
+          label: "PAT 可用性检查",
+          query: "?type=json",
+          desc: "调试专用接口，用来检测后台 GitHub Token (PAT) 的有效性。",
+        },
       ];
 
       // Draw API Table
       document.getElementById("endpoint-grid").innerHTML = endpoints
-        .map(function(ep) {
+        .map(function (ep) {
           const url = baseUrl + ep.path + ep.query;
-          return '<div class="endpoint-card"><div class="endpoint-title"><span class="endpoint-path">' + ep.path + '</span><span class="endpoint-method">GET</span></div><p class="endpoint-desc">' + ep.label + ' — ' + ep.desc + '</p><a href="' + url + '" class="endpoint-link" target="_blank" rel="noreferrer">在新标签页打开 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div>';
+          return (
+            '<div class="endpoint-card"><div class="endpoint-title"><span class="endpoint-path">' +
+            ep.path +
+            '</span><span class="endpoint-method">GET</span></div><p class="endpoint-desc">' +
+            ep.label +
+            " — " +
+            ep.desc +
+            '</p><a href="' +
+            url +
+            '" class="endpoint-link" target="_blank" rel="noreferrer">在新标签页打开 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div>'
+          );
         })
         .join("");
 
@@ -728,7 +996,7 @@
       const elUsername = document.getElementById("username");
       const elCardType = document.getElementById("card-type");
       const elTheme = document.getElementById("theme");
-      
+
       // Supported themes from upstream github-readme-stats
       const themes = [
         { value: "default", name: "Default (明亮蓝色)" },
@@ -805,12 +1073,12 @@
         { value: "neon", name: "Neon" },
         { value: "blue_navy", name: "Blue Navy" },
         { value: "calm_pink", name: "Calm Pink" },
-        { value: "ambient_gradient", name: "Ambient Gradient (渐变配色)" }
+        { value: "ambient_gradient", name: "Ambient Gradient (渐变配色)" },
       ];
 
       // Populate theme options dynamically
       elTheme.innerHTML = "";
-      themes.forEach(t => {
+      themes.forEach((t) => {
         const opt = document.createElement("option");
         opt.value = t.value;
         opt.textContent = t.name;
@@ -847,12 +1115,39 @@
       // Output DOM
       const previewBox = document.getElementById("preview-box");
       const previewImage = document.getElementById("preview-image");
+      const previewStatus = document.getElementById("preview-status");
       const markdownCode = document.getElementById("markdown-code");
       const rawUrl = document.getElementById("raw-url");
 
+      const topLangLayouts = [
+        ["compact", "Compact (紧凑列表)"],
+        ["normal", "Normal (进度条)"],
+        ["donut", "Donut (环形图)"],
+        ["donut-vertical", "Donut Vertical (垂直环图)"],
+        ["pie", "Pie (饼图)"],
+      ];
+      const wakatimeLayouts = topLangLayouts.slice(0, 2);
+
+      function updateLayoutOptions() {
+        const previous = elLayout.value;
+        const options =
+          elCardType.value === "wakatime" ? wakatimeLayouts : topLangLayouts;
+        elLayout.replaceChildren(
+          ...options.map(([value, label]) => {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = label;
+            return option;
+          }),
+        );
+        elLayout.value = options.some(([value]) => value === previous)
+          ? previous
+          : options[0][0];
+      }
+
       function updateFieldsVisibility() {
         const cardType = elCardType.value;
-        
+
         // Hide all conditional areas first
         elLayoutField.style.display = "none";
         elLangsCountField.style.display = "none";
@@ -902,22 +1197,37 @@
           apiPath = "/api/top-langs";
           params.set("username", username);
           params.set("layout", elLayout.value);
-          params.set("langs_count", elLangsCount.value);
+          params.set(
+            "langs_count",
+            String(Math.min(20, Math.max(1, Number(elLangsCount.value) || 6))),
+          );
           if (elHideProgress.checked) params.set("hide_progress", "true");
         } else if (cardType === "repo") {
           apiPath = "/api/pin";
           params.set("username", username);
-          params.set("repo", elRepoName.value.trim() || "github-readme-stats-eo");
+          params.set(
+            "repo",
+            elRepoName.value.trim() || "github-readme-stats-eo",
+          );
           if (elShowOwner.checked) params.set("show_owner", "true");
         } else if (cardType === "gist") {
           apiPath = "/api/gist";
-          params.set("id", elGistId.value.trim() || "bbfce31e0217a3689c8d961a356cb10d");
+          params.set(
+            "id",
+            elGistId.value.trim() || "bbfce31e0217a3689c8d961a356cb10d",
+          );
           if (elShowOwner.checked) params.set("show_owner", "true");
         } else if (cardType === "wakatime") {
           apiPath = "/api/wakatime";
           params.set("username", username);
-          params.set("layout", elLayout.value === "compact" ? "compact" : "normal");
-          params.set("langs_count", elLangsCount.value);
+          params.set(
+            "layout",
+            elLayout.value === "compact" ? "compact" : "normal",
+          );
+          params.set(
+            "langs_count",
+            String(Math.min(10, Math.max(1, Number(elLangsCount.value) || 5))),
+          );
           if (elHideProgress.checked) params.set("hide_progress", "true");
         }
 
@@ -939,6 +1249,8 @@
       function updatePreview() {
         const fullUrl = buildURL();
         previewBox.classList.add("loading");
+        previewBox.classList.remove("has-error");
+        previewStatus.textContent = "加载中…";
         previewImage.src = fullUrl;
 
         // Code update
@@ -947,7 +1259,7 @@
           "top-langs": "Top Languages",
           repo: "Pinned Repo",
           gist: "Gist Card",
-          wakatime: "WakaTime Stats"
+          wakatime: "WakaTime Stats",
         };
         const activeName = cardNameMap[elCardType.value] || "Card";
 
@@ -958,24 +1270,47 @@
       // Hide loading spinner when image successfully loads or fails
       previewImage.addEventListener("load", () => {
         previewBox.classList.remove("loading");
+        previewBox.classList.remove("has-error");
+        previewStatus.textContent =
+          previewImage.naturalWidth +
+          " × " +
+          previewImage.naturalHeight +
+          " SVG";
       });
       previewImage.addEventListener("error", () => {
         previewBox.classList.remove("loading");
+        previewBox.classList.add("has-error");
+        previewStatus.textContent = "加载失败";
       });
 
+      let previewTimer;
+      function schedulePreview() {
+        clearTimeout(previewTimer);
+        previewTimer = setTimeout(updatePreview, 250);
+      }
+
       // Bind events to trigger visual updates
-      [elUsername, elRepoName, elGistId, elLangsCount, elCustomTitle].forEach(input => {
-        input.addEventListener("input", updatePreview);
-      });
-      [elCardType, elTheme, elLayout].forEach(select => {
+      [elUsername, elRepoName, elGistId, elLangsCount, elCustomTitle].forEach(
+        (input) => {
+          input.addEventListener("input", schedulePreview);
+        },
+      );
+      [elCardType, elTheme, elLayout].forEach((select) => {
         select.addEventListener("change", () => {
           if (select === elCardType) {
+            updateLayoutOptions();
             updateFieldsVisibility();
           }
           updatePreview();
         });
       });
-      [elShowIcons, elHideBorder, elHideProgress, elTextBold, elShowOwner].forEach(checkbox => {
+      [
+        elShowIcons,
+        elHideBorder,
+        elHideProgress,
+        elTextBold,
+        elShowOwner,
+      ].forEach((checkbox) => {
         checkbox.addEventListener("change", updatePreview);
       });
 
@@ -984,17 +1319,21 @@
         const btn = document.getElementById(btnId);
         btn.addEventListener("click", () => {
           const text = document.getElementById(codeId).textContent;
-          navigator.clipboard.writeText(text).then(() => {
-            const originalHTML = btn.innerHTML;
-            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"></path></svg> 已复制!';
-            btn.classList.add("copied");
-            setTimeout(() => {
-              btn.innerHTML = originalHTML;
-              btn.classList.remove("copied");
-            }, 2000);
-          }).catch(err => {
-            console.error("Failed to copy text: ", err);
-          });
+          navigator.clipboard
+            .writeText(text)
+            .then(() => {
+              const originalHTML = btn.innerHTML;
+              btn.innerHTML =
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"></path></svg> 已复制!';
+              btn.classList.add("copied");
+              setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove("copied");
+              }, 2000);
+            })
+            .catch((err) => {
+              console.error("Failed to copy text: ", err);
+            });
         });
       }
 
@@ -1002,6 +1341,7 @@
       bindCopyBtn("copy-url-btn", "raw-url");
 
       // Initial execution
+      updateLayoutOptions();
       updateFieldsVisibility();
       updatePreview();
     </script>
