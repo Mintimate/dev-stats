@@ -1,4 +1,4 @@
-package handler
+package handle
 
 import (
 	"bytes"
@@ -20,10 +20,11 @@ import (
 	"time"
 )
 
-const (
+const errorCacheSeconds = 10 * 60
+
+var (
 	githubGraphQLEndpoint = "https://api.github.com/graphql"
 	githubRESTEndpoint    = "https://api.github.com"
-	errorCacheSeconds     = 10 * 60
 )
 
 type cachePolicy struct {
@@ -119,43 +120,43 @@ type contributionDay struct {
 }
 
 type streakData struct {
-	Name           string
-	Current        int
-	CurrentStart   string
-	CurrentEnd     string
-	Longest        int
-	LongestStart   string
-	LongestEnd     string
-	Total          int
-	FirstDate      string
-	LastDate       string
+	Name             string
+	Current          int
+	CurrentStart     string
+	CurrentEnd       string
+	Longest          int
+	LongestStart     string
+	LongestEnd       string
+	Total            int
+	FirstDate        string
+	LastDate         string
 	ContributionDays int
 }
 
 type profileSummaryData struct {
-	Name          string
-	Login         string
-	AvatarURL     string
-	Followers     int
-	Following     int
-	Repositories  int
-	Gists         int
-	TotalStars    int
-	TotalForks    int
-	TotalCommits  int
-	TotalPRs      int
-	TotalIssues   int
-	ActiveYears   []int
-	MemberSince   string
+	Name         string
+	Login        string
+	AvatarURL    string
+	Followers    int
+	Following    int
+	Repositories int
+	Gists        int
+	TotalStars   int
+	TotalForks   int
+	TotalCommits int
+	TotalPRs     int
+	TotalIssues  int
+	ActiveYears  []int
+	MemberSince  string
 }
 
 type activityItem struct {
-	Type       string
-	Repo       string
-	Title      string
-	Action     string
-	CreatedAt  string
-	URL        string
+	Type      string
+	Repo      string
+	Title     string
+	Action    string
+	CreatedAt string
+	URL       string
 }
 
 type repoLanguagesData struct {
@@ -166,17 +167,21 @@ type repoLanguagesData struct {
 }
 
 type organizationData struct {
-	Name          string
-	Login         string
-	AvatarURL     string
-	Description   string
-	Repositories  int
-	Members       int
-	TotalStars    int
-	TotalForks    int
-	TotalIssues   int
-	TopRepository string
-	TopRepoStars  int
+	Name                 string
+	Login                string
+	AvatarURL            string
+	Description          string
+	Repositories         int
+	Members              int
+	TotalStars           int
+	TotalForks           int
+	TotalIssues          int
+	TopRepository        string
+	TopRepoStars         int
+	ActiveContributors   int
+	RecentContributions  int
+	TopContributor       string
+	TopContributorEvents int
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -265,6 +270,12 @@ func writeHomePage(w http.ResponseWriter, r *http.Request) {
         <a class="endpoint" href="%[1]s/api/pin?username=Mintimate&repo=github-readme-stats-eo" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/pin</span><span class="hint">仓库卡片</span></span></a>
         <a class="endpoint" href="%[1]s/api/gist?id=bbfce31e0217a3689c8d961a356cb10d" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/gist</span><span class="hint">Gist 卡片</span></span></a>
         <a class="endpoint" href="%[1]s/api/wakatime?username=ffflabs&layout=compact" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/wakatime</span><span class="hint">WakaTime 统计</span></span></a>
+        <a class="endpoint" href="%[1]s/api/streak?username=Mintimate" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/streak</span><span class="hint">连续贡献统计</span></span></a>
+        <a class="endpoint" href="%[1]s/api/profile-summary?username=Mintimate" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/profile-summary</span><span class="hint">开发者资料概览</span></span></a>
+        <a class="endpoint" href="%[1]s/api/contribution-calendar?username=Mintimate" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/contribution-calendar</span><span class="hint">贡献日历</span></span></a>
+        <a class="endpoint" href="%[1]s/api/recent-activity?username=Mintimate" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/recent-activity</span><span class="hint">最近公开动态</span></span></a>
+        <a class="endpoint" href="%[1]s/api/repo-languages?username=Mintimate&repo=github-readme-stats-eo" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/repo-languages</span><span class="hint">仓库语言占比</span></span></a>
+        <a class="endpoint" href="%[1]s/api/org?org=github" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/org</span><span class="hint">组织统计</span></span></a>
       </section>
       <aside>
         <h2>快速预览</h2>
@@ -868,6 +879,408 @@ query userInfo($login: String!, $includeMergedPullRequests: Boolean!, $includeDi
 		RankLevel:                level,
 		RankPercentile:           percentile,
 	}, nil
+}
+
+func (c *gitHubClient) fetchContributionCalendar(ctx context.Context, username string) (string, []contributionDay, error) {
+	query := `
+query ContributionCalendar($login: String!) {
+  user(login: $login) {
+    name
+    login
+    contributionsCollection {
+      contributionCalendar {
+        weeks { contributionDays { date contributionCount } }
+      }
+    }
+  }
+}`
+	var response struct {
+		User struct {
+			Name                    string `json:"name"`
+			Login                   string `json:"login"`
+			ContributionsCollection struct {
+				ContributionCalendar struct {
+					Weeks []struct {
+						ContributionDays []struct {
+							Date              string `json:"date"`
+							ContributionCount int    `json:"contributionCount"`
+						} `json:"contributionDays"`
+					} `json:"weeks"`
+				} `json:"contributionCalendar"`
+			} `json:"contributionsCollection"`
+		} `json:"user"`
+	}
+	if err := c.graphQL(ctx, query, map[string]any{"login": username}, &response); err != nil {
+		return "", nil, err
+	}
+	if response.User.Login == "" {
+		return "", nil, errors.New("user not found")
+	}
+	days := make([]contributionDay, 0, 371)
+	for _, week := range response.User.ContributionsCollection.ContributionCalendar.Weeks {
+		for _, day := range week.ContributionDays {
+			days = append(days, contributionDay{Date: day.Date, Count: day.ContributionCount})
+		}
+	}
+	sort.Slice(days, func(i, j int) bool { return days[i].Date < days[j].Date })
+	name := response.User.Name
+	if name == "" {
+		name = response.User.Login
+	}
+	return name, days, nil
+}
+
+func calculateStreak(name string, days []contributionDay) streakData {
+	data := streakData{Name: name}
+	if len(days) == 0 {
+		return data
+	}
+	data.FirstDate, data.LastDate = days[0].Date, days[len(days)-1].Date
+	longestStart := 0
+	runStart, runLength := 0, 0
+	for i, day := range days {
+		data.Total += day.Count
+		if day.Count > 0 {
+			data.ContributionDays++
+			if runLength == 0 {
+				runStart = i
+			}
+			runLength++
+			if runLength > data.Longest {
+				data.Longest = runLength
+				longestStart = runStart
+				data.LongestStart = days[longestStart].Date
+				data.LongestEnd = day.Date
+			}
+		} else {
+			runLength = 0
+		}
+	}
+	last := len(days) - 1
+	if days[last].Count == 0 && days[last].Date == time.Now().Format("2006-01-02") {
+		last--
+	}
+	end := last
+	for last >= 0 && days[last].Count > 0 {
+		data.Current++
+		last--
+	}
+	if data.Current > 0 {
+		data.CurrentStart = days[last+1].Date
+		data.CurrentEnd = days[end].Date
+	}
+	return data
+}
+
+func (c *gitHubClient) fetchProfileSummary(ctx context.Context, username string) (profileSummaryData, error) {
+	query := `
+query ProfileSummary($login: String!) {
+  user(login: $login) {
+    name login avatarUrl createdAt
+    followers { totalCount }
+    following { totalCount }
+    gists(first: 1) { totalCount }
+    repositories(first: 100, ownerAffiliations: OWNER) {
+      totalCount
+      nodes { stargazerCount forkCount }
+    }
+    pullRequests(first: 1) { totalCount }
+    issues(first: 1) { totalCount }
+    contributionsCollection {
+      totalCommitContributions
+      contributionYears
+    }
+  }
+}`
+	var response struct {
+		User struct {
+			Name, Login, AvatarURL, CreatedAt                 string
+			Followers, Following, Gists, PullRequests, Issues count
+			Repositories                                      struct {
+				TotalCount int `json:"totalCount"`
+				Nodes      []struct {
+					StargazerCount int `json:"stargazerCount"`
+					ForkCount      int `json:"forkCount"`
+				} `json:"nodes"`
+			} `json:"repositories"`
+			ContributionsCollection struct {
+				TotalCommitContributions int   `json:"totalCommitContributions"`
+				ContributionYears        []int `json:"contributionYears"`
+			} `json:"contributionsCollection"`
+		} `json:"user"`
+	}
+	if err := c.graphQL(ctx, query, map[string]any{"login": username}, &response); err != nil {
+		return profileSummaryData{}, err
+	}
+	if response.User.Login == "" {
+		return profileSummaryData{}, errors.New("user not found")
+	}
+	data := profileSummaryData{
+		Name: response.User.Name, Login: response.User.Login, AvatarURL: response.User.AvatarURL,
+		Followers: response.User.Followers.TotalCount, Following: response.User.Following.TotalCount,
+		Repositories: response.User.Repositories.TotalCount, Gists: response.User.Gists.TotalCount,
+		TotalCommits: response.User.ContributionsCollection.TotalCommitContributions,
+		TotalPRs:     response.User.PullRequests.TotalCount, TotalIssues: response.User.Issues.TotalCount,
+		ActiveYears: response.User.ContributionsCollection.ContributionYears, MemberSince: response.User.CreatedAt,
+	}
+	if data.Name == "" {
+		data.Name = data.Login
+	}
+	for _, repo := range response.User.Repositories.Nodes {
+		data.TotalStars += repo.StargazerCount
+		data.TotalForks += repo.ForkCount
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(data.ActiveYears)))
+	return data, nil
+}
+
+func (c *gitHubClient) fetchRecentActivity(ctx context.Context, username string, count int) ([]activityItem, error) {
+	count = minInt(max(count, 1), 10)
+	var events []struct {
+		Type string `json:"type"`
+		Repo struct {
+			Name string `json:"name"`
+		} `json:"repo"`
+		CreatedAt string `json:"created_at"`
+		Payload   struct {
+			Action  string `json:"action"`
+			Size    int    `json:"size"`
+			Commits []struct {
+				Message string `json:"message"`
+			} `json:"commits"`
+			PullRequest struct {
+				Title   string `json:"title"`
+				HTMLURL string `json:"html_url"`
+			} `json:"pull_request"`
+			Issue struct {
+				Title   string `json:"title"`
+				HTMLURL string `json:"html_url"`
+			} `json:"issue"`
+			Release struct {
+				Name    string `json:"name"`
+				TagName string `json:"tag_name"`
+				HTMLURL string `json:"html_url"`
+			} `json:"release"`
+		} `json:"payload"`
+	}
+	path := "/users/" + url.PathEscape(username) + "/events/public?per_page=100"
+	if err := c.restJSON(ctx, path, &events); err != nil {
+		return nil, err
+	}
+	items := make([]activityItem, 0, count)
+	for _, event := range events {
+		item := activityItem{Repo: event.Repo.Name, CreatedAt: event.CreatedAt}
+		switch event.Type {
+		case "PushEvent":
+			item.Type, item.Action = "commit", "pushed"
+			item.Title = fmt.Sprintf("Pushed %d commit(s)", event.Payload.Size)
+			if len(event.Payload.Commits) > 0 && event.Payload.Commits[0].Message != "" {
+				item.Title = strings.Split(event.Payload.Commits[0].Message, "\n")[0]
+			}
+			item.URL = "https://github.com/" + event.Repo.Name
+		case "PullRequestEvent":
+			item.Type, item.Action, item.Title, item.URL = "pull-request", event.Payload.Action, event.Payload.PullRequest.Title, event.Payload.PullRequest.HTMLURL
+		case "IssuesEvent":
+			item.Type, item.Action, item.Title, item.URL = "issue", event.Payload.Action, event.Payload.Issue.Title, event.Payload.Issue.HTMLURL
+		case "ReleaseEvent":
+			item.Type, item.Action, item.Title, item.URL = "release", event.Payload.Action, event.Payload.Release.Name, event.Payload.Release.HTMLURL
+			if item.Title == "" {
+				item.Title = event.Payload.Release.TagName
+			}
+		default:
+			continue
+		}
+		items = append(items, item)
+		if len(items) == count {
+			break
+		}
+	}
+	return items, nil
+}
+
+func (c *gitHubClient) fetchRepoLanguages(ctx context.Context, username, repo string, count int) (repoLanguagesData, error) {
+	query := `
+query RepoLanguages($owner: String!, $name: String!, $count: Int!) {
+  repository(owner: $owner, name: $name) {
+    name nameWithOwner
+    languages(first: $count, orderBy: {field: SIZE, direction: DESC}) {
+      totalSize
+      edges { size node { name color } }
+    }
+  }
+}`
+	var response struct {
+		Repository struct {
+			Name, NameWithOwner string
+			Languages           struct {
+				TotalSize int `json:"totalSize"`
+				Edges     []struct {
+					Size int                          `json:"size"`
+					Node struct{ Name, Color string } `json:"node"`
+				} `json:"edges"`
+			} `json:"languages"`
+		} `json:"repository"`
+	}
+	count = minInt(max(count, 1), 20)
+	if err := c.graphQL(ctx, query, map[string]any{"owner": username, "name": repo, "count": count}, &response); err != nil {
+		return repoLanguagesData{}, err
+	}
+	if response.Repository.Name == "" {
+		return repoLanguagesData{}, errors.New("repository not found")
+	}
+	data := repoLanguagesData{Name: response.Repository.Name, NameWithOwner: response.Repository.NameWithOwner, TotalSize: response.Repository.Languages.TotalSize}
+	for _, edge := range response.Repository.Languages.Edges {
+		data.Languages = append(data.Languages, languageStat{Name: edge.Node.Name, Color: defaultColor(edge.Node.Color, "#858585"), Size: float64(edge.Size)})
+	}
+	return data, nil
+}
+
+func (c *gitHubClient) fetchOrganization(ctx context.Context, login string) (organizationData, error) {
+	queryWithMembers := `
+query OrganizationSummary($login: String!) {
+  organization(login: $login) {
+    name login avatarUrl description
+    membersWithRole(first: 1) { totalCount }
+    repositories(first: 100, orderBy: {field: STARGAZERS, direction: DESC}) {
+      totalCount
+      nodes { nameWithOwner stargazerCount forkCount issues(first: 1) { totalCount } }
+    }
+  }
+}`
+	var response struct {
+		Organization struct {
+			Name, Login, AvatarURL, Description string
+			MembersWithRole                     count `json:"membersWithRole"`
+			Repositories                        struct {
+				TotalCount int `json:"totalCount"`
+				Nodes      []struct {
+					NameWithOwner  string `json:"nameWithOwner"`
+					StargazerCount int    `json:"stargazerCount"`
+					ForkCount      int    `json:"forkCount"`
+					Issues         count  `json:"issues"`
+				} `json:"nodes"`
+			} `json:"repositories"`
+		} `json:"organization"`
+	}
+	err := c.graphQL(ctx, queryWithMembers, map[string]any{"login": login}, &response)
+	hasScopeError := false
+	if err != nil {
+		errMsg := strings.ToLower(err.Error())
+		if strings.Contains(errMsg, "scope") || strings.Contains(errMsg, "memberswithrole") || strings.Contains(errMsg, "name") {
+			hasScopeError = true
+		}
+	}
+	if (err != nil && hasScopeError) || (err == nil && response.Organization.Login == "") {
+		var restOrg struct {
+			Name        string `json:"name"`
+			Login       string `json:"login"`
+			AvatarURL   string `json:"avatar_url"`
+			Description string `json:"description"`
+			PublicRepos int    `json:"public_repos"`
+		}
+		restErr := c.restJSON(ctx, "/orgs/"+url.PathEscape(login), &restOrg)
+		if restErr == nil && restOrg.Login != "" {
+			searchQuery := `
+query OrgRepos($queryString: String!) {
+  search(query: $queryString, type: REPOSITORY, first: 100) {
+    repositoryCount
+    nodes {
+      ... on Repository {
+        nameWithOwner
+        stargazerCount
+        forkCount
+        issues(states: OPEN) { totalCount }
+      }
+    }
+  }
+}`
+			var searchResp struct {
+				Search struct {
+					RepositoryCount int `json:"repositoryCount"`
+					Nodes           []struct {
+						NameWithOwner  string `json:"nameWithOwner"`
+						StargazerCount int    `json:"stargazerCount"`
+						ForkCount      int    `json:"forkCount"`
+						Issues         count  `json:"issues"`
+					} `json:"nodes"`
+				} `json:"search"`
+			}
+			qVar := fmt.Sprintf("org:%s is:public sort:stars-desc", login)
+			gqlErr := c.graphQL(ctx, searchQuery, map[string]any{"queryString": qVar}, &searchResp)
+			if gqlErr == nil {
+				response.Organization.Name = restOrg.Name
+				response.Organization.Login = restOrg.Login
+				response.Organization.AvatarURL = restOrg.AvatarURL
+				response.Organization.Description = restOrg.Description
+				response.Organization.Repositories.TotalCount = restOrg.PublicRepos
+
+				response.Organization.Repositories.Nodes = nil
+				for _, node := range searchResp.Search.Nodes {
+					response.Organization.Repositories.Nodes = append(response.Organization.Repositories.Nodes, struct {
+						NameWithOwner  string `json:"nameWithOwner"`
+						StargazerCount int    `json:"stargazerCount"`
+						ForkCount      int    `json:"forkCount"`
+						Issues         count  `json:"issues"`
+					}{
+						NameWithOwner:  node.NameWithOwner,
+						StargazerCount: node.StargazerCount,
+						ForkCount:      node.ForkCount,
+						Issues:         node.Issues,
+					})
+				}
+				err = nil
+			} else {
+				err = gqlErr
+			}
+		} else if restErr != nil {
+			err = restErr
+		}
+	}
+	if err != nil {
+		return organizationData{}, err
+	}
+	org := response.Organization
+	if org.Login == "" {
+		return organizationData{}, errors.New("organization not found")
+	}
+	data := organizationData{Name: org.Name, Login: org.Login, AvatarURL: org.AvatarURL, Description: org.Description, Repositories: org.Repositories.TotalCount, Members: org.MembersWithRole.TotalCount}
+	if data.Name == "" {
+		data.Name = data.Login
+	}
+	for i, repo := range org.Repositories.Nodes {
+		data.TotalStars += repo.StargazerCount
+		data.TotalForks += repo.ForkCount
+		data.TotalIssues += repo.Issues.TotalCount
+		if i == 0 {
+			data.TopRepository, data.TopRepoStars = repo.NameWithOwner, repo.StargazerCount
+		}
+	}
+	var events []struct {
+		Type  string `json:"type"`
+		Actor struct {
+			Login string `json:"login"`
+		} `json:"actor"`
+	}
+	if err := c.restJSON(ctx, "/orgs/"+url.PathEscape(login)+"/events?per_page=100", &events); err == nil {
+		contributors := map[string]int{}
+		for _, event := range events {
+			switch event.Type {
+			case "PushEvent", "PullRequestEvent", "IssuesEvent", "ReleaseEvent":
+				if event.Actor.Login == "" {
+					continue
+				}
+				contributors[event.Actor.Login]++
+				data.RecentContributions++
+			}
+		}
+		data.ActiveContributors = len(contributors)
+		for contributor, eventCount := range contributors {
+			if eventCount > data.TopContributorEvents {
+				data.TopContributor, data.TopContributorEvents = contributor, eventCount
+			}
+		}
+	}
+	return data, nil
 }
 
 type count struct {
@@ -1661,6 +2074,226 @@ func renderWakatimeCard(langs []wakatimeLanguage, opts cardOptions, count int, h
 	return cardSVG(495, height, opts, title, rows.String(), "")
 }
 
+func renderStreakCard(data streakData, opts cardOptions) string {
+	title := opts.CustomTitle
+	if title == "" {
+		title = data.Name + "'s Contribution Streak"
+	}
+	offset := cardContentOffset(opts)
+	height := 195 + offset
+	currentRange := formatDateRange(data.CurrentStart, data.CurrentEnd)
+	longestRange := formatDateRange(data.LongestStart, data.LongestEnd)
+	body := fmt.Sprintf(`
+<g transform="translate(0,%d)">
+  <line x1="165" y1="72" x2="165" y2="145" stroke="%s" opacity=".18"/>
+  <line x1="330" y1="72" x2="330" y2="145" stroke="%s" opacity=".18"/>
+  %s%s%s
+</g>`, offset, opts.TextColor, opts.TextColor,
+		streakMetric(82, "Current Streak", data.Current, "days", currentRange, opts),
+		streakMetric(247, "Longest Streak", data.Longest, "days", longestRange, opts),
+		streakMetric(412, "Total Contributions", data.Total, "", fmt.Sprintf("%d active days", data.ContributionDays), opts))
+	return cardSVG(495, max(150, height), opts, title, body, "")
+}
+
+func streakMetric(cx int, label string, value int, unit, detail string, opts cardOptions) string {
+	valueText := formatIntWithCommas(value)
+	if unit != "" {
+		valueText += " " + unit
+	}
+	return fmt.Sprintf(`<g text-anchor="middle"><text x="%d" y="88" class="metric-value">%s</text><text x="%d" y="112" class="label">%s</text><text x="%d" y="134" class="muted">%s</text><circle cx="%d" cy="55" r="5" fill="%s"/></g>`, cx, html.EscapeString(valueText), cx, html.EscapeString(label), cx, html.EscapeString(defaultString(detail, "No active streak")), cx, opts.IconColor)
+}
+
+func renderProfileSummaryCard(data profileSummaryData, opts cardOptions) string {
+	title := opts.CustomTitle
+	if title == "" {
+		title = data.Name + "'s Profile Summary"
+	}
+	offset := cardContentOffset(opts)
+	years := make([]string, 0, minInt(len(data.ActiveYears), 6))
+	for i, year := range data.ActiveYears {
+		if i == 6 {
+			break
+		}
+		years = append(years, strconv.Itoa(year))
+	}
+	memberSince := shortYear(data.MemberSince)
+	body := fmt.Sprintf(`<g transform="translate(0,%d)">
+<text x="25" y="66" class="muted">@%s · GitHub member since %s</text>
+%s%s%s%s%s%s%s%s
+		<text x="25" y="214" class="muted">Active years: %s</text>
+</g>`, offset, html.EscapeString(data.Login), memberSince,
+		summaryMetric(25, 94, "Repositories", data.Repositories, opts), summaryMetric(145, 94, "Followers", data.Followers, opts),
+		summaryMetric(265, 94, "Stars earned", data.TotalStars, opts), summaryMetric(385, 94, "Forks", data.TotalForks, opts),
+		summaryMetric(25, 150, "Commits (year)", data.TotalCommits, opts), summaryMetric(145, 150, "Pull requests", data.TotalPRs, opts),
+		summaryMetric(265, 150, "Issues", data.TotalIssues, opts), summaryMetric(385, 150, "Gists", data.Gists, opts), strings.Join(years, " · "))
+	return cardSVG(495, max(190, 245+offset), opts, title, body, "")
+}
+
+func summaryMetric(x, y int, label string, value int, opts cardOptions) string {
+	return fmt.Sprintf(`<g transform="translate(%d,%d)"><rect width="100" height="42" rx="7" fill="%s" opacity=".07"/><text x="10" y="18" class="metric-small">%s</text><text x="10" y="34" class="micro">%s</text></g>`, x, y, opts.IconColor, html.EscapeString(formatNumber(value)), html.EscapeString(label))
+}
+
+func renderContributionCalendarCard(name string, days []contributionDay, opts cardOptions) string {
+	title := opts.CustomTitle
+	if title == "" {
+		title = name + "'s Contribution Calendar"
+	}
+	offset := cardContentOffset(opts)
+	maxCount, total := 0, 0
+	for _, day := range days {
+		total += day.Count
+		if day.Count > maxCount {
+			maxCount = day.Count
+		}
+	}
+	var cells, months strings.Builder
+	lastMonth := time.Month(0)
+	for i, day := range days {
+		date, err := time.Parse("2006-01-02", day.Date)
+		if err != nil {
+			continue
+		}
+		week := i / 7
+		x, y := 25+week*13, 64+int(date.Weekday())*13+offset
+		level := contributionLevel(day.Count, maxCount)
+		opacity := []float64{0.08, 0.3, 0.5, 0.72, 1}[level]
+		cells.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="10" height="10" rx="2" fill="%s" opacity="%.2f"><title>%s: %d contributions</title></rect>`, x, y, opts.IconColor, opacity, day.Date, day.Count))
+		if date.Day() <= 7 && date.Month() != lastMonth && week < 51 {
+			months.WriteString(fmt.Sprintf(`<text x="%d" y="55" class="micro">%s</text>`, x, date.Format("Jan")))
+			lastMonth = date.Month()
+		}
+	}
+	body := fmt.Sprintf(`<g>%s%s<text x="25" y="%d" class="muted">%s contributions in the last year</text><g transform="translate(642,%d)"><text x="0" y="10" class="micro">Less</text>%s<text x="72" y="10" class="micro">More</text></g></g>`, months.String(), cells.String(), 169+offset, html.EscapeString(formatIntWithCommas(total)), 159+offset, calendarLegend(opts))
+	return cardSVG(740, max(145, 190+offset), opts, title, body, "")
+}
+
+func contributionLevel(count, maximum int) int {
+	if count <= 0 || maximum <= 0 {
+		return 0
+	}
+	level := int(math.Ceil(float64(count) / float64(maximum) * 4))
+	return minInt(max(level, 1), 4)
+}
+
+func calendarLegend(opts cardOptions) string {
+	var out strings.Builder
+	for i, opacity := range []float64{0.08, 0.3, 0.5, 0.72, 1} {
+		out.WriteString(fmt.Sprintf(`<rect x="%d" width="10" height="10" rx="2" fill="%s" opacity="%.2f"/>`, 30+i*13, opts.IconColor, opacity))
+	}
+	return out.String()
+}
+
+func renderRecentActivityCard(username string, items []activityItem, opts cardOptions) string {
+	title := opts.CustomTitle
+	if title == "" {
+		title = username + "'s Recent Activity"
+	}
+	offset := cardContentOffset(opts)
+	var rows strings.Builder
+	if len(items) == 0 {
+		rows.WriteString(fmt.Sprintf(`<text x="25" y="%d" class="muted">No recent public activity</text>`, 75+offset))
+	}
+	for i, item := range items {
+		y := 67 + offset + i*42
+		label := activityLabel(item)
+		rows.WriteString(fmt.Sprintf(`<g transform="translate(25,%d)"><circle cx="6" cy="4" r="6" fill="%s" opacity=".9"/><text x="23" y="8" class="label">%s</text><text x="150" y="8" class="activity-title">%s</text><text x="510" y="8" class="micro" text-anchor="end">%s</text><line x1="0" y1="24" x2="510" y2="24" stroke="%s" opacity=".1"/></g>`, y, activityColor(item.Type, opts), html.EscapeString(label), html.EscapeString(truncate(item.Title, 48)), html.EscapeString(shortDate(item.CreatedAt)), opts.TextColor))
+	}
+	return cardSVG(560, max(115, 75+len(items)*42+offset), opts, title, rows.String(), "")
+}
+
+func activityLabel(item activityItem) string {
+	labels := map[string]string{"commit": "Commit", "pull-request": "Pull request", "issue": "Issue", "release": "Release"}
+	label := labels[item.Type]
+	if item.Action != "" && item.Type != "commit" {
+		label += " · " + item.Action
+	}
+	return label
+}
+
+func activityColor(kind string, opts cardOptions) string {
+	switch kind {
+	case "release":
+		return opts.TitleColor
+	case "issue":
+		return opts.RingColor
+	default:
+		return opts.IconColor
+	}
+}
+
+func renderRepoLanguagesCard(data repoLanguagesData, opts cardOptions) string {
+	title := opts.CustomTitle
+	if title == "" {
+		title = data.NameWithOwner + " Languages"
+	}
+	offset := cardContentOffset(opts)
+	barWidth := 445.0
+	x := 25.0
+	var bar, legend strings.Builder
+	for i, lang := range data.Languages {
+		percent := percentOf(lang.Size, float64(data.TotalSize))
+		width := barWidth * percent / 100
+		bar.WriteString(fmt.Sprintf(`<rect x="%.2f" y="70" width="%.2f" height="12" fill="%s"/>`, x, width, lang.Color))
+		x += width
+		col, row := i%2, i/2
+		legend.WriteString(fmt.Sprintf(`<g transform="translate(%d,%d)"><circle cx="5" cy="5" r="5" fill="%s"/><text x="17" y="9" class="lang-name">%s %.2f%%</text></g>`, 25+col*225, 105+offset+row*25, lang.Color, html.EscapeString(lang.Name), percent))
+	}
+	body := fmt.Sprintf(`<g transform="translate(0,%d)"><defs><clipPath id="language-bar"><rect x="25" y="70" width="445" height="12" rx="6"/></clipPath></defs><g clip-path="url(#language-bar)">%s</g><text x="25" y="60" class="muted">%s total</text></g>%s`, offset, bar.String(), html.EscapeString(formatBytes(int64(data.TotalSize))), legend.String())
+	height := max(155, 130+((len(data.Languages)+1)/2)*25+offset)
+	return cardSVG(495, height, opts, title, body, "")
+}
+
+func renderOrganizationCard(data organizationData, opts cardOptions) string {
+	title := opts.CustomTitle
+	if title == "" {
+		title = data.Name + " Organization Stats"
+	}
+	offset := cardContentOffset(opts)
+	description := truncate(defaultString(data.Description, "GitHub organization"), 70)
+	contributorSummary := "No recent public contribution data"
+	if data.TopContributor != "" {
+		contributorSummary = fmt.Sprintf("Top contributor: @%s · %d recent events", data.TopContributor, data.TopContributorEvents)
+	}
+	body := fmt.Sprintf(`<g transform="translate(0,%d)"><text x="25" y="65" class="muted">@%s · %s</text>%s%s%s%s%s<text x="25" y="143" class="micro">%s</text><rect x="25" y="155" width="445" height="42" rx="8" fill="%s" opacity=".08"/><text x="38" y="174" class="micro">Top repository</text><text x="38" y="190" class="label">%s</text><text x="455" y="184" text-anchor="end" class="metric-small">★ %s</text></g>`, offset, html.EscapeString(data.Login), html.EscapeString(description), orgMetric(25, "Repositories", data.Repositories, opts), orgMetric(115, "Members", data.Members, opts), orgMetric(205, "Stars", data.TotalStars, opts), orgMetric(295, "Contributors", data.ActiveContributors, opts), orgMetric(385, "Recent activity", data.RecentContributions, opts), html.EscapeString(contributorSummary), opts.IconColor, html.EscapeString(data.TopRepository), html.EscapeString(formatNumber(data.TopRepoStars)))
+	return cardSVG(495, max(190, 220+offset), opts, title, body, "")
+}
+
+func orgMetric(x int, label string, value int, opts cardOptions) string {
+	return fmt.Sprintf(`<g transform="translate(%d,86)"><rect width="82" height="42" rx="7" fill="%s" opacity=".07"/><text x="9" y="18" class="metric-small">%s</text><text x="9" y="34" class="micro">%s</text></g>`, x, opts.IconColor, html.EscapeString(formatNumber(value)), html.EscapeString(label))
+}
+
+func cardContentOffset(opts cardOptions) int {
+	if opts.HideTitle {
+		return -30
+	}
+	return 0
+}
+
+func formatDateRange(start, end string) string {
+	if start == "" || end == "" {
+		return ""
+	}
+	return shortDate(start) + " – " + shortDate(end)
+}
+
+func shortDate(value string) string {
+	if len(value) >= 10 {
+		value = value[:10]
+	}
+	date, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return value
+	}
+	return date.Format("Jan 2, 2006")
+}
+
+func shortYear(value string) string {
+	if len(value) >= 4 {
+		return value[:4]
+	}
+	return value
+}
+
 func cardSVG(width int, height int, opts cardOptions, title string, body string, overlay string) string {
 	stroke := opts.BorderColor
 	if opts.HideBorder {
@@ -1697,6 +2330,8 @@ func cardSVG(width int, height int, opts cardOptions, title string, body string,
 .rank{font:700 38px 'Segoe UI',Ubuntu,Sans-Serif;fill:%s}
 .rank-percentile{font:700 16px 'Segoe UI',Ubuntu,Sans-Serif;fill:%s}
 .icon{fill:%s}.lang-name{font:400 13px 'Segoe UI',Ubuntu,Sans-Serif;fill:%s}
+.metric-value{font:700 24px 'Segoe UI',Ubuntu,Sans-Serif;fill:%s}.metric-small{font:700 15px 'Segoe UI',Ubuntu,Sans-Serif;fill:%s}
+.micro{font:400 10px 'Segoe UI',Ubuntu,Sans-Serif;fill:%s}.activity-title{font:400 12px 'Segoe UI',Ubuntu,Sans-Serif;fill:%s}
 .rank-circle-rim{stroke:%s;fill:none;stroke-width:6;opacity:.2}.rank-circle{stroke:%s;fill:none;stroke-width:6;stroke-linecap:round;opacity:.85}
 </style>
 %s
@@ -1704,7 +2339,7 @@ func cardSVG(width int, height int, opts cardOptions, title string, body string,
 %s
 %s
 %s
-</svg>`, width, height, width, height, opts.TitleColor, opts.TextColor, opts.TextColor, opts.IconColor, opts.TextColor, opts.TextColor, opts.TitleColor, opts.TextColor, opts.IconColor, opts.TextColor, opts.RingColor, opts.RingColor, defs, width-1, height-1, opts.BorderRadius, bg, stroke, titleNode, body, overlay)
+</svg>`, width, height, width, height, opts.TitleColor, opts.TextColor, opts.TextColor, opts.IconColor, opts.TextColor, opts.TextColor, opts.TitleColor, opts.TextColor, opts.IconColor, opts.TextColor, opts.TitleColor, opts.TextColor, opts.TextColor, opts.TextColor, opts.RingColor, opts.RingColor, defs, width-1, height-1, opts.BorderRadius, bg, stroke, titleNode, body, overlay)
 }
 
 func writeSVG(w http.ResponseWriter, cacheSeconds int, svg string) {
@@ -2065,6 +2700,13 @@ func truncate(value string, maxLen int) string {
 
 func max(a int, b int) int {
 	if a > b {
+		return a
+	}
+	return b
+}
+
+func minInt(a int, b int) int {
+	if a < b {
 		return a
 	}
 	return b
