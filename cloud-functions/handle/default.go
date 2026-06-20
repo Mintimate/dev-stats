@@ -2163,7 +2163,7 @@ func renderContributionCalendarCard(name string, days []contributionDay, opts ca
 			lastMonth = date.Month()
 		}
 	}
-	body := fmt.Sprintf(`<g>%s%s<text x="25" y="%d" class="muted">%s contributions in the last year</text><g transform="translate(642,%d)"><text x="0" y="10" class="micro">Less</text>%s<text x="72" y="10" class="micro">More</text></g></g>`, months.String(), cells.String(), 169+offset, html.EscapeString(formatIntWithCommas(total)), 159+offset, calendarLegend(opts))
+	body := fmt.Sprintf(`<g>%s%s<text x="25" y="%d" class="muted">%s contributions in the last year</text><g transform="translate(588,%d)"><text x="0" y="10" class="micro">Less</text>%s<text x="96" y="10" class="micro">More</text></g></g>`, months.String(), cells.String(), 169+offset, html.EscapeString(formatIntWithCommas(total)), 159+offset, calendarLegend(opts))
 	return cardSVG(740, max(145, 190+offset), opts, title, body, "")
 }
 
