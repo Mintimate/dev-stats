@@ -4,14 +4,21 @@
 
 本项目基于 [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats) 核心代码，适配 [腾讯云 EdgeOne Pages](https://pages.edgeone.ai) 平台部署。
 
-原项目采用 Vercel 平台部署，本版本专为 EdgeOne Pages 的 Node Functions 环境优化，提供相同的 API 接口和功能。
+原项目采用 Vercel 平台部署，本版本适配 EdgeOne Pages Cloud Functions，并开始提供 Go 运行时实现，提供相同的 API 接口和功能。
 
 ## 项目简介
 
 - **动态统计卡片**：展示 GitHub 数据（如提交次数、PR、Star 等）
-- **多种主题**：支持自定义颜色和布局
-- **EdgeOne Pages 优化**：完美适配 EdgeOne Pages 部署环境
+- **预设卡片展厅**：支持多款卡片（综合统计、常用语言、连续贡献、WakaTime、仓库卡、组织卡）同屏展示与一键配置
+- **全新配置面板**：更美观的表单布局，支持防抖自动刷新与实时生成 Markdown/HTML 代码
+- **多种主题与布局**：完整适配原项目的各种卡片参数、主题与紧凑/默认布局切换
+- **EdgeOne Pages 优化**：适配 EdgeOne Pages Cloud Functions 与平台边缘缓存
+- **Go Cloud Functions**：采用 Go 运行时，提供超低冷启动与极速响应
 - **兼容原项目 API**：与原项目保持相同的查询参数和使用方式
+
+## 界面展示
+
+![EdgeOne Pages Dashboard](./docs/static/dashboard.webp)
 
 ## 快速开始
 
@@ -55,17 +62,48 @@
 
 > **注意**：EdgeOne Pages 在部署后加载环境变量，每次更改环境变量后需要重新触发部署使变量生效。
 
-## 当前已知限制
+## 缓存策略
 
-EdgeOne Pages 入口节点不支持按请求缓存，卡片接口默认会直接回源。建议在自定义域名前再套一层 CDN（如 EdgeOne CDN / Cloudflare）对静态响应做缓存，缓解 GitHub API 速率压力（还有请求次数的限制）。
+本项目会在函数响应中返回 `Cache-Control`，并在 `edgeone.json` 中为主要卡片接口配置 Pages 缓存：
 
-比如: 我使用 EdgeOne 的站点加速，再次套娃 EdgeOne Pages，就可以实现缓存:
+- `/api`：默认缓存 1 天
+- `/api/top-langs`：默认缓存 6 天
+- `/api/pin`：默认缓存 10 天
+- `/api/gist`：默认缓存 2 天
+- `/api/wakatime`：默认缓存 1 天
+- `/api/streak`、`/api/contribution-calendar`：默认缓存 12 小时
+- `/api/recent-activity`：默认缓存 1 小时
+- `/api/profile-summary`、`/api/repo-languages`、`/api/org`：默认缓存 1 天
+
+状态接口不会配置平台缓存，避免 PAT 状态、可用性检查等动态结果被长期缓存。高流量公开实例仍可在自定义域名前增加 EdgeOne CDN / Cloudflare 等 CDN 层，用于更细粒度的缓存命中、清理和观测。
+
+例如：我使用 EdgeOne 的站点加速再次代理 EdgeOne Pages，可以获得额外的 CDN 缓存控制：
 
 ![配置回源站点为 EdgeOne Pages](./docs/static/CdnOriginToCdnConfig.webp)
 
 对应的缓存规则:
 
 ![配置的回源规则](./docs/static/OriginRulesConfig.webp)
+
+## Go Cloud Functions
+
+Go 版本入口位于 `cloud-functions/index.go`，采用 EdgeOne Pages Cloud Functions Framework mode。业务代码放在 `cloud-functions/internal`，按 `handler`（HTTP 路由与响应）、`service`（GitHub/WakaTime 数据访问）和 `card`（主题、统一样式与 SVG 渲染）分层，同时覆盖 `/`、`/api` 与 `/api/*`。当前已覆盖：
+
+- `/api` - GitHub 统计卡片
+- `/api/top-langs` - 语言占比卡片
+- `/api/pin` - 仓库卡片
+- `/api/gist` - Gist 卡片
+- `/api/wakatime` - WakaTime 统计卡片
+- `/api/streak` - 连续贡献统计卡片
+- `/api/profile-summary` - 开发者资料概览卡片
+- `/api/contribution-calendar` - 年度贡献日历卡片
+- `/api/recent-activity` - 最近公开动态卡片
+- `/api/repo-languages` - 指定仓库语言占比卡片
+- `/api/org` - GitHub 组织统计卡片
+- `/api/status/up` - PAT 可用性检查
+- `/api/status/pat-info` - PAT 状态详情
+
+Go Cloud Functions 是当前主实现，Node Functions 已移除。当前 Go 版本优先覆盖核心数据与 SVG 输出，常用主题、布局和展示参数会继续按原项目行为补齐。
 
 ## 获取 GitHub Token（Classic）
 
@@ -95,6 +133,12 @@ EdgeOne Pages 入口节点不支持按请求缓存，卡片接口默认会直接
 - `/api/pin` - 仓库卡片
 - `/api/gist` - Gist 卡片
 - `/api/wakatime` - WakaTime 统计卡片
+- `/api/streak` - 连续贡献统计卡片
+- `/api/profile-summary` - 开发者资料概览卡片
+- `/api/contribution-calendar` - 年度贡献日历卡片
+- `/api/recent-activity` - 最近公开动态卡片
+- `/api/repo-languages` - 指定仓库语言占比卡片
+- `/api/org` - GitHub 组织统计卡片
 
 详细参数请参考 [原项目文档](https://github.com/anuraghazra/github-readme-stats/blob/master/readme.md)。
 

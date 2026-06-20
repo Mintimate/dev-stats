@@ -22,4 +22,9 @@ tests
 .env
 .edgeone
 .tef_dist/*
+.gocache
+.gotmp
   
+# AI 
+.agents/
+skills-lock.json
