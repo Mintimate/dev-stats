@@ -87,7 +87,7 @@
 
 ## Go Cloud Functions
 
-Go 版本入口位于 `cloud-functions/[[default]].go`，采用 EdgeOne Pages Cloud Functions Handler mode 单文件 catch-all，同时处理 `/`、`/api` 与 `/api/*`。当前已覆盖：
+Go 版本入口位于 `cloud-functions/index.go`，采用 EdgeOne Pages Cloud Functions Framework mode。业务代码放在 `cloud-functions/internal`，按 `handler`（HTTP 路由与响应）、`service`（GitHub/WakaTime 数据访问）和 `card`（主题、统一样式与 SVG 渲染）分层，同时覆盖 `/`、`/api` 与 `/api/*`。当前已覆盖：
 
 - `/api` - GitHub 统计卡片
 - `/api/top-langs` - 语言占比卡片

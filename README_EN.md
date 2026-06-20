@@ -87,7 +87,7 @@ Corresponding cache rules:
 
 ## Go Cloud Functions
 
-The Go entrypoint lives in `cloud-functions/[[default]].go` and uses EdgeOne Pages Cloud Functions Handler mode as a single catch-all file for `/`, `/api`, and `/api/*`. It currently covers:
+The Go entrypoint lives in `cloud-functions/index.go` and uses EdgeOne Pages Cloud Functions Framework mode. Application code lives under `cloud-functions/internal`, layered into `handler` (HTTP routing and responses), `service` (GitHub/WakaTime data access), and `card` (themes, shared styles, and SVG rendering), while covering `/`, `/api`, and `/api/*`. It currently covers:
 
 - `/api` - GitHub Stats Card
 - `/api/top-langs` - Top Languages Card
