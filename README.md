@@ -9,10 +9,16 @@
 ## 项目简介
 
 - **动态统计卡片**：展示 GitHub 数据（如提交次数、PR、Star 等）
-- **多种主题**：支持自定义颜色和布局
-- **EdgeOne Pages 优化**：适配 EdgeOne Pages Cloud Functions 与平台缓存
-- **Go Cloud Functions**：新增 Go 运行时入口，降低冷启动和运行时依赖
+- **预设卡片展厅**：支持多款卡片（综合统计、常用语言、连续贡献、WakaTime、仓库卡、组织卡）同屏展示与一键配置
+- **全新配置面板**：更美观的表单布局，支持防抖自动刷新与实时生成 Markdown/HTML 代码
+- **多种主题与布局**：完整适配原项目的各种卡片参数、主题与紧凑/默认布局切换
+- **EdgeOne Pages 优化**：适配 EdgeOne Pages Cloud Functions 与平台边缘缓存
+- **Go Cloud Functions**：采用 Go 运行时，提供超低冷启动与极速响应
 - **兼容原项目 API**：与原项目保持相同的查询参数和使用方式
+
+## 界面展示
+
+![EdgeOne Pages Dashboard](./docs/static/dashboard.webp)
 
 ## 快速开始
 
@@ -65,6 +71,9 @@
 - `/api/pin`：默认缓存 10 天
 - `/api/gist`：默认缓存 2 天
 - `/api/wakatime`：默认缓存 1 天
+- `/api/streak`、`/api/contribution-calendar`：默认缓存 12 小时
+- `/api/recent-activity`：默认缓存 1 小时
+- `/api/profile-summary`、`/api/repo-languages`、`/api/org`：默认缓存 1 天
 
 状态接口不会配置平台缓存，避免 PAT 状态、可用性检查等动态结果被长期缓存。高流量公开实例仍可在自定义域名前增加 EdgeOne CDN / Cloudflare 等 CDN 层，用于更细粒度的缓存命中、清理和观测。
 
@@ -85,6 +94,12 @@ Go 版本入口位于 `cloud-functions/[[default]].go`，采用 EdgeOne Pages Cl
 - `/api/pin` - 仓库卡片
 - `/api/gist` - Gist 卡片
 - `/api/wakatime` - WakaTime 统计卡片
+- `/api/streak` - 连续贡献统计卡片
+- `/api/profile-summary` - 开发者资料概览卡片
+- `/api/contribution-calendar` - 年度贡献日历卡片
+- `/api/recent-activity` - 最近公开动态卡片
+- `/api/repo-languages` - 指定仓库语言占比卡片
+- `/api/org` - GitHub 组织统计卡片
 - `/api/status/up` - PAT 可用性检查
 - `/api/status/pat-info` - PAT 状态详情
 
@@ -118,6 +133,12 @@ Go Cloud Functions 是当前主实现，Node Functions 已移除。当前 Go 版
 - `/api/pin` - 仓库卡片
 - `/api/gist` - Gist 卡片
 - `/api/wakatime` - WakaTime 统计卡片
+- `/api/streak` - 连续贡献统计卡片
+- `/api/profile-summary` - 开发者资料概览卡片
+- `/api/contribution-calendar` - 年度贡献日历卡片
+- `/api/recent-activity` - 最近公开动态卡片
+- `/api/repo-languages` - 指定仓库语言占比卡片
+- `/api/org` - GitHub 组织统计卡片
 
 详细参数请参考 [原项目文档](https://github.com/anuraghazra/github-readme-stats/blob/master/readme.md)。
 

@@ -13,7 +13,6 @@ import {
   measureText,
 } from "../common/render.js";
 
-
 /** Import language colors.
  *
  * @description Node.js 20+ supports JSON imports with import assertions.

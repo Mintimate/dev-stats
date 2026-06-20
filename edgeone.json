@@ -25,6 +25,30 @@
     {
       "source": "/api/wakatime",
       "cacheTtl": 86400
+    },
+    {
+      "source": "/api/streak",
+      "cacheTtl": 43200
+    },
+    {
+      "source": "/api/profile-summary",
+      "cacheTtl": 86400
+    },
+    {
+      "source": "/api/contribution-calendar",
+      "cacheTtl": 43200
+    },
+    {
+      "source": "/api/recent-activity",
+      "cacheTtl": 3600
+    },
+    {
+      "source": "/api/repo-languages",
+      "cacheTtl": 86400
+    },
+    {
+      "source": "/api/org",
+      "cacheTtl": 86400
     }
   ],
   "cloudFunctions": {

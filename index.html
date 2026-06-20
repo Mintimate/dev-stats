@@ -210,45 +210,62 @@
         box-shadow: 0 0 0 3px var(--accent-glow);
       }
 
+      select.input-control {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+        background-size: 16px 16px;
+        padding-right: 40px;
+        cursor: pointer;
+      }
+
       .checkbox-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
         margin-top: 8px;
       }
 
-      .checkbox-control {
+      label.checkbox-control {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
         cursor: pointer;
         font-size: 14px;
         color: var(--muted);
         user-select: none;
+        transition: color 0.2s ease;
+        white-space: nowrap;
       }
 
-      .checkbox-control input {
+      label.checkbox-control input {
         appearance: none;
-        width: 16px;
-        height: 16px;
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
         border: 1px solid var(--panel-border);
-        border-radius: 4px;
+        border-radius: 6px;
         background: rgba(3, 7, 18, 0.5);
         cursor: pointer;
         display: grid;
         place-content: center;
-        transition: all 0.15s ease;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
       }
 
-      .checkbox-control input:checked {
+      label.checkbox-control input:checked {
         background: var(--accent);
         border-color: var(--accent);
+        box-shadow: 0 0 8px var(--accent-glow);
       }
 
-      .checkbox-control input:checked::before {
+      label.checkbox-control input:checked::before {
         content: "";
-        width: 8px;
-        height: 8px;
+        width: 10px;
+        height: 10px;
         background: white;
         clip-path: polygon(
           28% 38%,
@@ -260,7 +277,7 @@
         );
       }
 
-      .checkbox-control:hover {
+      label.checkbox-control:hover {
         color: var(--text);
       }
 
@@ -369,6 +386,105 @@
 
       .preview-box.loading .loader {
         display: block;
+      }
+
+      /* Presets & Gallery */
+      .gallery-section {
+        margin-bottom: 36px;
+      }
+      .gallery-title {
+        font-family: "Outfit", sans-serif;
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .gallery-title::before {
+        content: "";
+        width: 4px;
+        height: 18px;
+        background: var(--accent);
+        border-radius: 2px;
+        box-shadow: 0 0 10px var(--accent);
+      }
+      .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+      }
+      .gallery-card {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 18px;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+        justify-content: center;
+        min-height: 180px;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+      }
+      .gallery-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--accent);
+        box-shadow: 0 12px 24px rgba(59, 130, 246, 0.15);
+      }
+      .gallery-card.active {
+        border-color: var(--accent);
+        background: rgba(59, 130, 246, 0.05);
+        box-shadow:
+          0 0 0 2px var(--accent),
+          0 12px 24px rgba(59, 130, 246, 0.2);
+      }
+      .gallery-card img {
+        max-width: 100%;
+        max-height: 120px;
+        object-fit: contain;
+        border-radius: 6px;
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        transition: transform 0.3s ease;
+        background: transparent;
+      }
+      .gallery-card:hover img {
+        transform: scale(1.03);
+      }
+      .gallery-card-badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(3, 7, 18, 0.6);
+        border: 1px solid var(--panel-border);
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        color: var(--muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .gallery-card.active .gallery-card-badge {
+        color: #ffffff;
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .gallery-card-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        transition: color 0.2s ease;
+      }
+      .gallery-card.active .gallery-card-label,
+      .gallery-card:hover .gallery-card-label {
+        color: var(--text);
       }
 
       /* Code Block Output */
@@ -648,6 +764,100 @@
         }
       }
 
+      /* Custom Config Styles */
+      .config-section {
+        border-bottom: 1px solid var(--panel-border);
+        padding-bottom: 18px;
+        margin-bottom: 18px;
+      }
+      .config-section:last-of-type {
+        border-bottom: none;
+        padding-bottom: 0;
+        margin-bottom: 0;
+      }
+      .config-section-title {
+        font-family: "Outfit", sans-serif;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .config-section-title::before {
+        content: "";
+        width: 3px;
+        height: 12px;
+        background: var(--accent);
+        border-radius: 1px;
+        box-shadow: 0 0 6px var(--accent);
+      }
+      .form-group-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+        gap: 12px;
+      }
+      /* Details element accordion styling */
+      .colors-details {
+        border: none;
+      }
+      .colors-details summary {
+        list-style: none;
+        cursor: pointer;
+        outline: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .colors-details summary::-webkit-details-marker {
+        display: none;
+      }
+      .colors-details summary .arrow-indicator {
+        font-size: 11px;
+        color: var(--muted);
+        transition: transform 0.2s ease;
+      }
+      .colors-details[open] summary .arrow-indicator {
+        transform: rotate(90deg);
+      }
+      .color-picker-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .color-input-wrapper {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .color-input-wrapper input[type="color"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 38px;
+        height: 38px;
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        background: rgba(3, 7, 18, 0.5);
+        cursor: pointer;
+        padding: 0;
+        flex-shrink: 0;
+      }
+      .color-input-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+      .color-input-wrapper input[type="color"]::-webkit-color-swatch {
+        border: none;
+        border-radius: 7px;
+      }
+      .card-specific-section {
+        background: rgba(59, 130, 246, 0.03);
+        border: 1px solid rgba(59, 130, 246, 0.1);
+        border-radius: 12px;
+        padding: 16px;
+      }
+
       @media (prefers-reduced-motion: reduce) {
         *,
         *::before,
@@ -670,105 +880,279 @@
         </p>
       </header>
 
+      <!-- Demo Gallery Section -->
+      <section class="gallery-section">
+        <h2 class="gallery-title">预设卡片展厅</h2>
+        <div class="gallery-grid" id="gallery-grid">
+          <!-- Populated by JavaScript -->
+        </div>
+      </section>
+
       <div class="dashboard">
         <!-- Configuration Card -->
         <section class="card">
           <h2>配置面板</h2>
 
-          <div class="form-group">
-            <label for="username">GitHub 用户名</label>
-            <input
-              type="text"
-              id="username"
-              class="input-control"
-              value="Mintimate"
-              placeholder="输入您的用户名"
-            />
+          <!-- Group 1: 基础配置 -->
+          <div class="config-section">
+            <h3 class="config-section-title">基础配置</h3>
+            <div class="form-group">
+              <label for="username">GitHub 用户名</label>
+              <input
+                type="text"
+                id="username"
+                class="input-control"
+                value="Mintimate"
+                placeholder="输入您的用户名"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="card-type">卡片类型</label>
+              <select id="card-type" class="input-control">
+                <option value="stats">GitHub 综合统计卡</option>
+                <option value="top-langs">常用语言占比卡</option>
+                <option value="repo">仓库卡片 (Pin)</option>
+                <option value="gist">Gist 卡片</option>
+                <option value="wakatime">WakaTime 统计卡</option>
+                <option value="streak">连续贡献卡 (Streak)</option>
+                <option value="profile-summary">
+                  个人概览卡 (Profile Summary)
+                </option>
+                <option value="contribution-calendar">
+                  贡献日历卡 (Contribution Calendar)
+                </option>
+                <option value="recent-activity">
+                  最近动态卡 (Recent Activity)
+                </option>
+                <option value="repo-languages">
+                  仓库语言占比卡 (Repo Languages)
+                </option>
+                <option value="organization">
+                  组织统计卡 (Organization Stats)
+                </option>
+              </select>
+            </div>
+
+            <!-- Dynamic Repo Card fields -->
+            <div class="form-group" id="repo-field" style="display: none">
+              <label for="repo-name">仓库名称</label>
+              <input
+                type="text"
+                id="repo-name"
+                class="input-control"
+                value="github-readme-stats-eo"
+                placeholder="输入仓库名"
+              />
+            </div>
+
+            <!-- Dynamic Gist Card fields -->
+            <div class="form-group" id="gist-field" style="display: none">
+              <label for="gist-id">Gist ID</label>
+              <input
+                type="text"
+                id="gist-id"
+                class="input-control"
+                value="bbfce31e0217a3689c8d961a356cb10d"
+                placeholder="输入 Gist ID"
+              />
+            </div>
+
+            <div class="form-group" id="org-field" style="display: none">
+              <label for="org-name">GitHub 组织</label>
+              <input
+                type="text"
+                id="org-name"
+                class="input-control"
+                value="github"
+                placeholder="输入组织名"
+              />
+            </div>
           </div>
 
-          <div class="form-group">
-            <label for="card-type">卡片类型</label>
-            <select id="card-type" class="input-control">
-              <option value="stats">GitHub 综合统计卡</option>
-              <option value="top-langs">常用语言占比卡</option>
-              <option value="repo">仓库卡片 (Pin)</option>
-              <option value="gist">Gist 卡片</option>
-              <option value="wakatime">WakaTime 统计卡</option>
-            </select>
+          <!-- Group 2: 外观样式 -->
+          <div class="config-section">
+            <h3 class="config-section-title">外观与排版</h3>
+            <div class="form-group">
+              <label for="theme">卡片主题</label>
+              <select id="theme" class="input-control">
+                <option value="default">Default (明亮蓝色)</option>
+                <option value="dark">Dark (暗黑质感)</option>
+                <option value="radical">Radical (极客粉蓝)</option>
+                <option value="synthwave">Synthwave (赛博朋克)</option>
+                <option value="transparent">Transparent (半透明无背景)</option>
+              </select>
+            </div>
+
+            <!-- Layout field (only for top-langs & wakatime) -->
+            <div class="form-group" id="layout-field" style="display: none">
+              <label for="layout">展示布局</label>
+              <select id="layout" class="input-control">
+                <option value="compact">Compact (紧凑列表)</option>
+                <option value="normal">Normal (进度条)</option>
+                <option value="donut">Donut (环形图)</option>
+                <option value="donut-vertical">
+                  Donut Vertical (垂直环图)
+                </option>
+                <option value="pie">Pie (饼图)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="custom-title">自定义标题</label>
+              <input
+                type="text"
+                id="custom-title"
+                class="input-control"
+                value=""
+                placeholder="默认标题"
+              />
+            </div>
+
+            <div class="form-group-row">
+              <div class="form-group">
+                <label for="border-radius">边框圆角</label>
+                <input
+                  type="number"
+                  id="border-radius"
+                  class="input-control"
+                  value="4.5"
+                  min="0"
+                  max="30"
+                  step="0.5"
+                />
+              </div>
+              <div class="form-group">
+                <label for="card-width">卡片宽度 (px)</label>
+                <input
+                  type="number"
+                  id="card-width"
+                  class="input-control"
+                  value="0"
+                  min="0"
+                  placeholder="默认"
+                />
+              </div>
+              <div class="form-group">
+                <label for="line-height">行高 (px)</label>
+                <input
+                  type="number"
+                  id="line-height"
+                  class="input-control"
+                  value="25"
+                  min="15"
+                  max="50"
+                />
+              </div>
+            </div>
           </div>
 
-          <!-- Dynamic Repo Card fields -->
-          <div class="form-group" id="repo-field" style="display: none">
-            <label for="repo-name">仓库名称</label>
-            <input
-              type="text"
-              id="repo-name"
-              class="input-control"
-              value="github-readme-stats-eo"
-              placeholder="输入仓库名"
-            />
+          <!-- Group 3: 自定义配色 -->
+          <div class="config-section">
+            <details class="colors-details">
+              <summary class="config-section-title">
+                自定义配色 <span class="arrow-indicator">▶</span>
+              </summary>
+              <div class="color-picker-grid">
+                <div class="form-group">
+                  <label for="title-color">标题颜色</label>
+                  <div class="color-input-wrapper">
+                    <input
+                      type="color"
+                      id="title-color-picker"
+                      value="#3b82f6"
+                    />
+                    <input
+                      type="text"
+                      id="title-color"
+                      class="input-control"
+                      placeholder="6位16进制"
+                    />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="text-color">文本颜色</label>
+                  <div class="color-input-wrapper">
+                    <input
+                      type="color"
+                      id="text-color-picker"
+                      value="#f3f4f6"
+                    />
+                    <input
+                      type="text"
+                      id="text-color"
+                      class="input-control"
+                      placeholder="6位16进制"
+                    />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="icon-color">图标颜色</label>
+                  <div class="color-input-wrapper">
+                    <input
+                      type="color"
+                      id="icon-color-picker"
+                      value="#3b82f6"
+                    />
+                    <input
+                      type="text"
+                      id="icon-color"
+                      class="input-control"
+                      placeholder="6位16进制"
+                    />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="bg-color">背景颜色</label>
+                  <div class="color-input-wrapper">
+                    <input type="color" id="bg-color-picker" value="#070913" />
+                    <input
+                      type="text"
+                      id="bg-color"
+                      class="input-control"
+                      placeholder="6位16进制"
+                    />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="border-color">边框颜色</label>
+                  <div class="color-input-wrapper">
+                    <input
+                      type="color"
+                      id="border-color-picker"
+                      value="#ffffff"
+                    />
+                    <input
+                      type="text"
+                      id="border-color"
+                      class="input-control"
+                      placeholder="6位16进制"
+                    />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="ring-color">圆环颜色</label>
+                  <div class="color-input-wrapper">
+                    <input
+                      type="color"
+                      id="ring-color-picker"
+                      value="#3b82f6"
+                    />
+                    <input
+                      type="text"
+                      id="ring-color"
+                      class="input-control"
+                      placeholder="6位16进制"
+                    />
+                  </div>
+                </div>
+              </div>
+            </details>
           </div>
 
-          <!-- Dynamic Gist Card fields -->
-          <div class="form-group" id="gist-field" style="display: none">
-            <label for="gist-id">Gist ID</label>
-            <input
-              type="text"
-              id="gist-id"
-              class="input-control"
-              value="bbfce31e0217a3689c8d961a356cb10d"
-              placeholder="输入 Gist ID"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="theme">卡片主题</label>
-            <select id="theme" class="input-control">
-              <option value="default">Default (明亮蓝色)</option>
-              <option value="dark">Dark (暗黑质感)</option>
-              <option value="radical">Radical (极客粉蓝)</option>
-              <option value="synthwave">Synthwave (赛博朋克)</option>
-              <option value="transparent">Transparent (半透明无背景)</option>
-            </select>
-          </div>
-
-          <!-- Layout field (only for top-langs & wakatime) -->
-          <div class="form-group" id="layout-field" style="display: none">
-            <label for="layout">展示布局</label>
-            <select id="layout" class="input-control">
-              <option value="compact">Compact (紧凑列表)</option>
-              <option value="normal">Normal (进度条)</option>
-              <option value="donut">Donut (环形图)</option>
-              <option value="donut-vertical">Donut Vertical (垂直环图)</option>
-              <option value="pie">Pie (饼图)</option>
-            </select>
-          </div>
-
-          <div class="form-group" id="langs-count-field" style="display: none">
-            <label for="langs-count">展示语言数量</label>
-            <input
-              type="number"
-              id="langs-count"
-              class="input-control"
-              value="6"
-              min="1"
-              max="20"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="custom-title">自定义标题</label>
-            <input
-              type="text"
-              id="custom-title"
-              class="input-control"
-              value=""
-              placeholder="默认标题"
-            />
-          </div>
-
-          <div class="form-group">
-            <label>展示选项</label>
+          <!-- Group 4: 显示选项 -->
+          <div class="config-section">
+            <h3 class="config-section-title">显示与动画</h3>
             <div class="checkbox-grid">
               <label class="checkbox-control" id="opt-show-icons">
                 <input type="checkbox" id="show-icons" checked />
@@ -778,13 +1162,17 @@
                 <input type="checkbox" id="hide-border" />
                 <span>隐藏边框</span>
               </label>
-              <label class="checkbox-control" id="opt-hide-progress">
-                <input type="checkbox" id="hide-progress" />
-                <span>隐藏进度条</span>
+              <label class="checkbox-control" id="opt-hide-title">
+                <input type="checkbox" id="hide-title" />
+                <span>隐藏标题</span>
               </label>
               <label class="checkbox-control" id="opt-text-bold">
                 <input type="checkbox" id="text-bold" checked />
                 <span>粗体文本</span>
+              </label>
+              <label class="checkbox-control" id="opt-disable-animations">
+                <input type="checkbox" id="disable-animations" />
+                <span>禁用动画</span>
               </label>
               <label
                 class="checkbox-control"
@@ -794,6 +1182,191 @@
                 <input type="checkbox" id="show-owner" />
                 <span>显示拥有者</span>
               </label>
+              <label
+                class="checkbox-control"
+                id="opt-hide-progress"
+                style="display: none"
+              >
+                <input type="checkbox" id="hide-progress" />
+                <span>隐藏进度条</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Group 5: 专属高级配置 -->
+          <!-- Stats Card specific -->
+          <div
+            class="config-section card-specific-section"
+            id="stats-specific-fields"
+            style="display: none"
+          >
+            <h3 class="config-section-title">综合统计卡选项</h3>
+            <div class="checkbox-grid" style="margin-bottom: 16px">
+              <label class="checkbox-control">
+                <input type="checkbox" id="include-all-commits" />
+                <span>所有提交</span>
+              </label>
+              <label class="checkbox-control">
+                <input type="checkbox" id="show-prs-merged" />
+                <span>合并的PR</span>
+              </label>
+              <label class="checkbox-control">
+                <input type="checkbox" id="show-discussions-started" />
+                <span>发起的讨论</span>
+              </label>
+              <label class="checkbox-control">
+                <input type="checkbox" id="show-discussions-answered" />
+                <span>解答的讨论</span>
+              </label>
+              <label class="checkbox-control">
+                <input type="checkbox" id="hide-rank" />
+                <span>隐藏评级</span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="rank-icon">Rank 图标样式</label>
+              <select id="rank-icon" class="input-control">
+                <option value="default">Default (评级字母)</option>
+                <option value="github">GitHub 图标</option>
+                <option value="percentile">Percentile (百分比数值)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="exclude-repo">排除的仓库 (逗号分隔)</label>
+              <input
+                type="text"
+                id="exclude-repo"
+                class="input-control"
+                placeholder="例如: repo1,repo2"
+              />
+            </div>
+            <div class="form-group">
+              <label for="commits-year">统计年份 (例如: 2024)</label>
+              <input
+                type="text"
+                id="commits-year"
+                class="input-control"
+                placeholder="例如: 2024"
+              />
+            </div>
+          </div>
+
+          <!-- Top Langs specific -->
+          <div
+            class="config-section card-specific-section"
+            id="top-langs-specific-fields"
+            style="display: none"
+          >
+            <h3 class="config-section-title">语言占比卡选项</h3>
+            <div
+              class="form-group"
+              id="langs-count-field"
+              style="display: none"
+            >
+              <label for="langs-count">展示语言数量</label>
+              <input
+                type="number"
+                id="langs-count"
+                class="input-control"
+                value="6"
+                min="1"
+                max="20"
+              />
+            </div>
+            <div class="form-group">
+              <label for="exclude-repo-langs">排除的仓库 (逗号分隔)</label>
+              <input
+                type="text"
+                id="exclude-repo-langs"
+                class="input-control"
+                placeholder="例如: repo1,repo2"
+              />
+            </div>
+            <div class="form-group">
+              <label for="hide-langs">隐藏的语言 (逗号分隔)</label>
+              <input
+                type="text"
+                id="hide-langs"
+                class="input-control"
+                placeholder="例如: html,css"
+              />
+            </div>
+            <div class="form-group-row">
+              <div class="form-group">
+                <label for="size-weight">大小权重</label>
+                <input
+                  type="number"
+                  id="size-weight"
+                  class="input-control"
+                  value="1"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                />
+              </div>
+              <div class="form-group">
+                <label for="count-weight">数量权重</label>
+                <input
+                  type="number"
+                  id="count-weight"
+                  class="input-control"
+                  value="0"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- WakaTime specific -->
+          <div
+            class="config-section card-specific-section"
+            id="wakatime-specific-fields"
+            style="display: none"
+          >
+            <h3 class="config-section-title">WakaTime选项</h3>
+            <div class="form-group">
+              <label for="wakatime-hide-langs">隐藏的语言 (逗号分隔)</label>
+              <input
+                type="text"
+                id="wakatime-hide-langs"
+                class="input-control"
+                placeholder="例如: html,css"
+              />
+            </div>
+            <div class="form-group">
+              <label for="wakatime-api-domain">自定义 API 域名</label>
+              <input
+                type="text"
+                id="wakatime-api-domain"
+                class="input-control"
+                placeholder="例如: wakatime.com"
+              />
+            </div>
+          </div>
+
+          <!-- Recent Activity specific -->
+          <div
+            class="config-section card-specific-section"
+            id="recent-activity-specific-fields"
+            style="display: none"
+          >
+            <h3 class="config-section-title">最近动态选项</h3>
+            <div
+              class="form-group"
+              id="activity-count-field"
+              style="display: none"
+            >
+              <label for="activity-count">展示动态数量</label>
+              <input
+                type="number"
+                id="activity-count"
+                class="input-control"
+                value="5"
+                min="1"
+                max="10"
+              />
             </div>
           </div>
         </section>
@@ -926,6 +1499,300 @@
     <script>
       const baseUrl = window.location.origin;
 
+      const presets = [
+        {
+          id: "stats",
+          label: "GitHub 综合统计卡",
+          badge: "综合统计",
+          cardType: "stats",
+          theme: "dark",
+          showIcons: true,
+          textBold: true,
+          hideBorder: false,
+          customTitle: "",
+          getUrl: (baseUrl, username) =>
+            `${baseUrl}/api?username=${username}&show_icons=true&theme=dark`,
+        },
+        {
+          id: "top-langs",
+          label: "常用语言占比卡",
+          badge: "常用语言",
+          cardType: "top-langs",
+          theme: "radical",
+          layout: "compact",
+          langsCount: 6,
+          hideProgress: false,
+          hideBorder: false,
+          customTitle: "",
+          getUrl: (baseUrl, username) =>
+            `${baseUrl}/api/top-langs?username=${username}&layout=compact&langs_count=6&theme=radical`,
+        },
+        {
+          id: "streak",
+          label: "连续贡献卡",
+          badge: "连续贡献",
+          cardType: "streak",
+          theme: "synthwave",
+          hideBorder: false,
+          customTitle: "",
+          getUrl: (baseUrl, username) =>
+            `${baseUrl}/api/streak?username=${username}&theme=synthwave`,
+        },
+        {
+          id: "wakatime",
+          label: "WakaTime 统计卡",
+          badge: "WakaTime",
+          cardType: "wakatime",
+          theme: "tokyonight",
+          layout: "compact",
+          langsCount: 5,
+          hideProgress: false,
+          hideBorder: false,
+          customTitle: "",
+          getUrl: (baseUrl, username) =>
+            `${baseUrl}/api/wakatime?username=ffflabs&layout=compact&langs_count=5&theme=tokyonight`,
+        },
+        {
+          id: "repo",
+          label: "仓库卡片 (Pin)",
+          badge: "仓库卡片",
+          cardType: "repo",
+          repoName: "github-readme-stats-eo",
+          theme: "default",
+          showOwner: true,
+          hideBorder: false,
+          customTitle: "",
+          getUrl: (baseUrl, username) =>
+            `${baseUrl}/api/pin?username=${username}&repo=github-readme-stats-eo`,
+        },
+        {
+          id: "gist",
+          label: "Gist 详情卡片",
+          badge: "Gist",
+          cardType: "gist",
+          gistId: "bbfce31e0217a3689c8d961a356cb10d",
+          theme: "dracula",
+          showOwner: true,
+          hideBorder: false,
+          customTitle: "",
+          getUrl: (baseUrl, username) =>
+            `${baseUrl}/api/gist?id=bbfce31e0217a3689c8d961a356cb10d&theme=dracula`,
+        },
+        {
+          id: "profile-summary",
+          label: "个人概览卡",
+          badge: "个人概览",
+          cardType: "profile-summary",
+          theme: "shadow_blue",
+          hideBorder: false,
+          customTitle: "",
+          getUrl: (baseUrl, username) =>
+            `${baseUrl}/api/profile-summary?username=${username}&theme=shadow_blue`,
+        },
+        {
+          id: "contribution-calendar",
+          label: "贡献日历卡",
+          badge: "贡献日历",
+          cardType: "contribution-calendar",
+          theme: "github_dark_dimmed",
+          hideBorder: false,
+          customTitle: "",
+          getUrl: (baseUrl, username) =>
+            `${baseUrl}/api/contribution-calendar?username=${username}&theme=github_dark_dimmed`,
+        },
+        {
+          id: "recent-activity",
+          label: "最近动态卡",
+          badge: "最近动态",
+          cardType: "recent-activity",
+          theme: "one_dark_pro",
+          activityCount: 5,
+          hideBorder: false,
+          customTitle: "",
+          getUrl: (baseUrl, username) =>
+            `${baseUrl}/api/recent-activity?username=${username}&activity_count=5&theme=one_dark_pro`,
+        },
+        {
+          id: "repo-languages",
+          label: "仓库语言占比卡",
+          badge: "仓库语言",
+          cardType: "repo-languages",
+          repoName: "github-readme-stats-eo",
+          langsCount: 6,
+          theme: "rose_pine",
+          hideBorder: false,
+          customTitle: "",
+          getUrl: (baseUrl, username) =>
+            `${baseUrl}/api/repo-languages?username=${username}&repo=github-readme-stats-eo&langs_count=6&theme=rose_pine`,
+        },
+        {
+          id: "organization",
+          label: "组织统计卡",
+          badge: "组织统计",
+          cardType: "organization",
+          orgName: "github",
+          theme: "ambient_gradient",
+          hideBorder: false,
+          customTitle: "",
+          getUrl: (baseUrl, username) =>
+            `${baseUrl}/api/org?org=github&theme=ambient_gradient`,
+        },
+      ];
+
+      // Render Gallery
+      const galleryGrid = document.getElementById("gallery-grid");
+
+      function renderGallery() {
+        const username = elUsername.value.trim() || "Mintimate";
+        galleryGrid.innerHTML = presets
+          .map((p) => {
+            const imgUrl = p.getUrl(baseUrl, username);
+            return `
+            <div class="gallery-card" data-preset-id="${p.id}" id="gallery-${p.id}">
+              <span class="gallery-card-badge">${p.badge}</span>
+              <img src="${imgUrl}" alt="${p.label}" loading="lazy" />
+              <span class="gallery-card-label">${p.label}</span>
+            </div>
+          `;
+          })
+          .join("");
+
+        // Bind click events to gallery cards
+        presets.forEach((p) => {
+          const cardEl = document.getElementById(`gallery-${p.id}`);
+          if (cardEl) {
+            cardEl.addEventListener("click", () => {
+              applyPreset(p);
+            });
+          }
+        });
+      }
+
+      function applyPreset(preset) {
+        elCardType.value = preset.cardType;
+
+        // Update layout options since it depends on cardType
+        updateLayoutOptions();
+
+        elTheme.value = preset.theme;
+
+        if (preset.hasOwnProperty("layout")) {
+          elLayout.value = preset.layout;
+        }
+        if (preset.hasOwnProperty("langsCount")) {
+          elLangsCount.value = preset.langsCount;
+          document.getElementById("wakatime-langs-count").value =
+            preset.langsCount;
+        }
+        if (preset.hasOwnProperty("repoName")) {
+          elRepoName.value = preset.repoName;
+        }
+        if (preset.hasOwnProperty("orgName")) {
+          elOrgName.value = preset.orgName;
+        }
+        if (preset.hasOwnProperty("gistId")) {
+          elGistId.value = preset.gistId;
+        }
+        if (preset.hasOwnProperty("activityCount")) {
+          elActivityCount.value = preset.activityCount;
+        }
+
+        // Reset all color fields to empty
+        colors.forEach((c) => {
+          colorEls[c].textEl.value = "";
+          colorEls[c].pickerEl.value = "#3b82f6";
+        });
+
+        // Reset styling controls
+        document.getElementById("border-radius").value =
+          preset.borderRadius || "4.5";
+        document.getElementById("card-width").value = preset.cardWidth || "0";
+        document.getElementById("line-height").value =
+          preset.lineHeight || "25";
+
+        // Sync checkboxes
+        elShowIcons.checked = preset.showIcons !== false;
+        elTextBold.checked = preset.textBold !== false;
+        elHideBorder.checked = preset.hideBorder === true;
+        document.getElementById("hide-title").checked =
+          preset.hideTitle === true;
+        document.getElementById("disable-animations").checked =
+          preset.disableAnimations === true;
+        elShowOwner.checked = preset.showOwner === true;
+        elHideProgress.checked = preset.hideProgress === true;
+
+        // Stats specific checkboxes
+        document.getElementById("include-all-commits").checked =
+          preset.includeAllCommits === true;
+        document.getElementById("show-prs-merged").checked =
+          preset.showPrsMerged === true;
+        document.getElementById("show-discussions-started").checked =
+          preset.showDiscussionsStarted === true;
+        document.getElementById("show-discussions-answered").checked =
+          preset.showDiscussionsAnswered === true;
+        document.getElementById("hide-rank").checked = preset.hideRank === true;
+        document.getElementById("rank-icon").value =
+          preset.rankIcon || "default";
+        document.getElementById("exclude-repo").value =
+          preset.excludeRepo || "";
+        document.getElementById("commits-year").value =
+          preset.commitsYear || "";
+
+        // Top Langs / Wakatime specific inputs
+        document.getElementById("exclude-repo-langs").value =
+          preset.excludeRepo || "";
+        document.getElementById("hide-langs").value = preset.hideLangs || "";
+        document.getElementById("size-weight").value = preset.sizeWeight || "1";
+        document.getElementById("count-weight").value =
+          preset.countWeight || "0";
+        document.getElementById("wakatime-hide-langs").value =
+          preset.wakatimeHideLangs || "";
+        document.getElementById("wakatime-api-domain").value =
+          preset.wakatimeApiDomain || "";
+
+        elCustomTitle.value = preset.customTitle || "";
+
+        // Trigger updates
+        updateFieldsVisibility();
+        updatePreview();
+      }
+
+      function highlightMatchingPreset() {
+        const cardType = elCardType.value;
+        const theme = elTheme.value;
+        const layout = elLayout.value;
+        const hideBorder = elHideBorder.checked;
+
+        // Clear all active classes
+        document
+          .querySelectorAll(".gallery-card")
+          .forEach((card) => card.classList.remove("active"));
+
+        // Find match
+        const match = presets.find((p) => {
+          if (p.cardType !== cardType) return false;
+          if (p.theme !== theme) return false;
+          if (p.hasOwnProperty("layout") && p.layout !== layout) return false;
+          if (p.hideBorder !== hideBorder) return false;
+          return true;
+        });
+
+        if (match) {
+          const activeCard = document.getElementById(`gallery-${match.id}`);
+          if (activeCard) activeCard.classList.add("active");
+        }
+      }
+
+      function updateGalleryImages() {
+        const username = elUsername.value.trim() || "Mintimate";
+        presets.forEach((p) => {
+          const imgEl = document.querySelector(`#gallery-${p.id} img`);
+          if (imgEl) {
+            imgEl.src = p.getUrl(baseUrl, username);
+          }
+        });
+      }
+
       const endpoints = [
         {
           path: "/api",
@@ -956,6 +1823,42 @@
           label: "WakaTime 统计卡",
           query: "?username=ffflabs&layout=compact",
           desc: "挂载 WakaTime 开发者时长报告，生成占比与编码时间图。",
+        },
+        {
+          path: "/api/streak",
+          label: "连续贡献卡",
+          query: "?username=Mintimate",
+          desc: "展示当前连续贡献、最长连续贡献与年度贡献总数。",
+        },
+        {
+          path: "/api/profile-summary",
+          label: "开发者概览卡",
+          query: "?username=Mintimate",
+          desc: "汇总仓库、Followers、Star、Commit 与活跃年份。",
+        },
+        {
+          path: "/api/contribution-calendar",
+          label: "贡献日历卡",
+          query: "?username=Mintimate",
+          desc: "以热力图展示最近一年的 GitHub 贡献。",
+        },
+        {
+          path: "/api/recent-activity",
+          label: "最近动态卡",
+          query: "?username=Mintimate&activity_count=5",
+          desc: "展示最近公开 Commit、PR、Issue 与 Release。",
+        },
+        {
+          path: "/api/repo-languages",
+          label: "仓库语言卡",
+          query: "?username=Mintimate&repo=github-readme-stats-eo",
+          desc: "展示指定仓库的语言字节占比。",
+        },
+        {
+          path: "/api/org",
+          label: "组织统计卡",
+          query: "?org=github",
+          desc: "汇总组织仓库、成员、Star、Fork 与 Issue。",
         },
         {
           path: "/api/status/up",
@@ -1092,6 +1995,8 @@
       const elCustomTitle = document.getElementById("custom-title");
       const elRepoName = document.getElementById("repo-name");
       const elGistId = document.getElementById("gist-id");
+      const elOrgName = document.getElementById("org-name");
+      const elActivityCount = document.getElementById("activity-count");
 
       // Checkboxes
       const elShowIcons = document.getElementById("show-icons");
@@ -1105,6 +2010,10 @@
       const elLangsCountField = document.getElementById("langs-count-field");
       const elRepoField = document.getElementById("repo-field");
       const elGistField = document.getElementById("gist-field");
+      const elOrgField = document.getElementById("org-field");
+      const elActivityCountField = document.getElementById(
+        "activity-count-field",
+      );
 
       // Checkbox visual targets
       const optShowIcons = document.getElementById("opt-show-icons");
@@ -1128,6 +2037,44 @@
       ];
       const wakatimeLayouts = topLangLayouts.slice(0, 2);
 
+      // Color pickers sync bidirectional behaviour
+      const colors = [
+        "title-color",
+        "text-color",
+        "icon-color",
+        "bg-color",
+        "border-color",
+        "ring-color",
+      ];
+      const colorEls = {};
+      colors.forEach((c) => {
+        const textEl = document.getElementById(c);
+        const pickerEl = document.getElementById(c + "-picker");
+        colorEls[c] = { textEl, pickerEl };
+
+        // sync picker -> text
+        pickerEl.addEventListener("input", () => {
+          textEl.value = pickerEl.value.replace("#", "").toLowerCase();
+          schedulePreview();
+        });
+
+        // sync text -> picker
+        textEl.addEventListener("input", () => {
+          const val = textEl.value.trim();
+          if (/^[0-9a-fA-F]{3}$/.test(val) || /^[0-9a-fA-F]{6}$/.test(val)) {
+            let hex = val;
+            if (hex.length === 3) {
+              hex = hex
+                .split("")
+                .map((x) => x + x)
+                .join("");
+            }
+            pickerEl.value = "#" + hex.toLowerCase();
+          }
+          schedulePreview();
+        });
+      });
+
       function updateLayoutOptions() {
         const previous = elLayout.value;
         const options =
@@ -1148,35 +2095,60 @@
       function updateFieldsVisibility() {
         const cardType = elCardType.value;
 
-        // Hide all conditional areas first
+        // Hide all card-specific sections first
+        document.getElementById("stats-specific-fields").style.display = "none";
+        document.getElementById("top-langs-specific-fields").style.display =
+          "none";
+        document.getElementById("wakatime-specific-fields").style.display =
+          "none";
+        document.getElementById(
+          "recent-activity-specific-fields",
+        ).style.display = "none";
+
+        // Hide other dynamic fields
         elLayoutField.style.display = "none";
         elLangsCountField.style.display = "none";
         elRepoField.style.display = "none";
         elGistField.style.display = "none";
+        elOrgField.style.display = "none";
+        elActivityCountField.style.display = "none";
 
-        optShowIcons.style.display = "none";
-        optHideProgress.style.display = "none";
-        optTextBold.style.display = "none";
-        optShowOwner.style.display = "none";
-
+        // Show/hide based on cardType
         if (cardType === "stats") {
-          optShowIcons.style.display = "flex";
-          optTextBold.style.display = "flex";
+          document.getElementById("stats-specific-fields").style.display =
+            "block";
         } else if (cardType === "top-langs") {
+          document.getElementById("top-langs-specific-fields").style.display =
+            "block";
           elLayoutField.style.display = "block";
           elLangsCountField.style.display = "block";
-          optHideProgress.style.display = "flex";
         } else if (cardType === "repo") {
           elRepoField.style.display = "block";
-          optShowOwner.style.display = "flex";
         } else if (cardType === "gist") {
           elGistField.style.display = "block";
-          optShowOwner.style.display = "flex";
         } else if (cardType === "wakatime") {
+          document.getElementById("wakatime-specific-fields").style.display =
+            "block";
           elLayoutField.style.display = "block";
+        } else if (cardType === "repo-languages") {
+          elRepoField.style.display = "block";
           elLangsCountField.style.display = "block";
-          optHideProgress.style.display = "flex";
+        } else if (cardType === "organization") {
+          elOrgField.style.display = "block";
+        } else if (cardType === "recent-activity") {
+          document.getElementById(
+            "recent-activity-specific-fields",
+          ).style.display = "block";
+          elActivityCountField.style.display = "block";
         }
+
+        // Show/hide checkboxes compatibility
+        optShowIcons.style.display = cardType === "stats" ? "flex" : "none";
+        optTextBold.style.display = cardType === "stats" ? "flex" : "none";
+        optShowOwner.style.display =
+          cardType === "repo" || cardType === "gist" ? "flex" : "none";
+        optHideProgress.style.display =
+          cardType === "top-langs" || cardType === "wakatime" ? "flex" : "none";
       }
 
       function buildURL() {
@@ -1193,6 +2165,34 @@
           params.set("username", username);
           if (elShowIcons.checked) params.set("show_icons", "true");
           if (!elTextBold.checked) params.set("text_bold", "false");
+
+          if (document.getElementById("include-all-commits").checked)
+            params.set("include_all_commits", "true");
+          if (document.getElementById("show-prs-merged").checked)
+            params.set("show_prs_merged", "true");
+
+          const discStarted = document.getElementById(
+            "show-discussions-started",
+          ).checked;
+          const discAnswered = document.getElementById(
+            "show-discussions-answered",
+          ).checked;
+          if (discStarted && discAnswered)
+            params.set("show", "discussions_started,discussions_answered");
+          else if (discStarted) params.set("show", "discussions_started");
+          else if (discAnswered) params.set("show", "discussions_answered");
+
+          if (document.getElementById("hide-rank").checked)
+            params.set("hide_rank", "true");
+
+          const rankIcon = document.getElementById("rank-icon").value;
+          if (rankIcon !== "default") params.set("rank_icon", rankIcon);
+
+          const excl = document.getElementById("exclude-repo").value.trim();
+          if (excl) params.set("exclude_repo", excl);
+
+          const year = document.getElementById("commits-year").value.trim();
+          if (year) params.set("commits_year", year);
         } else if (cardType === "top-langs") {
           apiPath = "/api/top-langs";
           params.set("username", username);
@@ -1202,6 +2202,22 @@
             String(Math.min(20, Math.max(1, Number(elLangsCount.value) || 6))),
           );
           if (elHideProgress.checked) params.set("hide_progress", "true");
+
+          const excl = document
+            .getElementById("exclude-repo-langs")
+            .value.trim();
+          if (excl) params.set("exclude_repo", excl);
+
+          const hid = document.getElementById("hide-langs").value.trim();
+          if (hid) params.set("hide", hid);
+
+          const sWeight = document.getElementById("size-weight").value.trim();
+          if (sWeight !== "1" && sWeight !== "")
+            params.set("size_weight", sWeight);
+
+          const cWeight = document.getElementById("count-weight").value.trim();
+          if (cWeight !== "0" && cWeight !== "")
+            params.set("count_weight", cWeight);
         } else if (cardType === "repo") {
           apiPath = "/api/pin";
           params.set("username", username);
@@ -1224,11 +2240,59 @@
             "layout",
             elLayout.value === "compact" ? "compact" : "normal",
           );
+          const wkLangsCount =
+            document
+              .getElementById("wakatime-hide-langs")
+              .parentElement.parentElement.querySelector(
+                "#wakatime-langs-count",
+              )?.value || elLangsCount.value;
           params.set(
             "langs_count",
-            String(Math.min(10, Math.max(1, Number(elLangsCount.value) || 5))),
+            String(Math.min(10, Math.max(1, Number(wkLangsCount) || 5))),
           );
           if (elHideProgress.checked) params.set("hide_progress", "true");
+
+          const hid = document
+            .getElementById("wakatime-hide-langs")
+            .value.trim();
+          if (hid) params.set("hide", hid);
+
+          const apiDom = document
+            .getElementById("wakatime-api-domain")
+            .value.trim();
+          if (apiDom) params.set("api_domain", apiDom);
+        } else if (cardType === "streak") {
+          apiPath = "/api/streak";
+          params.set("username", username);
+        } else if (cardType === "profile-summary") {
+          apiPath = "/api/profile-summary";
+          params.set("username", username);
+        } else if (cardType === "contribution-calendar") {
+          apiPath = "/api/contribution-calendar";
+          params.set("username", username);
+        } else if (cardType === "recent-activity") {
+          apiPath = "/api/recent-activity";
+          params.set("username", username);
+          params.set(
+            "activity_count",
+            String(
+              Math.min(10, Math.max(1, Number(elActivityCount.value) || 5)),
+            ),
+          );
+        } else if (cardType === "repo-languages") {
+          apiPath = "/api/repo-languages";
+          params.set("username", username);
+          params.set(
+            "repo",
+            elRepoName.value.trim() || "github-readme-stats-eo",
+          );
+          params.set(
+            "langs_count",
+            String(Math.min(20, Math.max(1, Number(elLangsCount.value) || 6))),
+          );
+        } else if (cardType === "organization") {
+          apiPath = "/api/org";
+          params.set("org", elOrgName.value.trim() || "github");
         }
 
         // Common configurations
@@ -1238,9 +2302,39 @@
         if (elHideBorder.checked) {
           params.set("hide_border", "true");
         }
+        if (document.getElementById("hide-title").checked) {
+          params.set("hide_title", "true");
+        }
+        if (document.getElementById("disable-animations").checked) {
+          params.set("disable_animations", "true");
+        }
         if (customTitle) {
           params.set("custom_title", customTitle);
         }
+
+        // Styling dimensions
+        const borderRadius = document
+          .getElementById("border-radius")
+          .value.trim();
+        if (borderRadius !== "4.5" && borderRadius !== "") {
+          params.set("border_radius", borderRadius);
+        }
+        const cardWidth = document.getElementById("card-width").value.trim();
+        if (cardWidth !== "0" && cardWidth !== "") {
+          params.set("card_width", cardWidth);
+        }
+        const lineHeight = document.getElementById("line-height").value.trim();
+        if (lineHeight !== "25" && lineHeight !== "") {
+          params.set("line_height", lineHeight);
+        }
+
+        // Custom colors
+        colors.forEach((c) => {
+          const val = colorEls[c].textEl.value.trim();
+          if (val) {
+            params.set(c.replace("-", "_"), val);
+          }
+        });
 
         const queryStr = params.toString() ? "?" + params.toString() : "";
         return baseUrl + apiPath + queryStr;
@@ -1253,6 +2347,9 @@
         previewStatus.textContent = "加载中…";
         previewImage.src = fullUrl;
 
+        // Highlight matching preset
+        highlightMatchingPreset();
+
         // Code update
         const cardNameMap = {
           stats: "GitHub Stats",
@@ -1260,6 +2357,12 @@
           repo: "Pinned Repo",
           gist: "Gist Card",
           wakatime: "WakaTime Stats",
+          streak: "Contribution Streak",
+          "profile-summary": "Profile Summary",
+          "contribution-calendar": "Contribution Calendar",
+          "recent-activity": "Recent Activity",
+          "repo-languages": "Repository Languages",
+          organization: "Organization Stats",
         };
         const activeName = cardNameMap[elCardType.value] || "Card";
 
@@ -1286,32 +2389,71 @@
       let previewTimer;
       function schedulePreview() {
         clearTimeout(previewTimer);
-        previewTimer = setTimeout(updatePreview, 250);
+        previewTimer = setTimeout(() => {
+          updatePreview();
+          updateGalleryImages();
+        }, 250);
       }
 
       // Bind events to trigger visual updates
-      [elUsername, elRepoName, elGistId, elLangsCount, elCustomTitle].forEach(
-        (input) => {
-          input.addEventListener("input", schedulePreview);
-        },
-      );
-      [elCardType, elTheme, elLayout].forEach((select) => {
-        select.addEventListener("change", () => {
-          if (select === elCardType) {
-            updateLayoutOptions();
-            updateFieldsVisibility();
-          }
-          updatePreview();
-        });
+      const allInputs = [
+        elUsername,
+        elRepoName,
+        elGistId,
+        elOrgName,
+        elLangsCount,
+        elActivityCount,
+        elCustomTitle,
+        document.getElementById("border-radius"),
+        document.getElementById("card-width"),
+        document.getElementById("line-height"),
+        document.getElementById("wakatime-hide-langs"),
+        document.getElementById("wakatime-api-domain"),
+        document.getElementById("exclude-repo"),
+        document.getElementById("commits-year"),
+        document.getElementById("exclude-repo-langs"),
+        document.getElementById("hide-langs"),
+        document.getElementById("size-weight"),
+        document.getElementById("count-weight"),
+      ];
+      allInputs.forEach((input) => {
+        if (input) input.addEventListener("input", schedulePreview);
       });
-      [
+
+      const allSelects = [
+        elCardType,
+        elTheme,
+        elLayout,
+        document.getElementById("rank-icon"),
+      ];
+      allSelects.forEach((select) => {
+        if (select) {
+          select.addEventListener("change", () => {
+            if (select === elCardType) {
+              updateLayoutOptions();
+              updateFieldsVisibility();
+            }
+            updatePreview();
+          });
+        }
+      });
+
+      const allCheckboxes = [
         elShowIcons,
         elHideBorder,
         elHideProgress,
         elTextBold,
         elShowOwner,
-      ].forEach((checkbox) => {
-        checkbox.addEventListener("change", updatePreview);
+        document.getElementById("hide-title"),
+        document.getElementById("disable-animations"),
+        document.getElementById("include-all-commits"),
+        document.getElementById("show-prs-merged"),
+        document.getElementById("show-discussions-started"),
+        document.getElementById("show-discussions-answered"),
+        document.getElementById("hide-rank"),
+      ];
+      allCheckboxes.forEach((checkbox) => {
+        if (checkbox) checkbox.addEventListener("change", updatePreview);
       });
 
       // Copy features
@@ -1341,6 +2483,7 @@
       bindCopyBtn("copy-url-btn", "raw-url");
 
       // Initial execution
+      renderGallery();
       updateLayoutOptions();
       updateFieldsVisibility();
       updatePreview();

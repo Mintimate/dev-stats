@@ -9,10 +9,16 @@ The original project is deployed on Vercel. This version is adapted for EdgeOne 
 ## Features
 
 - **Dynamic Statistics Cards**: Display GitHub data (commits, PRs, stars, etc.)
-- **Multiple Themes**: Support for custom colors and layouts
+- **Presets Gallery**: Interactive dashboard showcase displaying multiple live cards side-by-side with one-click configuration
+- **All-New Configuration Panel**: Premium web form layout supporting input debouncing and real-time Markdown/HTML code generation
+- **Multiple Themes & Layouts**: Full support for themes, layouts (compact/normal), and custom styling parameters
 - **EdgeOne Pages Optimized**: Adapted for EdgeOne Pages Cloud Functions and platform caching
-- **Go Cloud Functions**: Adds a Go runtime entrypoint with fewer runtime dependencies
+- **Go Cloud Functions**: Uses a Go runtime backend for minimal cold starts and high performance
 - **Original API Compatible**: Maintains the same query parameters and usage as the original project
+
+## Interface Preview
+
+![EdgeOne Pages Dashboard](./docs/static/dashboard.webp)
 
 ## Quick Start
 
@@ -65,6 +71,9 @@ This project returns `Cache-Control` headers from the functions and configures P
 - `/api/pin`: cached for 10 days by default
 - `/api/gist`: cached for 2 days by default
 - `/api/wakatime`: cached for 1 day by default
+- `/api/streak` and `/api/contribution-calendar`: cached for 12 hours by default
+- `/api/recent-activity`: cached for 1 hour by default
+- `/api/profile-summary`, `/api/repo-languages`, and `/api/org`: cached for 1 day by default
 
 Status endpoints are not configured for platform caching, so PAT health and availability checks do not get cached for too long. High-traffic public instances can still place EdgeOne CDN / Cloudflare or another CDN layer in front of the custom domain for more cache control, purge support, and observability.
 
@@ -85,6 +94,12 @@ The Go entrypoint lives in `cloud-functions/[[default]].go` and uses EdgeOne Pag
 - `/api/pin` - Repository Pin Card
 - `/api/gist` - Gist Card
 - `/api/wakatime` - WakaTime Stats Card
+- `/api/streak` - Contribution Streak Card
+- `/api/profile-summary` - Developer Profile Summary Card
+- `/api/contribution-calendar` - Contribution Calendar Card
+- `/api/recent-activity` - Recent Public Activity Card
+- `/api/repo-languages` - Repository Languages Card
+- `/api/org` - GitHub Organization Stats Card
 - `/api/status/up` - PAT availability check
 - `/api/status/pat-info` - PAT status details
 
@@ -118,6 +133,12 @@ After deployment, visit your EdgeOne Pages domain to see the usage documentation
 - `/api/pin` - Repository Pin Card
 - `/api/gist` - Gist Card
 - `/api/wakatime` - WakaTime Stats Card
+- `/api/streak` - Contribution Streak Card
+- `/api/profile-summary` - Developer Profile Summary Card
+- `/api/contribution-calendar` - Contribution Calendar Card
+- `/api/recent-activity` - Recent Public Activity Card
+- `/api/repo-languages` - Repository Languages Card
+- `/api/org` - GitHub Organization Stats Card
 
 For detailed parameters, please refer to the [original project documentation](https://github.com/anuraghazra/github-readme-stats/blob/master/readme.md).
 
