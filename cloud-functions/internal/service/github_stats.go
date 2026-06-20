@@ -134,7 +134,7 @@ query ContributionCalendar($login: String!) {
     login
     contributionsCollection {
       contributionCalendar {
-        weeks { ContributionDays { date contributionCount } }
+        weeks { contributionDays { date contributionCount } }
       }
     }
   }
@@ -149,7 +149,7 @@ query ContributionCalendar($login: String!) {
 						ContributionDays []struct {
 							Date              string `json:"date"`
 							ContributionCount int    `json:"contributionCount"`
-						} `json:"ContributionDays"`
+						} `json:"contributionDays"`
 					} `json:"weeks"`
 				} `json:"contributionCalendar"`
 			} `json:"contributionsCollection"`
