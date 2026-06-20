@@ -18,6 +18,19 @@
       rel="stylesheet"
     />
 
+    <!-- Anti-FOUC Theme Script -->
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme-pref') || 'system';
+        if (theme === 'system') {
+          const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        } else {
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+      })();
+    </script>
+
     <style>
       :root {
         --bg: #070913;
@@ -37,6 +50,45 @@
         --ok: #10b981;
         --ok-glow: rgba(16, 185, 129, 0.2);
         --code-bg: #030712;
+
+        /* Theme specific variables */
+        --grid-color: rgba(255, 255, 255, 0.03);
+        --input-bg: rgba(3, 7, 18, 0.5);
+        --preview-bg: rgba(3, 7, 18, 0.3);
+        --badge-bg: rgba(3, 7, 18, 0.6);
+        --footer-bg: rgba(3, 7, 18, 0.4);
+        --code-header-bg: rgba(255, 255, 255, 0.02);
+        --btn-hover-bg: rgba(255, 255, 255, 0.05);
+        --card-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      }
+
+      html[data-theme="light"] {
+        --bg: #f8fafc;
+        --bg-gradient: radial-gradient(
+          circle at 50% 0%,
+          #e2e8f0 0%,
+          #f8fafc 70%
+        );
+        --panel: rgba(255, 255, 255, 0.65);
+        --panel-border: rgba(15, 23, 42, 0.08);
+        --panel-hover: rgba(255, 255, 255, 0.85);
+        --text: #0f172a;
+        --muted: #64748b;
+        --accent: #2563eb;
+        --accent-glow: rgba(37, 99, 235, 0.1);
+        --accent-hover: #1d4ed8;
+        --ok: #059669;
+        --ok-glow: rgba(5, 150, 105, 0.15);
+        --code-bg: #f1f5f9;
+        
+        --grid-color: rgba(15, 23, 42, 0.04);
+        --input-bg: rgba(255, 255, 255, 0.8);
+        --preview-bg: rgba(255, 255, 255, 0.4);
+        --badge-bg: rgba(241, 245, 249, 0.8);
+        --footer-bg: rgba(255, 255, 255, 0.4);
+        --code-header-bg: rgba(15, 23, 42, 0.04);
+        --btn-hover-bg: rgba(15, 23, 42, 0.05);
+        --card-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
       }
 
       * {
@@ -65,8 +117,8 @@
         width: 100%;
         height: 600px;
         background-image:
-          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          linear-gradient(var(--grid-color) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
         background-size: 40px 40px;
         background-position: center top;
         mask-image: linear-gradient(
@@ -84,6 +136,7 @@
       }
 
       main {
+        position: relative;
         width: min(1320px, calc(100% - 40px));
         margin: 0 auto;
         padding: 48px 0 72px;
@@ -156,7 +209,7 @@
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
         padding: 24px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        box-shadow: var(--card-shadow);
       }
 
       h2 {
@@ -194,7 +247,7 @@
 
       .input-control {
         width: 100%;
-        background: rgba(3, 7, 18, 0.5);
+        background: var(--input-bg);
         border: 1px solid var(--panel-border);
         border-radius: 8px;
         color: var(--text);
@@ -248,7 +301,7 @@
         height: 18px;
         border: 1px solid var(--panel-border);
         border-radius: 6px;
-        background: rgba(3, 7, 18, 0.5);
+        background: var(--input-bg);
         cursor: pointer;
         display: grid;
         place-content: center;
@@ -289,7 +342,7 @@
       }
 
       .preview-box {
-        background: rgba(3, 7, 18, 0.3);
+        background: var(--preview-bg);
         border: 1px solid var(--panel-border);
         border-radius: 16px;
         padding: 32px;
@@ -306,10 +359,10 @@
         position: absolute;
         inset: 0;
         background-image:
-          linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+          linear-gradient(var(--grid-color) 1px, transparent 1px),
           linear-gradient(
             90deg,
-            rgba(255, 255, 255, 0.025) 1px,
+            var(--grid-color) 1px,
             transparent 1px
           );
         background-size: 28px 28px;
@@ -368,7 +421,7 @@
         position: absolute;
         width: 40px;
         height: 40px;
-        border: 3px solid rgba(255, 255, 255, 0.05);
+        border: 3px solid var(--panel-border);
         border-top-color: var(--accent);
         border-radius: 50%;
         animation: spin 1s linear infinite;
@@ -461,7 +514,7 @@
         position: absolute;
         top: 10px;
         left: 10px;
-        background: rgba(3, 7, 18, 0.6);
+        background: var(--badge-bg);
         border: 1px solid var(--panel-border);
         padding: 4px 8px;
         border-radius: 6px;
@@ -506,7 +559,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: rgba(255, 255, 255, 0.02);
+        background: var(--code-header-bg);
         padding: 8px 16px;
         border-bottom: 1px solid var(--panel-border);
       }
@@ -535,7 +588,7 @@
       }
 
       .copy-btn:hover {
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--btn-hover-bg);
         color: var(--text);
       }
 
@@ -669,7 +722,7 @@
         width: 100%;
         border-top: 1px solid var(--panel-border);
         padding: 24px 0;
-        background: rgba(3, 7, 18, 0.4);
+        background: var(--footer-bg);
         margin-top: auto;
       }
 
@@ -867,10 +920,104 @@
           scroll-behavior: auto !important;
         }
       }
+
+      /* Light Theme overrides for Title & Code text */
+      html[data-theme="light"] h1 {
+        background: linear-gradient(135deg, #0f172a 40%, #4f46e5 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      html[data-theme="light"] code {
+        color: #1e293b;
+      }
+
+      /* Theme Switcher Styles */
+      .theme-switch-wrapper {
+        position: absolute;
+        top: 24px;
+        right: 0;
+        z-index: 100;
+      }
+
+      .theme-switch-container {
+        display: inline-flex;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 99px;
+        padding: 3px;
+        position: relative;
+        gap: 2px;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .theme-btn {
+        background: transparent;
+        border: none;
+        color: var(--muted);
+        padding: 6px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 99px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+        user-select: none;
+        z-index: 1;
+      }
+
+      .theme-btn svg {
+        width: 15px;
+        height: 15px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .theme-btn:hover {
+        color: var(--text);
+      }
+
+      .theme-btn.active {
+        color: #ffffff;
+        background: var(--accent);
+        box-shadow: 0 2px 8px var(--accent-glow);
+      }
+
+      @media (max-width: 860px) {
+        .theme-switch-wrapper {
+          position: static;
+          display: flex;
+          justify-content: center;
+          margin-bottom: 24px;
+        }
+      }
     </style>
   </head>
   <body>
     <main>
+      <div class="theme-switch-wrapper">
+        <div class="theme-switch-container">
+          <button class="theme-btn" data-theme-val="light" title="亮色模式">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <span>亮色</span>
+          </button>
+          <button class="theme-btn" data-theme-val="system" title="系统默认">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            <span>系统</span>
+          </button>
+          <button class="theme-btn" data-theme-val="dark" title="暗色模式">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            <span>暗色</span>
+          </button>
+        </div>
+      </div>
       <header>
         <span class="badge">Go Cloud Functions</span>
         <h1>GitHub Readme Stats · EdgeOne</h1>
@@ -2481,6 +2628,49 @@
 
       bindCopyBtn("copy-markdown-btn", "markdown-code");
       bindCopyBtn("copy-url-btn", "raw-url");
+
+      // Theme Switcher Interactive Logic
+      const themeBtns = document.querySelectorAll(".theme-btn");
+      const savedThemePref = localStorage.getItem("theme-pref") || "system";
+
+      function applyTheme(themePref) {
+        // Set active class on buttons
+        themeBtns.forEach((btn) => {
+          if (btn.getAttribute("data-theme-val") === themePref) {
+            btn.classList.add("active");
+          } else {
+            btn.classList.remove("active");
+          }
+        });
+
+        // Set theme attribute
+        if (themePref === "system") {
+          const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+        } else {
+          document.documentElement.setAttribute("data-theme", themePref);
+        }
+      }
+
+      // Initialize Theme
+      applyTheme(savedThemePref);
+
+      // Event Listeners for theme switch buttons
+      themeBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const selected = btn.getAttribute("data-theme-val");
+          localStorage.setItem("theme-pref", selected);
+          applyTheme(selected);
+        });
+      });
+
+      // System Preference Change Listener
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+        const currentPref = localStorage.getItem("theme-pref") || "system";
+        if (currentPref === "system") {
+          document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+        }
+      });
 
       // Initial execution
       renderGallery();
