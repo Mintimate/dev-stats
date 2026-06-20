@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github-readme-stats-eo/cloud-functions/handle"
+	"github-readme-stats-eo/cloud-functions/internal/handler"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,7 +22,7 @@ func main() {
 	r.Use(gin.Recovery())
 
 	// Route all requests to our standard http handler
-	r.Any("/*any", gin.WrapF(handle.Handler))
+	r.Any("/*any", gin.WrapF(handler.Handler))
 
 	log.Printf("Server listening on port %s", port)
 	if err := r.Run(":" + port); err != nil {
