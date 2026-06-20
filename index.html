@@ -1002,6 +1002,77 @@
           margin-bottom: 24px;
         }
       }
+
+      /* Support & Author Card Styles */
+      .support-card {
+        margin-top: 24px;
+      }
+      
+      .support-card h2 {
+        margin-bottom: 16px;
+      }
+
+      .support-links {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .support-btn {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 18px;
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        background: var(--input-bg);
+        color: var(--text);
+        text-decoration: none;
+        transition: all 0.2s ease;
+      }
+
+      .support-btn svg {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
+        transition: color 0.2s ease;
+      }
+
+      .support-btn span {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .support-btn .support-desc {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 400;
+        margin-left: auto;
+      }
+
+      .support-btn:hover {
+        transform: translateY(-2px);
+        border-color: var(--accent);
+        box-shadow: 0 4px 12px var(--accent-glow);
+        background: var(--panel-hover);
+      }
+
+      .blog-btn:hover svg {
+        color: #3b82f6;
+      }
+
+      .bilibili-btn:hover svg {
+        color: #00aeec;
+      }
+
+      .afdian-btn:hover svg {
+        color: #946ce6;
+      }
     </style>
   </head>
   <body>
@@ -1598,7 +1669,28 @@
                   复制
                 </button>
               </div>
-              <pre><code id="raw-url"></code></pre>
+            <pre><code id="raw-url"></code></pre>
+          </div>
+
+          <!-- Author Support Card -->
+          <div class="card support-card">
+            <h2>关于作者</h2>
+            <div class="support-links">
+              <a href="https://www.mintimate.cn" target="_blank" rel="noreferrer" class="support-btn blog-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
+                <span>作者博客</span>
+                <span class="support-desc">技术分享与教程</span>
+              </a>
+              <a href="https://space.bilibili.com/355567627" target="_blank" rel="noreferrer" class="support-btn bilibili-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="13" rx="2" ry="2"/><path d="m17 2-3 5M7 2l3 5M8 14h.01M16 14h.01"/></svg>
+                <span>关注 B 站</span>
+                <span class="support-desc">视频内容与动态</span>
+              </a>
+              <a href="https://ifdian.net/a/mintimate" target="_blank" rel="noreferrer" class="support-btn afdian-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span>赞助支持</span>
+                <span class="support-desc">用爱发电，支持项目</span>
+              </a>
             </div>
           </div>
         </section>
