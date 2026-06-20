@@ -936,12 +936,15 @@
         color: #1e293b;
       }
 
-      /* Theme Switcher Styles */
+      /* Theme & Language Switcher Styles */
       .theme-switch-wrapper {
         position: absolute;
         top: 24px;
         right: 0;
         z-index: 100;
+        display: flex;
+        gap: 12px;
+        align-items: center;
       }
 
       .theme-switch-container {
@@ -957,7 +960,7 @@
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       }
 
-      .theme-btn {
+      .theme-btn, .lang-btn {
         background: transparent;
         border: none;
         color: var(--muted);
@@ -972,6 +975,7 @@
         transition: all 0.2s ease;
         user-select: none;
         z-index: 1;
+        text-decoration: none;
       }
 
       .theme-btn svg {
@@ -984,11 +988,11 @@
         stroke-linejoin: round;
       }
 
-      .theme-btn:hover {
+      .theme-btn:hover, .lang-btn:hover {
         color: var(--text);
       }
 
-      .theme-btn.active {
+      .theme-btn.active, .lang-btn.active {
         color: #ffffff;
         background: var(--accent);
         box-shadow: 0 2px 8px var(--accent-glow);
@@ -999,6 +1003,7 @@
           position: static;
           display: flex;
           justify-content: center;
+          gap: 12px;
           margin-bottom: 24px;
         }
       }
@@ -1078,25 +1083,35 @@
   <body>
     <main>
       <div class="theme-switch-wrapper">
+        <!-- Language Switcher -->
+        <div class="theme-switch-container" id="lang-switch-container">
+          <button class="lang-btn" data-lang-val="zh" data-i18n-title="lang-zh-title" title="简体中文">
+            <span>中文</span>
+          </button>
+          <button class="lang-btn" data-lang-val="en" data-i18n-title="lang-en-title" title="English">
+            <span>EN</span>
+          </button>
+        </div>
+        <!-- Theme Switcher -->
         <div class="theme-switch-container">
-          <button class="theme-btn" data-theme-val="light" title="亮色模式">
+          <button class="theme-btn" data-theme-val="light" data-i18n-title="theme-light-title" title="亮色模式">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-            <span>亮色</span>
+            <span data-i18n="theme-light">亮色</span>
           </button>
-          <button class="theme-btn" data-theme-val="system" title="系统默认">
+          <button class="theme-btn" data-theme-val="system" data-i18n-title="theme-system-title" title="系统默认">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-            <span>系统</span>
+            <span data-i18n="theme-system">系统</span>
           </button>
-          <button class="theme-btn" data-theme-val="dark" title="暗色模式">
+          <button class="theme-btn" data-theme-val="dark" data-i18n-title="theme-dark-title" title="暗色模式">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-            <span>暗色</span>
+            <span data-i18n="theme-dark">暗色</span>
           </button>
         </div>
       </div>
       <header>
-        <span class="badge">Go Cloud Functions</span>
-        <h1>GitHub Readme Stats · EdgeOne</h1>
-        <p class="lead">
+        <span class="badge" data-i18n="badge-gocf">Go Cloud Functions</span>
+        <h1 data-i18n="app-title">GitHub Readme Stats · EdgeOne</h1>
+        <p class="lead" data-i18n="lead-desc">
           在 Tencent EdgeOne Pages Edge
           边缘侧极致加速的统计卡片生成器，提供极速响应的动态 SVG 数据渲染服务。
         </p>
@@ -1104,7 +1119,7 @@
 
       <!-- Demo Gallery Section -->
       <section class="gallery-section">
-        <h2 class="gallery-title">预设卡片展厅</h2>
+        <h2 class="gallery-title" data-i18n="gallery-title">预设卡片展厅</h2>
         <div class="gallery-grid" id="gallery-grid">
           <!-- Populated by JavaScript -->
         </div>
@@ -1113,44 +1128,45 @@
       <div class="dashboard">
         <!-- Configuration Card -->
         <section class="card">
-          <h2>配置面板</h2>
+          <h2 data-i18n="config-panel-title">配置面板</h2>
 
           <!-- Group 1: 基础配置 -->
           <div class="config-section">
-            <h3 class="config-section-title">基础配置</h3>
+            <h3 class="config-section-title" data-i18n="basic-config">基础配置</h3>
             <div class="form-group">
-              <label for="username">GitHub 用户名</label>
+              <label for="username" data-i18n="username-label">GitHub 用户名</label>
               <input
                 type="text"
                 id="username"
                 class="input-control"
                 value="Mintimate"
                 placeholder="输入您的用户名"
+                data-i18n-placeholder="username-placeholder"
               />
             </div>
 
             <div class="form-group">
-              <label for="card-type">卡片类型</label>
+              <label for="card-type" data-i18n="card-type-label">卡片类型</label>
               <select id="card-type" class="input-control">
-                <option value="stats">GitHub 综合统计卡</option>
-                <option value="top-langs">常用语言占比卡</option>
-                <option value="repo">仓库卡片 (Pin)</option>
-                <option value="gist">Gist 卡片</option>
-                <option value="wakatime">WakaTime 统计卡</option>
-                <option value="streak">连续贡献卡 (Streak)</option>
-                <option value="profile-summary">
+                <option value="stats" data-i18n="opt-stats">GitHub 综合统计卡</option>
+                <option value="top-langs" data-i18n="opt-top-langs">常用语言占比卡</option>
+                <option value="repo" data-i18n="opt-repo">仓库卡片 (Pin)</option>
+                <option value="gist" data-i18n="opt-gist">Gist 卡片</option>
+                <option value="wakatime" data-i18n="opt-wakatime">WakaTime 统计卡</option>
+                <option value="streak" data-i18n="opt-streak">连续贡献卡 (Streak)</option>
+                <option value="profile-summary" data-i18n="opt-profile-summary">
                   个人概览卡 (Profile Summary)
                 </option>
-                <option value="contribution-calendar">
+                <option value="contribution-calendar" data-i18n="opt-contribution-calendar">
                   贡献日历卡 (Contribution Calendar)
                 </option>
-                <option value="recent-activity">
+                <option value="recent-activity" data-i18n="opt-recent-activity">
                   最近动态卡 (Recent Activity)
                 </option>
-                <option value="repo-languages">
+                <option value="repo-languages" data-i18n="opt-repo-languages">
                   仓库语言占比卡 (Repo Languages)
                 </option>
-                <option value="organization">
+                <option value="organization" data-i18n="opt-organization">
                   组织统计卡 (Organization Stats)
                 </option>
               </select>
@@ -1158,45 +1174,48 @@
 
             <!-- Dynamic Repo Card fields -->
             <div class="form-group" id="repo-field" style="display: none">
-              <label for="repo-name">仓库名称</label>
+              <label for="repo-name" data-i18n="repo-name-label">仓库名称</label>
               <input
                 type="text"
                 id="repo-name"
                 class="input-control"
                 value="github-readme-stats-eo"
                 placeholder="输入仓库名"
+                data-i18n-placeholder="repo-name-placeholder"
               />
             </div>
 
             <!-- Dynamic Gist Card fields -->
             <div class="form-group" id="gist-field" style="display: none">
-              <label for="gist-id">Gist ID</label>
+              <label for="gist-id" data-i18n="gist-id-label">Gist ID</label>
               <input
                 type="text"
                 id="gist-id"
                 class="input-control"
                 value="bbfce31e0217a3689c8d961a356cb10d"
                 placeholder="输入 Gist ID"
+                data-i18n-placeholder="gist-id-placeholder"
               />
             </div>
 
             <div class="form-group" id="org-field" style="display: none">
-              <label for="org-name">GitHub 组织</label>
+              <label for="org-name" data-i18n="org-name-label">GitHub 组织</label>
               <input
                 type="text"
                 id="org-name"
                 class="input-control"
                 value="github"
                 placeholder="输入组织名"
+                data-i18n-placeholder="org-name-placeholder"
               />
             </div>
           </div>
 
           <!-- Group 2: 外观样式 -->
           <div class="config-section">
-            <h3 class="config-section-title">外观与排版</h3>
+            <h3 class="config-section-title" data-i18n="appearance-config">外观与排版</h3>
             <div class="form-group">
-              <label for="theme">卡片主题</label>
+              <label for="theme" data-i18n="theme-label">卡片主题</label>
               <select id="theme" class="input-control">
                 <option value="default">Default (明亮蓝色)</option>
                 <option value="dark">Dark (暗黑质感)</option>
@@ -1208,7 +1227,7 @@
 
             <!-- Layout field (only for top-langs & wakatime) -->
             <div class="form-group" id="layout-field" style="display: none">
-              <label for="layout">展示布局</label>
+              <label for="layout" data-i18n="layout-label">展示布局</label>
               <select id="layout" class="input-control">
                 <option value="compact">Compact (紧凑列表)</option>
                 <option value="normal">Normal (进度条)</option>
@@ -1221,19 +1240,20 @@
             </div>
 
             <div class="form-group">
-              <label for="custom-title">自定义标题</label>
+              <label for="custom-title" data-i18n="custom-title-label">自定义标题</label>
               <input
                 type="text"
                 id="custom-title"
                 class="input-control"
                 value=""
                 placeholder="默认标题"
+                data-i18n-placeholder="custom-title-placeholder"
               />
             </div>
 
             <div class="form-group-row">
               <div class="form-group">
-                <label for="border-radius">边框圆角</label>
+                <label for="border-radius" data-i18n="border-radius-label">边框圆角</label>
                 <input
                   type="number"
                   id="border-radius"
@@ -1245,7 +1265,7 @@
                 />
               </div>
               <div class="form-group">
-                <label for="card-width">卡片宽度 (px)</label>
+                <label for="card-width" data-i18n="card-width-label">卡片宽度 (px)</label>
                 <input
                   type="number"
                   id="card-width"
@@ -1253,10 +1273,11 @@
                   value="0"
                   min="0"
                   placeholder="默认"
+                  data-i18n-placeholder="default-placeholder"
                 />
               </div>
               <div class="form-group">
-                <label for="line-height">行高 (px)</label>
+                <label for="line-height" data-i18n="line-height-label">行高 (px)</label>
                 <input
                   type="number"
                   id="line-height"
@@ -1273,11 +1294,11 @@
           <div class="config-section">
             <details class="colors-details">
               <summary class="config-section-title">
-                自定义配色 <span class="arrow-indicator">▶</span>
+                <span data-i18n="custom-colors">自定义配色</span> <span class="arrow-indicator">▶</span>
               </summary>
               <div class="color-picker-grid">
                 <div class="form-group">
-                  <label for="title-color">标题颜色</label>
+                  <label for="title-color" data-i18n="title-color-label">标题颜色</label>
                   <div class="color-input-wrapper">
                     <input
                       type="color"
@@ -1289,11 +1310,12 @@
                       id="title-color"
                       class="input-control"
                       placeholder="6位16进制"
+                      data-i18n-placeholder="hex-placeholder"
                     />
                   </div>
                 </div>
                 <div class="form-group">
-                  <label for="text-color">文本颜色</label>
+                  <label for="text-color" data-i18n="text-color-label">文本颜色</label>
                   <div class="color-input-wrapper">
                     <input
                       type="color"
@@ -1305,11 +1327,12 @@
                       id="text-color"
                       class="input-control"
                       placeholder="6位16进制"
+                      data-i18n-placeholder="hex-placeholder"
                     />
                   </div>
                 </div>
                 <div class="form-group">
-                  <label for="icon-color">图标颜色</label>
+                  <label for="icon-color" data-i18n="icon-color-label">图标颜色</label>
                   <div class="color-input-wrapper">
                     <input
                       type="color"
@@ -1321,11 +1344,12 @@
                       id="icon-color"
                       class="input-control"
                       placeholder="6位16进制"
+                      data-i18n-placeholder="hex-placeholder"
                     />
                   </div>
                 </div>
                 <div class="form-group">
-                  <label for="bg-color">背景颜色</label>
+                  <label for="bg-color" data-i18n="bg-color-label">背景颜色</label>
                   <div class="color-input-wrapper">
                     <input type="color" id="bg-color-picker" value="#070913" />
                     <input
@@ -1333,11 +1357,12 @@
                       id="bg-color"
                       class="input-control"
                       placeholder="6位16进制"
+                      data-i18n-placeholder="hex-placeholder"
                     />
                   </div>
                 </div>
                 <div class="form-group">
-                  <label for="border-color">边框颜色</label>
+                  <label for="border-color" data-i18n="border-color-label">边框颜色</label>
                   <div class="color-input-wrapper">
                     <input
                       type="color"
@@ -1349,11 +1374,12 @@
                       id="border-color"
                       class="input-control"
                       placeholder="6位16进制"
+                      data-i18n-placeholder="hex-placeholder"
                     />
                   </div>
                 </div>
                 <div class="form-group">
-                  <label for="ring-color">圆环颜色</label>
+                  <label for="ring-color" data-i18n="ring-color-label">圆环颜色</label>
                   <div class="color-input-wrapper">
                     <input
                       type="color"
@@ -1365,6 +1391,7 @@
                       id="ring-color"
                       class="input-control"
                       placeholder="6位16进制"
+                      data-i18n-placeholder="hex-placeholder"
                     />
                   </div>
                 </div>
@@ -1374,27 +1401,27 @@
 
           <!-- Group 4: 显示选项 -->
           <div class="config-section">
-            <h3 class="config-section-title">显示与动画</h3>
+            <h3 class="config-section-title" data-i18n="display-animations">显示与动画</h3>
             <div class="checkbox-grid">
               <label class="checkbox-control" id="opt-show-icons">
                 <input type="checkbox" id="show-icons" checked />
-                <span>显示图标</span>
+                <span data-i18n="show-icons-label">显示图标</span>
               </label>
               <label class="checkbox-control" id="opt-hide-border">
                 <input type="checkbox" id="hide-border" />
-                <span>隐藏边框</span>
+                <span data-i18n="hide-border-label">隐藏边框</span>
               </label>
               <label class="checkbox-control" id="opt-hide-title">
                 <input type="checkbox" id="hide-title" />
-                <span>隐藏标题</span>
+                <span data-i18n="hide-title-label">隐藏标题</span>
               </label>
               <label class="checkbox-control" id="opt-text-bold">
                 <input type="checkbox" id="text-bold" checked />
-                <span>粗体文本</span>
+                <span data-i18n="text-bold-label">粗体文本</span>
               </label>
               <label class="checkbox-control" id="opt-disable-animations">
                 <input type="checkbox" id="disable-animations" />
-                <span>禁用动画</span>
+                <span data-i18n="disable-animations-label">禁用动画</span>
               </label>
               <label
                 class="checkbox-control"
@@ -1402,7 +1429,7 @@
                 style="display: none"
               >
                 <input type="checkbox" id="show-owner" />
-                <span>显示拥有者</span>
+                <span data-i18n="show-owner-label">显示拥有者</span>
               </label>
               <label
                 class="checkbox-control"
@@ -1410,7 +1437,7 @@
                 style="display: none"
               >
                 <input type="checkbox" id="hide-progress" />
-                <span>隐藏进度条</span>
+                <span data-i18n="hide-progress-label">隐藏进度条</span>
               </label>
             </div>
           </div>
@@ -1422,53 +1449,55 @@
             id="stats-specific-fields"
             style="display: none"
           >
-            <h3 class="config-section-title">综合统计卡选项</h3>
+            <h3 class="config-section-title" data-i18n="stats-options-title">综合统计卡选项</h3>
             <div class="checkbox-grid" style="margin-bottom: 16px">
               <label class="checkbox-control">
                 <input type="checkbox" id="include-all-commits" />
-                <span>所有提交</span>
+                <span data-i18n="all-commits-label">所有提交</span>
               </label>
               <label class="checkbox-control">
                 <input type="checkbox" id="show-prs-merged" />
-                <span>合并的PR</span>
+                <span data-i18n="merged-prs-label">合并的PR</span>
               </label>
               <label class="checkbox-control">
                 <input type="checkbox" id="show-discussions-started" />
-                <span>发起的讨论</span>
+                <span data-i18n="started-discussions-label">发起的讨论</span>
               </label>
               <label class="checkbox-control">
                 <input type="checkbox" id="show-discussions-answered" />
-                <span>解答的讨论</span>
+                <span data-i18n="answered-discussions-label">解答的讨论</span>
               </label>
               <label class="checkbox-control">
                 <input type="checkbox" id="hide-rank" />
-                <span>隐藏评级</span>
+                <span data-i18n="hide-rank-label">隐藏评级</span>
               </label>
             </div>
             <div class="form-group">
-              <label for="rank-icon">Rank 图标样式</label>
+              <label for="rank-icon" data-i18n="rank-icon-label">Rank 图标样式</label>
               <select id="rank-icon" class="input-control">
-                <option value="default">Default (评级字母)</option>
-                <option value="github">GitHub 图标</option>
-                <option value="percentile">Percentile (百分比数值)</option>
+                <option value="default" data-i18n="rank-opt-default">Default (评级字母)</option>
+                <option value="github" data-i18n="rank-opt-github">GitHub 图标</option>
+                <option value="percentile" data-i18n="rank-opt-percentile">Percentile (百分比数值)</option>
               </select>
             </div>
             <div class="form-group">
-              <label for="exclude-repo">排除的仓库 (逗号分隔)</label>
+              <label for="exclude-repo" data-i18n="exclude-repos-label">排除的仓库 (逗号分隔)</label>
               <input
                 type="text"
                 id="exclude-repo"
                 class="input-control"
                 placeholder="例如: repo1,repo2"
+                data-i18n-placeholder="excl-repos-placeholder"
               />
             </div>
             <div class="form-group">
-              <label for="commits-year">统计年份 (例如: 2024)</label>
+              <label for="commits-year" data-i18n="stats-year-label">统计年份 (例如: 2024)</label>
               <input
                 type="text"
                 id="commits-year"
                 class="input-control"
                 placeholder="例如: 2024"
+                data-i18n-placeholder="year-placeholder"
               />
             </div>
           </div>
@@ -1479,13 +1508,13 @@
             id="top-langs-specific-fields"
             style="display: none"
           >
-            <h3 class="config-section-title">语言占比卡选项</h3>
+            <h3 class="config-section-title" data-i18n="langs-options-title">语言占比卡选项</h3>
             <div
               class="form-group"
               id="langs-count-field"
               style="display: none"
             >
-              <label for="langs-count">展示语言数量</label>
+              <label for="langs-count" data-i18n="langs-count-label">展示语言数量</label>
               <input
                 type="number"
                 id="langs-count"
@@ -1496,26 +1525,28 @@
               />
             </div>
             <div class="form-group">
-              <label for="exclude-repo-langs">排除的仓库 (逗号分隔)</label>
+              <label for="exclude-repo-langs" data-i18n="exclude-repos-label">排除的仓库 (逗号分隔)</label>
               <input
                 type="text"
                 id="exclude-repo-langs"
                 class="input-control"
                 placeholder="例如: repo1,repo2"
+                data-i18n-placeholder="excl-repos-placeholder"
               />
             </div>
             <div class="form-group">
-              <label for="hide-langs">隐藏的语言 (逗号分隔)</label>
+              <label for="hide-langs" data-i18n="hide-langs-label">隐藏的语言 (逗号分隔)</label>
               <input
                 type="text"
                 id="hide-langs"
                 class="input-control"
                 placeholder="例如: html,css"
+                data-i18n-placeholder="hide-langs-placeholder"
               />
             </div>
             <div class="form-group-row">
               <div class="form-group">
-                <label for="size-weight">大小权重</label>
+                <label for="size-weight" data-i18n="size-weight-label">大小权重</label>
                 <input
                   type="number"
                   id="size-weight"
@@ -1527,7 +1558,7 @@
                 />
               </div>
               <div class="form-group">
-                <label for="count-weight">数量权重</label>
+                <label for="count-weight" data-i18n="count-weight-label">数量权重</label>
                 <input
                   type="number"
                   id="count-weight"
@@ -1547,23 +1578,25 @@
             id="wakatime-specific-fields"
             style="display: none"
           >
-            <h3 class="config-section-title">WakaTime选项</h3>
+            <h3 class="config-section-title" data-i18n="wakatime-options-title">WakaTime选项</h3>
             <div class="form-group">
-              <label for="wakatime-hide-langs">隐藏的语言 (逗号分隔)</label>
+              <label for="wakatime-hide-langs" data-i18n="hide-langs-label">隐藏的语言 (逗号分隔)</label>
               <input
                 type="text"
                 id="wakatime-hide-langs"
                 class="input-control"
                 placeholder="例如: html,css"
+                data-i18n-placeholder="hide-langs-placeholder"
               />
             </div>
             <div class="form-group">
-              <label for="wakatime-api-domain">自定义 API 域名</label>
+              <label for="wakatime-api-domain" data-i18n="custom-api-domain">自定义 API 域名</label>
               <input
                 type="text"
                 id="wakatime-api-domain"
                 class="input-control"
                 placeholder="例如: wakatime.com"
+                data-i18n-placeholder="waka-domain-placeholder"
               />
             </div>
           </div>
@@ -1574,13 +1607,13 @@
             id="recent-activity-specific-fields"
             style="display: none"
           >
-            <h3 class="config-section-title">最近动态选项</h3>
+            <h3 class="config-section-title" data-i18n="recent-options-title">最近动态选项</h3>
             <div
               class="form-group"
               id="activity-count-field"
               style="display: none"
             >
-              <label for="activity-count">展示动态数量</label>
+              <label for="activity-count" data-i18n="activity-count-label">展示动态数量</label>
               <input
                 type="number"
                 id="activity-count"
@@ -1597,29 +1630,30 @@
         <section class="preview-pane">
           <div class="card">
             <div class="section-heading">
-              <h2>实时预览</h2>
+              <h2 data-i18n="preview-title">实时预览</h2>
               <span
                 class="preview-status"
                 id="preview-status"
                 aria-live="polite"
+                data-i18n="status-ready"
                 >准备加载</span
               >
             </div>
             <div class="preview-box" id="preview-box">
               <div class="loader"></div>
               <img id="preview-image" alt="Realtime preview" />
-              <p class="preview-error" id="preview-error">
+              <p class="preview-error" id="preview-error" data-i18n="preview-error-desc">
                 卡片加载失败，请检查用户名或接口参数。
               </p>
             </div>
           </div>
 
           <div class="card output-box">
-            <h2>获取代码</h2>
+            <h2 data-i18n="get-code-title">获取代码</h2>
 
             <div class="code-container">
               <div class="code-header">
-                <span>Markdown 引用</span>
+                <span data-i18n="markdown-ref">Markdown 引用</span>
                 <button class="copy-btn" id="copy-markdown-btn">
                   <svg
                     width="14"
@@ -1641,7 +1675,7 @@
                       d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
                     ></path>
                   </svg>
-                  复制
+                  <span class="copy-btn-text" data-i18n="copy">复制</span>
                 </button>
               </div>
               <pre><code id="markdown-code"></code></pre>
@@ -1649,7 +1683,7 @@
 
             <div class="code-container">
               <div class="code-header">
-                <span>直链 URL</span>
+                <span data-i18n="direct-url">直链 URL</span>
                 <button class="copy-btn" id="copy-url-btn">
                   <svg
                     width="14"
@@ -1666,7 +1700,7 @@
                       d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
                     ></path>
                   </svg>
-                  复制
+                  <span class="copy-btn-text" data-i18n="copy">复制</span>
                 </button>
               </div>
             <pre><code id="raw-url"></code></pre>
@@ -1674,22 +1708,22 @@
 
           <!-- Author Support Card -->
           <div class="card support-card">
-            <h2>关于作者</h2>
+            <h2 data-i18n="about-author">关于作者</h2>
             <div class="support-links">
               <a href="https://www.mintimate.cn" target="_blank" rel="noreferrer" class="support-btn blog-btn">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
-                <span>作者博客</span>
-                <span class="support-desc">技术分享与教程</span>
+                <span data-i18n="author-blog">作者博客</span>
+                <span class="support-desc" data-i18n="author-blog-desc">技术分享与教程</span>
               </a>
               <a href="https://space.bilibili.com/355567627" target="_blank" rel="noreferrer" class="support-btn bilibili-btn">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="13" rx="2" ry="2"/><path d="m17 2-3 5M7 2l3 5M8 14h.01M16 14h.01"/></svg>
-                <span>关注 B 站</span>
-                <span class="support-desc">视频内容与动态</span>
+                <span data-i18n="follow-bilibili">关注 B 站</span>
+                <span class="support-desc" data-i18n="follow-bilibili-desc">视频内容与动态</span>
               </a>
               <a href="https://ifdian.net/a/mintimate" target="_blank" rel="noreferrer" class="support-btn afdian-btn">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span>赞助支持</span>
-                <span class="support-desc">用爱发电，支持项目</span>
+                <span data-i18n="sponsor-author">赞助支持</span>
+                <span class="support-desc" data-i18n="sponsor-author-desc">用爱发电，支持项目</span>
               </a>
             </div>
           </div>
@@ -1699,7 +1733,7 @@
       <!-- Toggleable Reference API Docs -->
       <section class="docs-section">
         <button class="docs-toggle" id="docs-toggle">
-          <span>查看所有底层 API 参考</span>
+          <span data-i18n="view-api-docs">查看所有底层 API 参考</span>
           <svg
             id="docs-toggle-arrow"
             width="18"
@@ -1721,18 +1755,20 @@
 
     <footer>
       <div class="footer-content">
-        <span>Powered by Tencent EdgeOne Pages · 极速边缘节点</span>
+        <span data-i18n="powered-by">Powered by Tencent EdgeOne Pages · 极速边缘节点</span>
         <div class="footer-links">
           <a
             href="https://github.com/Mintimate/github-readme-stats-eo"
             target="_blank"
             rel="noreferrer"
+            data-i18n="github-repo"
             >GitHub 仓库</a
           >
           <a
             href="https://github.com/anuraghazra/github-readme-stats"
             target="_blank"
             rel="noreferrer"
+            data-i18n="upstream-repo"
             >Upstream 原版</a
           >
         </div>
@@ -1882,19 +1918,383 @@
         },
       ];
 
+      const presetTranslationsEn = {
+        "stats": { label: "GitHub Stats Card", badge: "Stats" },
+        "top-langs": { label: "Top Languages Card", badge: "Languages" },
+        "streak": { label: "Contribution Streak Card", badge: "Streak" },
+        "wakatime": { label: "WakaTime Stats Card", badge: "WakaTime" },
+        "repo": { label: "Repository Card (Pin)", badge: "Pin Repo" },
+        "gist": { label: "Gist Details Card", badge: "Gist" },
+        "profile-summary": { label: "Profile Summary Card", badge: "Summary" },
+        "contribution-calendar": { label: "Contribution Calendar Card", badge: "Calendar" },
+        "recent-activity": { label: "Recent Activity Card", badge: "Recent Activity" },
+        "repo-languages": { label: "Repo Languages Card", badge: "Languages" },
+        "organization": { label: "Organization Stats Card", badge: "Org Stats" }
+      };
+
+      const endpoints = [
+        {
+          path: "/api",
+          label: "GitHub 综合统计卡",
+          query: "?username=Mintimate&show_icons=true",
+          desc: "渲染用户的 Github 各项状态指标（Star、提交、PR、Issue等）。",
+        },
+        {
+          path: "/api/top-langs",
+          label: "常用语言占比卡",
+          query: "?username=Mintimate&layout=compact",
+          desc: "展示用户使用最多的编程语言比例，支持多种图形及排版。",
+        },
+        {
+          path: "/api/pin",
+          label: "仓库卡片 (Pin)",
+          query: "?username=Mintimate&repo=github-readme-stats-eo",
+          desc: "突出展示某个指定的开源软件仓库的信息卡片。",
+        },
+        {
+          path: "/api/gist",
+          label: "Gist 详情卡片",
+          query: "?id=bbfce31e0217a3689c8d961a356cb10d",
+          desc: "获取并优雅展示指定 Gist 代码片段的状态。",
+        },
+        {
+          path: "/api/wakatime",
+          label: "WakaTime 统计卡",
+          query: "?username=ffflabs&layout=compact",
+          desc: "挂载 WakaTime 开发者时长报告，生成占比与编码时间图。",
+        },
+        {
+          path: "/api/streak",
+          label: "连续贡献卡",
+          query: "?username=Mintimate",
+          desc: "展示当前连续贡献、最长连续贡献与年度贡献总数。",
+        },
+        {
+          path: "/api/profile-summary",
+          label: "开发者概览卡",
+          query: "?username=Mintimate",
+          desc: "汇总仓库、Followers、Star、Commit 与活跃年份。",
+        },
+        {
+          path: "/api/contribution-calendar",
+          label: "贡献日历卡",
+          query: "?username=Mintimate",
+          desc: "以热力图展示最近一年的 GitHub 贡献。",
+        },
+        {
+          path: "/api/recent-activity",
+          label: "最近动态卡",
+          query: "?username=Mintimate&activity_count=5",
+          desc: "展示最近公开 Commit、PR、Issue 与 Release。",
+        },
+        {
+          path: "/api/repo-languages",
+          label: "仓库语言卡",
+          query: "?username=Mintimate&repo=github-readme-stats-eo",
+          desc: "展示指定仓库的语言字节占比。",
+        },
+        {
+          path: "/api/org",
+          label: "组织统计卡",
+          query: "?org=github",
+          desc: "汇总组织仓库、成员、Star、Fork 与 Issue。",
+        },
+        {
+          path: "/api/status/up",
+          label: "PAT 可用性检查",
+          query: "?type=json",
+          desc: "调试专用接口，用来检测后台 GitHub Token (PAT) 的有效性。",
+        },
+      ];
+
+      const endpointTranslationsEn = {
+        "/api": {
+          label: "GitHub Stats Card",
+          desc: "Renders user's GitHub stats metrics (Stars, Commits, PRs, Issues, etc.)."
+        },
+        "/api/top-langs": {
+          label: "Top Languages Card",
+          desc: "Displays user's most used programming languages, supporting multiple layouts."
+        },
+        "/api/pin": {
+          label: "Repository Card (Pin)",
+          desc: "Features a specific pinned GitHub repository information card."
+        },
+        "/api/gist": {
+          label: "Gist Details Card",
+          desc: "Retrieves and beautifully displays the status of a specified Gist code snippet."
+        },
+        "/api/wakatime": {
+          label: "WakaTime Stats Card",
+          desc: "Displays user's WakaTime development hour reports and programming language time graphs."
+        },
+        "/api/streak": {
+          label: "Contribution Streak Card",
+          desc: "Displays user's current streak, longest streak, and total contributions."
+        },
+        "/api/profile-summary": {
+          label: "Developer Profile Summary Card",
+          desc: "Summarizes user's repositories, followers, stars, commits, and active years."
+        },
+        "/api/contribution-calendar": {
+          label: "Contribution Calendar Card",
+          desc: "Displays a heat map calendar of the user's contributions over the past year."
+        },
+        "/api/recent-activity": {
+          label: "Recent Activity Card",
+          desc: "Displays user's recent public Commits, PRs, Issues, and Releases."
+        },
+        "/api/repo-languages": {
+          label: "Repository Languages Card",
+          desc: "Displays the breakdown of language bytes for a specific repository."
+        },
+        "/api/org": {
+          label: "Organization Stats Card",
+          desc: "Summarizes organization repositories, members, stars, forks, and issues."
+        },
+        "/api/status/up": {
+          label: "PAT Availability Check",
+          desc: "Dedicated debug API to check target backend GitHub Token (PAT) validity."
+        }
+      };
+
+      const i18n = {
+        zh: {
+          "badge-gocf": "Go Cloud Functions",
+          "app-title": "GitHub Readme Stats · EdgeOne",
+          "lead-desc": "在 Tencent EdgeOne Pages Edge 边缘侧极致加速的统计卡片生成器，提供极速响应的动态 SVG 数据渲染服务。",
+          "gallery-title": "预设卡片展厅",
+          "config-panel-title": "配置面板",
+          "basic-config": "基础配置",
+          "username-label": "GitHub 用户名",
+          "username-placeholder": "输入您的用户名",
+          "card-type-label": "卡片类型",
+          "opt-stats": "GitHub 综合统计卡",
+          "opt-top-langs": "常用语言占比卡",
+          "opt-repo": "仓库卡片 (Pin)",
+          "opt-gist": "Gist 卡片",
+          "opt-wakatime": "WakaTime 统计卡",
+          "opt-streak": "连续贡献卡 (Streak)",
+          "opt-profile-summary": "个人概览卡 (Profile Summary)",
+          "opt-contribution-calendar": "贡献日历卡 (Contribution Calendar)",
+          "opt-recent-activity": "最近动态卡 (Recent Activity)",
+          "opt-repo-languages": "仓库语言占比卡 (Repo Languages)",
+          "opt-organization": "组织统计卡 (Organization Stats)",
+          "repo-name-label": "仓库名称",
+          "repo-name-placeholder": "输入仓库名",
+          "gist-id-label": "Gist ID",
+          "gist-id-placeholder": "输入 Gist ID",
+          "org-name-label": "GitHub 组织",
+          "org-name-placeholder": "输入组织名",
+          "appearance-config": "外观与排版",
+          "theme-label": "卡片主题",
+          "layout-label": "展示布局",
+          "custom-title-label": "自定义标题",
+          "custom-title-placeholder": "默认标题",
+          "border-radius-label": "边框圆角",
+          "card-width-label": "卡片宽度 (px)",
+          "default-placeholder": "默认",
+          "line-height-label": "行高 (px)",
+          "custom-colors": "自定义配色",
+          "title-color-label": "标题颜色",
+          "hex-placeholder": "6位16进制",
+          "text-color-label": "文本颜色",
+          "icon-color-label": "图标颜色",
+          "bg-color-label": "背景颜色",
+          "border-color-label": "边框颜色",
+          "ring-color-label": "圆环颜色",
+          "display-animations": "显示与动画",
+          "show-icons-label": "显示图标",
+          "hide-border-label": "隐藏边框",
+          "hide-title-label": "隐藏标题",
+          "text-bold-label": "粗体文本",
+          "disable-animations-label": "禁用动画",
+          "show-owner-label": "显示拥有者",
+          "hide-progress-label": "隐藏进度条",
+          "stats-options-title": "综合统计卡选项",
+          "all-commits-label": "所有提交",
+          "merged-prs-label": "合并的PR",
+          "started-discussions-label": "发起的讨论",
+          "answered-discussions-label": "解答的讨论",
+          "hide-rank-label": "隐藏评级",
+          "rank-icon-label": "Rank 图标样式",
+          "rank-opt-default": "Default (评级字母)",
+          "rank-opt-github": "GitHub 图标",
+          "rank-opt-percentile": "Percentile (百分比数值)",
+          "exclude-repos-label": "排除的仓库 (逗号分隔)",
+          "excl-repos-placeholder": "例如: repo1,repo2",
+          "stats-year-label": "统计年份 (例如: 2024)",
+          "year-placeholder": "例如: 2024",
+          "langs-options-title": "语言占比卡选项",
+          "langs-count-label": "展示语言数量",
+          "hide-langs-label": "隐藏的语言 (逗号分隔)",
+          "hide-langs-placeholder": "例如: html,css",
+          "size-weight-label": "大小权重",
+          "count-weight-label": "数量权重",
+          "wakatime-options-title": "WakaTime 选项",
+          "custom-api-domain": "自定义 API 域名",
+          "waka-domain-placeholder": "例如: wakatime.com",
+          "recent-options-title": "最近动态选项",
+          "activity-count-label": "展示动态数量",
+          "preview-title": "实时预览",
+          "status-ready": "准备加载",
+          "status-loading": "加载中…",
+          "status-failed": "加载失败",
+          "preview-error-desc": "卡片加载失败，请检查用户名或接口参数。",
+          "get-code-title": "获取代码",
+          "markdown-ref": "Markdown 引用",
+          "direct-url": "直链 URL",
+          "copy": "复制",
+          "copied": "已复制!",
+          "about-author": "关于作者",
+          "author-blog": "作者博客",
+          "author-blog-desc": "技术分享与教程",
+          "follow-bilibili": "关注 B 站",
+          "follow-bilibili-desc": "视频内容与动态",
+          "sponsor-author": "赞助支持",
+          "sponsor-author-desc": "用爱发电，支持项目",
+          "view-api-docs": "查看所有底层 API 参考",
+          "powered-by": "Powered by Tencent EdgeOne Pages · 极速边缘节点",
+          "github-repo": "GitHub 仓库",
+          "upstream-repo": "Upstream 原版",
+          
+          "lang-zh-title": "简体中文",
+          "lang-en-title": "English",
+          "theme-light-title": "亮色模式",
+          "theme-system-title": "系统默认",
+          "theme-dark-title": "暗色模式",
+          "theme-light": "亮色",
+          "theme-system": "系统",
+          "theme-dark": "暗色"
+        },
+        en: {
+          "badge-gocf": "Go Cloud Functions",
+          "app-title": "GitHub Readme Stats · EdgeOne",
+          "lead-desc": "A fast statistics card generator deployed on Tencent EdgeOne Pages Edge, providing ultra-responsive dynamic SVG rendering services.",
+          "gallery-title": "Preset Gallery",
+          "config-panel-title": "Configuration Panel",
+          "basic-config": "Basic Configuration",
+          "username-label": "GitHub Username",
+          "username-placeholder": "Enter your username",
+          "card-type-label": "Card Type",
+          "opt-stats": "GitHub Stats Card",
+          "opt-top-langs": "Top Languages Card",
+          "opt-repo": "Repository Card (Pin)",
+          "opt-gist": "Gist Card",
+          "opt-wakatime": "WakaTime Card",
+          "opt-streak": "Streak Card",
+          "opt-profile-summary": "Profile Summary Card",
+          "opt-contribution-calendar": "Contribution Calendar Card",
+          "opt-recent-activity": "Recent Activity Card",
+          "opt-repo-languages": "Repo Languages Card",
+          "opt-organization": "Organization Stats Card",
+          "repo-name-label": "Repository Name",
+          "repo-name-placeholder": "Enter repository name",
+          "gist-id-label": "Gist ID",
+          "gist-id-placeholder": "Enter Gist ID",
+          "org-name-label": "GitHub Organization",
+          "org-name-placeholder": "Enter organization name",
+          "appearance-config": "Appearance & Layout",
+          "theme-label": "Card Theme",
+          "layout-label": "Layout Style",
+          "custom-title-label": "Custom Title",
+          "custom-title-placeholder": "Default Title",
+          "border-radius-label": "Border Radius",
+          "card-width-label": "Card Width (px)",
+          "default-placeholder": "Default",
+          "line-height-label": "Line Height (px)",
+          "custom-colors": "Custom Colors",
+          "title-color-label": "Title Color",
+          "hex-placeholder": "6-digit hex",
+          "text-color-label": "Text Color",
+          "icon-color-label": "Icon Color",
+          "bg-color-label": "Background Color",
+          "border-color-label": "Border Color",
+          "ring-color-label": "Ring Color",
+          "display-animations": "Display & Animations",
+          "show-icons-label": "Show Icons",
+          "hide-border-label": "Hide Border",
+          "hide-title-label": "Hide Title",
+          "text-bold-label": "Bold Text",
+          "disable-animations-label": "Disable Animations",
+          "show-owner-label": "Show Owner",
+          "hide-progress-label": "Hide Progress Bar",
+          "stats-options-title": "GitHub Stats Options",
+          "all-commits-label": "All Commits",
+          "merged-prs-label": "Merged PRs",
+          "started-discussions-label": "Started Discussions",
+          "answered-discussions-label": "Answered Discussions",
+          "hide-rank-label": "Hide Rank",
+          "rank-icon-label": "Rank Icon Style",
+          "rank-opt-default": "Default (Rank Letter)",
+          "rank-opt-github": "GitHub Icon",
+          "rank-opt-percentile": "Percentile (Numeric)",
+          "exclude-repos-label": "Exclude Repos (comma-separated)",
+          "excl-repos-placeholder": "e.g., repo1,repo2",
+          "stats-year-label": "Stats Year (e.g., 2024)",
+          "year-placeholder": "e.g., 2024",
+          "langs-options-title": "Languages Card Options",
+          "langs-count-label": "Languages Limit",
+          "hide-langs-label": "Hide Languages (comma-separated)",
+          "hide-langs-placeholder": "e.g., html,css",
+          "size-weight-label": "Size Weight",
+          "count-weight-label": "Count Weight",
+          "wakatime-options-title": "WakaTime Options",
+          "custom-api-domain": "Custom API Domain",
+          "waka-domain-placeholder": "e.g., wakatime.com",
+          "recent-options-title": "Recent Activity Options",
+          "activity-count-label": "Activity Limit",
+          "preview-title": "Live Preview",
+          "status-ready": "Ready to load",
+          "status-loading": "Loading...",
+          "status-failed": "Load failed",
+          "preview-error-desc": "Failed to load card. Please check the username or API parameters.",
+          "get-code-title": "Retrieve Code",
+          "markdown-ref": "Markdown Code",
+          "direct-url": "Direct Link",
+          "copy": "Copy",
+          "copied": "Copied!",
+          "about-author": "About Author",
+          "author-blog": "Author's Blog",
+          "author-blog-desc": "Tech articles and tutorials",
+          "follow-bilibili": "Bilibili Channel",
+          "follow-bilibili-desc": "Video content and updates",
+          "sponsor-author": "Sponsor/Donate",
+          "sponsor-author-desc": "Support projects and developer",
+          "view-api-docs": "View Underlaying API Documentation",
+          "powered-by": "Powered by Tencent EdgeOne Pages · Ultra Fast Edge",
+          "github-repo": "GitHub Repo",
+          "upstream-repo": "Upstream Original",
+          
+          "lang-zh-title": "简体中文",
+          "lang-en-title": "English",
+          "theme-light-title": "Light Mode",
+          "theme-system-title": "System Default",
+          "theme-dark-title": "Dark Mode",
+          "theme-light": "Light",
+          "theme-system": "System",
+          "theme-dark": "Dark"
+        }
+      };
+
+      let currentLang = "zh";
+
       // Render Gallery
       const galleryGrid = document.getElementById("gallery-grid");
 
       function renderGallery() {
         const username = elUsername.value.trim() || "Mintimate";
+        const isEn = (currentLang === "en");
         galleryGrid.innerHTML = presets
           .map((p) => {
             const imgUrl = p.getUrl(baseUrl, username);
+            const badgeText = isEn ? (presetTranslationsEn[p.id]?.badge || p.badge) : p.badge;
+            const labelText = isEn ? (presetTranslationsEn[p.id]?.label || p.label) : p.label;
             return `
             <div class="gallery-card" data-preset-id="${p.id}" id="gallery-${p.id}">
-              <span class="gallery-card-badge">${p.badge}</span>
-              <img src="${imgUrl}" alt="${p.label}" loading="lazy" />
-              <span class="gallery-card-label">${p.label}</span>
+              <span class="gallery-card-badge">${badgeText}</span>
+              <img src="${imgUrl}" alt="${labelText}" loading="lazy" />
+              <span class="gallery-card-label">${labelText}</span>
             </div>
           `;
           })
@@ -2036,98 +2436,29 @@
         });
       }
 
-      const endpoints = [
-        {
-          path: "/api",
-          label: "GitHub 综合统计卡",
-          query: "?username=Mintimate&show_icons=true",
-          desc: "渲染用户的 Github 各项状态指标（Star、提交、PR、Issue等）。",
-        },
-        {
-          path: "/api/top-langs",
-          label: "常用语言占比卡",
-          query: "?username=Mintimate&layout=compact",
-          desc: "展示用户使用最多的编程语言比例，支持多种图形及排版。",
-        },
-        {
-          path: "/api/pin",
-          label: "仓库卡片 (Pin)",
-          query: "?username=Mintimate&repo=github-readme-stats-eo",
-          desc: "突出展示某个指定的开源软件仓库的信息卡片。",
-        },
-        {
-          path: "/api/gist",
-          label: "Gist 详情卡片",
-          query: "?id=bbfce31e0217a3689c8d961a356cb10d",
-          desc: "获取并优雅展示指定 Gist 代码片段的状态。",
-        },
-        {
-          path: "/api/wakatime",
-          label: "WakaTime 统计卡",
-          query: "?username=ffflabs&layout=compact",
-          desc: "挂载 WakaTime 开发者时长报告，生成占比与编码时间图。",
-        },
-        {
-          path: "/api/streak",
-          label: "连续贡献卡",
-          query: "?username=Mintimate",
-          desc: "展示当前连续贡献、最长连续贡献与年度贡献总数。",
-        },
-        {
-          path: "/api/profile-summary",
-          label: "开发者概览卡",
-          query: "?username=Mintimate",
-          desc: "汇总仓库、Followers、Star、Commit 与活跃年份。",
-        },
-        {
-          path: "/api/contribution-calendar",
-          label: "贡献日历卡",
-          query: "?username=Mintimate",
-          desc: "以热力图展示最近一年的 GitHub 贡献。",
-        },
-        {
-          path: "/api/recent-activity",
-          label: "最近动态卡",
-          query: "?username=Mintimate&activity_count=5",
-          desc: "展示最近公开 Commit、PR、Issue 与 Release。",
-        },
-        {
-          path: "/api/repo-languages",
-          label: "仓库语言卡",
-          query: "?username=Mintimate&repo=github-readme-stats-eo",
-          desc: "展示指定仓库的语言字节占比。",
-        },
-        {
-          path: "/api/org",
-          label: "组织统计卡",
-          query: "?org=github",
-          desc: "汇总组织仓库、成员、Star、Fork 与 Issue。",
-        },
-        {
-          path: "/api/status/up",
-          label: "PAT 可用性检查",
-          query: "?type=json",
-          desc: "调试专用接口，用来检测后台 GitHub Token (PAT) 的有效性。",
-        },
-      ];
-
       // Draw API Table
-      document.getElementById("endpoint-grid").innerHTML = endpoints
-        .map(function (ep) {
-          const url = baseUrl + ep.path + ep.query;
-          return (
-            '<div class="endpoint-card"><div class="endpoint-title"><span class="endpoint-path">' +
-            ep.path +
-            '</span><span class="endpoint-method">GET</span></div><p class="endpoint-desc">' +
-            ep.label +
-            " — " +
-            ep.desc +
-            '</p><a href="' +
-            url +
-            '" class="endpoint-link" target="_blank" rel="noreferrer">在新标签页打开 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div>'
-          );
-        })
-        .join("");
+      function renderEndpoints() {
+        const isEn = (currentLang === "en");
+        document.getElementById("endpoint-grid").innerHTML = endpoints
+          .map(function (ep) {
+            const url = baseUrl + ep.path + ep.query;
+            const labelText = isEn ? (endpointTranslationsEn[ep.path]?.label || ep.label) : ep.label;
+            const descText = isEn ? (endpointTranslationsEn[ep.path]?.desc || ep.desc) : ep.desc;
+            const linkText = isEn ? 'Open in new tab' : '在新标签页打开';
+            return (
+              '<div class="endpoint-card"><div class="endpoint-title"><span class="endpoint-path">' +
+              ep.path +
+              '</span><span class="endpoint-method">GET</span></div><p class="endpoint-desc">' +
+              labelText +
+              " — " +
+              descText +
+              '</p><a href="' +
+              url +
+              '" class="endpoint-link" target="_blank" rel="noreferrer">' + linkText + ' <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div>'
+            );
+          })
+          .join("");
+      }
 
       // Toggle Doc
       const docsToggle = document.getElementById("docs-toggle");
@@ -2222,17 +2553,32 @@
         { value: "ambient_gradient", name: "Ambient Gradient (渐变配色)" },
       ];
 
+      const themeTranslationsEn = {
+        "default": "Default (Bright Blue)",
+        "default_repocard": "Default Repocard",
+        "transparent": "Transparent (No Background)",
+        "dark": "Dark (Elegant Dark)",
+        "radical": "Radical (Pink/Blue)",
+        "synthwave": "Synthwave (Cyberpunk)",
+        "ambient_gradient": "Ambient Gradient"
+      };
+
       // Populate theme options dynamically
-      elTheme.innerHTML = "";
-      themes.forEach((t) => {
-        const opt = document.createElement("option");
-        opt.value = t.value;
-        opt.textContent = t.name;
-        if (t.value === "dark") {
-          opt.selected = true;
-        }
-        elTheme.appendChild(opt);
-      });
+      function populateThemes() {
+        const isEn = (currentLang === "en");
+        const previous = elTheme.value || "dark";
+        elTheme.innerHTML = "";
+        themes.forEach((t) => {
+          const opt = document.createElement("option");
+          opt.value = t.value;
+          opt.textContent = isEn ? (themeTranslationsEn[t.value] || t.name.replace(/\s*\(.*?\)/, '')) : t.name;
+          if (t.value === previous) {
+            opt.selected = true;
+          }
+          elTheme.appendChild(opt);
+        });
+      }
+
       const elLayout = document.getElementById("layout");
       const elLangsCount = document.getElementById("langs-count");
       const elCustomTitle = document.getElementById("custom-title");
@@ -2278,6 +2624,13 @@
         ["donut-vertical", "Donut Vertical (垂直环图)"],
         ["pie", "Pie (饼图)"],
       ];
+      const topLangLayoutsEn = [
+        ["compact", "Compact List"],
+        ["normal", "Normal (Progress Bar)"],
+        ["donut", "Donut Chart"],
+        ["donut-vertical", "Donut Vertical Chart"],
+        ["pie", "Pie Chart"],
+      ];
       const wakatimeLayouts = topLangLayouts.slice(0, 2);
 
       // Color pickers sync bidirectional behaviour
@@ -2320,8 +2673,11 @@
 
       function updateLayoutOptions() {
         const previous = elLayout.value;
+        const isEn = (currentLang === "en");
         const options =
-          elCardType.value === "wakatime" ? wakatimeLayouts : topLangLayouts;
+          elCardType.value === "wakatime" 
+            ? (isEn ? topLangLayoutsEn.slice(0, 2) : wakatimeLayouts) 
+            : (isEn ? topLangLayoutsEn : topLangLayouts);
         elLayout.replaceChildren(
           ...options.map(([value, label]) => {
             const option = document.createElement("option");
@@ -2587,7 +2943,7 @@
         const fullUrl = buildURL();
         previewBox.classList.add("loading");
         previewBox.classList.remove("has-error");
-        previewStatus.textContent = "加载中…";
+        previewStatus.textContent = currentLang === "zh" ? "加载中…" : "Loading...";
         previewImage.src = fullUrl;
 
         // Highlight matching preset
@@ -2626,7 +2982,7 @@
       previewImage.addEventListener("error", () => {
         previewBox.classList.remove("loading");
         previewBox.classList.add("has-error");
-        previewStatus.textContent = "加载失败";
+        previewStatus.textContent = currentLang === "zh" ? "加载失败" : "Load failed";
       });
 
       let previewTimer;
@@ -2708,8 +3064,9 @@
             .writeText(text)
             .then(() => {
               const originalHTML = btn.innerHTML;
+              const copiedText = currentLang === "zh" ? "已复制!" : "Copied!";
               btn.innerHTML =
-                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"></path></svg> 已复制!';
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"></path></svg> ' + copiedText;
               btn.classList.add("copied");
               setTimeout(() => {
                 btn.innerHTML = originalHTML;
@@ -2768,9 +3125,89 @@
         }
       });
 
+      // Language Switcher interactive logic
+      function applyLanguage(lang) {
+        currentLang = lang;
+        localStorage.setItem("lang-pref", lang);
+
+        // Update active class on buttons
+        const langBtns = document.querySelectorAll(".lang-btn");
+        langBtns.forEach((btn) => {
+          if (btn.getAttribute("data-lang-val") === lang) {
+            btn.classList.add("active");
+          } else {
+            btn.classList.remove("active");
+          }
+        });
+
+        // Translate data-i18n elements
+        const elements = document.querySelectorAll("[data-i18n]");
+        elements.forEach((el) => {
+          const key = el.getAttribute("data-i18n");
+          if (i18n[lang] && i18n[lang][key]) {
+            el.textContent = i18n[lang][key];
+          }
+        });
+
+        // Translate data-i18n-placeholder elements
+        const placeholders = document.querySelectorAll("[data-i18n-placeholder]");
+        placeholders.forEach((el) => {
+          const key = el.getAttribute("data-i18n-placeholder");
+          if (i18n[lang] && i18n[lang][key]) {
+            el.placeholder = i18n[lang][key];
+          }
+        });
+
+        // Translate data-i18n-title elements
+        const titles = document.querySelectorAll("[data-i18n-title]");
+        titles.forEach((el) => {
+          const key = el.getAttribute("data-i18n-title");
+          if (i18n[lang] && i18n[lang][key]) {
+            el.title = i18n[lang][key];
+          }
+        });
+
+        // Regenerate dynamically populated elements
+        populateThemes();
+        updateLayoutOptions();
+        renderGallery();
+        renderEndpoints();
+        updatePreviewStatusText();
+      }
+
+      function updatePreviewStatusText() {
+        if (previewBox.classList.contains("loading")) {
+          previewStatus.textContent = currentLang === "zh" ? "加载中…" : "Loading...";
+        } else if (previewBox.classList.contains("has-error")) {
+          previewStatus.textContent = currentLang === "zh" ? "加载失败" : "Load failed";
+        } else if (previewStatus.textContent === "准备加载" || previewStatus.textContent === "Ready to load") {
+          previewStatus.textContent = currentLang === "zh" ? "准备加载" : "Ready to load";
+        }
+      }
+
+      // Event Listeners for language switch buttons
+      const langBtns = document.querySelectorAll(".lang-btn");
+      langBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const selected = btn.getAttribute("data-lang-val");
+          applyLanguage(selected);
+          updatePreview();
+        });
+      });
+
+      // Initialize Language
+      const urlParams = new URLSearchParams(window.location.search);
+      let savedLangPref = urlParams.get("lang");
+      if (!savedLangPref) {
+        savedLangPref = localStorage.getItem("lang-pref");
+      }
+      if (!savedLangPref) {
+        const browserLang = (navigator.language || navigator.userLanguage || "zh").toLowerCase();
+        savedLangPref = browserLang.startsWith("en") ? "en" : "zh";
+      }
+
       // Initial execution
-      renderGallery();
-      updateLayoutOptions();
+      applyLanguage(savedLangPref);
       updateFieldsVisibility();
       updatePreview();
     </script>
