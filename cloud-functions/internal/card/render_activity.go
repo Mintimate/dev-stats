@@ -87,11 +87,15 @@ func RenderProfileSummaryCard(data service.ProfileSummaryData, opts Options) str
 		years = append(years, strconv.Itoa(year))
 	}
 	memberSince := shortYear(data.MemberSince)
+	platform := data.Platform
+	if platform == "" {
+		platform = "GitHub"
+	}
 	body := fmt.Sprintf(`<g transform="translate(0,%d)">
-<text x="25" y="66" class="muted">@%s · GitHub member since %s</text>
+<text x="25" y="66" class="muted">@%s · %s member since %s</text>
 %s%s%s%s%s%s%s%s
 		<text x="25" y="214" class="muted">Active years: %s</text>
-</g>`, offset, html.EscapeString(data.Login), memberSince,
+</g>`, offset, html.EscapeString(data.Login), html.EscapeString(platform), memberSince,
 		summaryMetric(25, 94, "Repositories", data.Repositories, opts), summaryMetric(145, 94, "Followers", data.Followers, opts),
 		summaryMetric(265, 94, "Stars earned", data.TotalStars, opts), summaryMetric(385, 94, "Forks", data.TotalForks, opts),
 		summaryMetric(25, 150, "Commits (year)", data.TotalCommits, opts), summaryMetric(145, 150, "Pull requests", data.TotalPRs, opts),
@@ -208,7 +212,11 @@ func RenderRepoLanguagesCard(data service.RepoLanguagesData, opts Options) strin
 		col, row := i%2, i/2
 		legend.WriteString(fmt.Sprintf(`<g transform="translate(%d,%d)"><circle cx="5" cy="5" r="5" fill="%s"/><text x="17" y="9" class="lang-name">%s %.2f%%</text></g>`, 25+col*225, 105+offset+row*25, lang.Color, html.EscapeString(lang.Name), percent))
 	}
-	body := fmt.Sprintf(`<g transform="translate(0,%d)"><defs><clipPath id="language-bar"><rect x="25" y="70" width="445" height="12" rx="6"/></clipPath></defs><g clip-path="url(#language-bar)">%s</g><text x="25" y="60" class="muted">%s total</text></g>%s`, offset, bar.String(), html.EscapeString(formatBytes(int64(data.TotalSize))), legend.String())
+	totalLabel := data.TotalLabel
+	if totalLabel == "" {
+		totalLabel = formatBytes(int64(data.TotalSize)) + " total"
+	}
+	body := fmt.Sprintf(`<g transform="translate(0,%d)"><defs><clipPath id="language-bar"><rect x="25" y="70" width="445" height="12" rx="6"/></clipPath></defs><g clip-path="url(#language-bar)">%s</g><text x="25" y="60" class="muted">%s</text></g>%s`, offset, bar.String(), html.EscapeString(totalLabel), legend.String())
 	height := max(155, 130+((len(data.Languages)+1)/2)*25+offset)
 	return SVG(495, height, opts, title, body, "")
 }

@@ -26,6 +26,7 @@ type Client struct {
 }
 
 type StatsData struct {
+	Platform                 string
 	Name                     string
 	TotalCommits             int
 	TotalPRs                 int
@@ -97,6 +98,7 @@ type StreakData struct {
 }
 
 type ProfileSummaryData struct {
+	Platform     string
 	Name         string
 	Login        string
 	AvatarURL    string
@@ -126,6 +128,7 @@ type RepoLanguagesData struct {
 	Name          string
 	NameWithOwner string
 	TotalSize     int
+	TotalLabel    string
 	Languages     []LanguageStat
 }
 

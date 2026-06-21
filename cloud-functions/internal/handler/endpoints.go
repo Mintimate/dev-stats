@@ -18,10 +18,14 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := service.NewClient()
+	client, err := service.NewProvider(q.Get("platform"))
+	if err != nil {
+		writeSVGError(w, err.Error(), "Invalid platform")
+		return
+	}
 	data, err := client.FetchStats(r.Context(), username, parseBool(q.Get("include_all_commits")), parseCSV(q.Get("exclude_repo")), parseBool(q.Get("show_prs_merged")) || strings.Contains(q.Get("show"), "prs_merged"), strings.Contains(q.Get("show"), "discussions_started"), strings.Contains(q.Get("show"), "discussions_answered"), q.Get("commits_year"))
 	if err != nil {
-		writeSVGError(w, err.Error(), "GitHub API request failed")
+		writeSVGError(w, err.Error(), service.PlatformDisplayName(q.Get("platform"))+" API request failed")
 		return
 	}
 
@@ -37,10 +41,14 @@ func handleTopLangs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := service.NewClient()
+	client, err := service.NewProvider(q.Get("platform"))
+	if err != nil {
+		writeSVGError(w, err.Error(), "Invalid platform")
+		return
+	}
 	langs, err := client.FetchTopLanguages(r.Context(), username, parseCSV(q.Get("exclude_repo")), parseFloatDefault(q.Get("size_weight"), 1), parseFloatDefault(q.Get("count_weight"), 0))
 	if err != nil {
-		writeSVGError(w, err.Error(), "GitHub API request failed")
+		writeSVGError(w, err.Error(), service.PlatformDisplayName(q.Get("platform"))+" API request failed")
 		return
 	}
 
@@ -57,10 +65,14 @@ func handlePin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := service.NewClient()
+	client, err := service.NewProvider(q.Get("platform"))
+	if err != nil {
+		writeSVGError(w, err.Error(), "Invalid platform")
+		return
+	}
 	data, err := client.FetchRepo(r.Context(), username, repo)
 	if err != nil {
-		writeSVGError(w, err.Error(), "GitHub API request failed")
+		writeSVGError(w, err.Error(), service.PlatformDisplayName(q.Get("platform"))+" API request failed")
 		return
 	}
 
@@ -70,6 +82,10 @@ func handlePin(w http.ResponseWriter, r *http.Request) {
 
 func handleGist(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	if service.NormalizePlatform(q.Get("platform")) == "cnb" {
+		writeSVGError(w, "gist is not available for CNB", "Use a GitHub data source")
+		return
+	}
 	id := q.Get("id")
 	if id == "" {
 		writeSVGError(w, "Missing gist id", "Use /api/gist?id=GIST_ID")
@@ -112,10 +128,14 @@ func handleStreak(w http.ResponseWriter, r *http.Request) {
 		writeSVGError(w, "Missing username", "Use /api/streak?username=USERNAME")
 		return
 	}
-	client := service.NewClient()
+	client, err := service.NewProvider(q.Get("platform"))
+	if err != nil {
+		writeSVGError(w, err.Error(), "Invalid platform")
+		return
+	}
 	name, days, err := client.FetchContributionCalendar(r.Context(), username)
 	if err != nil {
-		writeSVGError(w, err.Error(), "GitHub API request failed")
+		writeSVGError(w, err.Error(), service.PlatformDisplayName(q.Get("platform"))+" API request failed")
 		return
 	}
 	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["streak"]), card.RenderStreakCard(service.CalculateStreak(name, days), card.OptionsFromQuery(q)))
@@ -128,10 +148,14 @@ func handleProfileSummary(w http.ResponseWriter, r *http.Request) {
 		writeSVGError(w, "Missing username", "Use /api/profile-summary?username=USERNAME")
 		return
 	}
-	client := service.NewClient()
+	client, err := service.NewProvider(q.Get("platform"))
+	if err != nil {
+		writeSVGError(w, err.Error(), "Invalid platform")
+		return
+	}
 	data, err := client.FetchProfileSummary(r.Context(), username)
 	if err != nil {
-		writeSVGError(w, err.Error(), "GitHub API request failed")
+		writeSVGError(w, err.Error(), service.PlatformDisplayName(q.Get("platform"))+" API request failed")
 		return
 	}
 	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["profileSummary"]), card.RenderProfileSummaryCard(data, card.OptionsFromQuery(q)))
@@ -144,10 +168,14 @@ func handleContributionCalendar(w http.ResponseWriter, r *http.Request) {
 		writeSVGError(w, "Missing username", "Use /api/contribution-calendar?username=USERNAME")
 		return
 	}
-	client := service.NewClient()
+	client, err := service.NewProvider(q.Get("platform"))
+	if err != nil {
+		writeSVGError(w, err.Error(), "Invalid platform")
+		return
+	}
 	name, days, err := client.FetchContributionCalendar(r.Context(), username)
 	if err != nil {
-		writeSVGError(w, err.Error(), "GitHub API request failed")
+		writeSVGError(w, err.Error(), service.PlatformDisplayName(q.Get("platform"))+" API request failed")
 		return
 	}
 	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["contributionCalendar"]), card.RenderContributionCalendarCard(name, days, card.OptionsFromQuery(q)))
@@ -160,10 +188,14 @@ func handleRecentActivity(w http.ResponseWriter, r *http.Request) {
 		writeSVGError(w, "Missing username", "Use /api/recent-activity?username=USERNAME")
 		return
 	}
-	client := service.NewClient()
+	client, err := service.NewProvider(q.Get("platform"))
+	if err != nil {
+		writeSVGError(w, err.Error(), "Invalid platform")
+		return
+	}
 	items, err := client.FetchRecentActivity(r.Context(), username, parseIntDefault(q.Get("activity_count"), 5))
 	if err != nil {
-		writeSVGError(w, err.Error(), "GitHub API request failed")
+		writeSVGError(w, err.Error(), service.PlatformDisplayName(q.Get("platform"))+" API request failed")
 		return
 	}
 	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["recentActivity"]), card.RenderRecentActivityCard(username, items, card.OptionsFromQuery(q)))
@@ -176,10 +208,14 @@ func handleRepoLanguages(w http.ResponseWriter, r *http.Request) {
 		writeSVGError(w, "Missing username or repo", "Use /api/repo-languages?username=USERNAME&repo=REPO")
 		return
 	}
-	client := service.NewClient()
+	client, err := service.NewProvider(q.Get("platform"))
+	if err != nil {
+		writeSVGError(w, err.Error(), "Invalid platform")
+		return
+	}
 	data, err := client.FetchRepoLanguages(r.Context(), username, repo, parseIntDefault(q.Get("langs_count"), 6))
 	if err != nil {
-		writeSVGError(w, err.Error(), "GitHub API request failed")
+		writeSVGError(w, err.Error(), service.PlatformDisplayName(q.Get("platform"))+" API request failed")
 		return
 	}
 	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["repoLanguages"]), card.RenderRepoLanguagesCard(data, card.OptionsFromQuery(q)))
@@ -192,18 +228,27 @@ func handleOrganization(w http.ResponseWriter, r *http.Request) {
 		writeSVGError(w, "Missing organization", "Use /api/org?org=ORGANIZATION")
 		return
 	}
-	client := service.NewClient()
+	client, err := service.NewProvider(q.Get("platform"))
+	if err != nil {
+		writeSVGError(w, err.Error(), "Invalid platform")
+		return
+	}
 	data, err := client.FetchOrganization(r.Context(), org)
 	if err != nil {
-		writeSVGError(w, err.Error(), "GitHub API request failed")
+		writeSVGError(w, err.Error(), service.PlatformDisplayName(q.Get("platform"))+" API request failed")
 		return
 	}
 	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["organization"]), card.RenderOrganizationCard(data, card.OptionsFromQuery(q)))
 }
 
 func handleStatusUp(w http.ResponseWriter, r *http.Request) {
-	client := service.NewClient()
-	up := client.HasUsableToken(r.Context())
+	platform := service.NormalizePlatform(r.URL.Query().Get("platform"))
+	up := false
+	if platform == "cnb" {
+		up = service.NewCNBClient().HasUsableToken(r.Context())
+	} else {
+		up = service.NewClient().HasUsableToken(r.Context())
+	}
 	if up {
 		w.Header().Set("Cache-Control", "max-age=0, s-maxage=300")
 	} else {
@@ -234,8 +279,12 @@ func handleStatusUp(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlePATInfo(w http.ResponseWriter, r *http.Request) {
-	client := service.NewClient()
-	info := client.PATInfo(r.Context())
+	var info map[string]any
+	if service.NormalizePlatform(r.URL.Query().Get("platform")) == "cnb" {
+		info = service.NewCNBClient().TokenInfo(r.Context())
+	} else {
+		info = service.NewClient().PATInfo(r.Context())
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "max-age=0, s-maxage=300")
 	_ = json.NewEncoder(w).Encode(info)
