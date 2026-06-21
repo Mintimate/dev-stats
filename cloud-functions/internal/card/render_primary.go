@@ -10,7 +10,11 @@ import (
 func RenderStatsCard(data service.StatsData, opts Options) string {
 	title := opts.CustomTitle
 	if title == "" {
-		title = data.Name + "'s GitHub Stats"
+		platform := data.Platform
+		if platform == "" {
+			platform = "GitHub"
+		}
+		title = data.Name + "'s " + platform + " Stats"
 	}
 	width := opts.CardWidth
 	if width < 287 {

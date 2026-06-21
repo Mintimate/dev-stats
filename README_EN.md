@@ -8,7 +8,7 @@ The original project is deployed on Vercel. This version is adapted for EdgeOne 
 
 ## Features
 
-- **Dynamic Statistics Cards**: Display GitHub data (commits, PRs, stars, etc.)
+- **Dynamic Statistics Cards**: Display GitHub or CNB data (commits, PRs, stars, etc.)
 - **Presets Gallery**: Interactive dashboard showcase displaying multiple live cards side-by-side with one-click configuration
 - **All-New Configuration Panel**: Premium web form layout supporting input debouncing and real-time Markdown/HTML code generation
 - **Multiple Themes & Layouts**: Full support for themes, layouts (compact/normal), and custom styling parameters
@@ -32,7 +32,7 @@ Click the button below to deploy:
 
 See [Tencent EdgeOne Pages Documentation](https://pages.edgeone.ai/en/document/product-introduction) for more details.
 
-> **Note**: You need to set the `PAT_1` environment variable. See [Environment Variables](#environment-variables). After changing environment variables, you need to trigger a new deployment for the changes to take effect.
+> **Note**: GitHub requires `PAT_1`; public CNB data does not require a token. See [Environment Variables](#environment-variables).
 
 ### Manual Deployment
 
@@ -43,7 +43,7 @@ See [Tencent EdgeOne Pages Documentation](https://pages.edgeone.ai/en/document/p
 
 ## Environment Variables
 
-This project requires the following environment variables to be configured in EdgeOne Pages:
+GitHub requires a token; public CNB data does not:
 
 ### Required Variables
 
@@ -54,6 +54,9 @@ This project requires the following environment variables to be configured in Ed
 
 ### Optional Variables
 
+- **`CNB_API_TOKEN`**: CNB access token
+  - Public cards use CNB's web JSON endpoints and do not require a token
+  - The token is only a fallback for future restricted Open API features and is never sent to public web endpoints
 - **`PREFERRED_ORIGIN`**: Custom domain prefix
   - Used for API example URLs displayed on the homepage
   - Example: `https://github-readme-stats.mintimate.cn`
@@ -104,6 +107,18 @@ The Go entrypoint lives in `cloud-functions/index.go` and uses EdgeOne Pages Clo
 - `/api/status/pat-info` - PAT status details
 
 Go Cloud Functions is now the primary implementation, and Node Functions have been removed. The current Go version prioritizes core data and SVG output while continuing to match common themes, layouts, and display parameters from the original project.
+
+### CNB Data Source
+
+Add `platform=cnb` to a card URL to use CNB. GitHub remains the default, so existing URLs do not change.
+
+```md
+![CNB Stats](https://your-domain.example/api?platform=cnb&username=yourusername&show_icons=true)
+![CNB Languages](https://your-domain.example/api/top-langs?platform=cnb&username=yourusername&layout=compact)
+![CNB Repo](https://your-domain.example/api/pin?platform=cnb&username=yourusername&repo=group/repository)
+```
+
+CNB currently supports `/api`, `/api/top-langs`, `/api/pin`, `/api/streak`, `/api/profile-summary`, `/api/contribution-calendar`, `/api/recent-activity`, and `/api/repo-languages`. Gists and organization stats have no equivalent data source and remain GitHub-only. CNB exposes primary/secondary languages rather than byte counts; language cards are weighted by repository occurrence.
 
 ## Get GitHub Token (Classic)
 

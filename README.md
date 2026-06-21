@@ -8,7 +8,7 @@
 
 ## 项目简介
 
-- **动态统计卡片**：展示 GitHub 数据（如提交次数、PR、Star 等）
+- **动态统计卡片**：展示 GitHub 或 CNB 数据（如提交次数、PR、Star 等）
 - **预设卡片展厅**：支持多款卡片（综合统计、常用语言、连续贡献、WakaTime、仓库卡、组织卡）同屏展示与一键配置
 - **全新配置面板**：更美观的表单布局，支持防抖自动刷新与实时生成 Markdown/HTML 代码
 - **多种主题与布局**：完整适配原项目的各种卡片参数、主题与紧凑/默认布局切换
@@ -32,7 +32,7 @@
 
 查看 [腾讯云 EdgeOne Pages 文档](https://pages.edgeone.ai/zh/document/product-introduction) 了解更多详情。
 
-> **注意**：需要设置环境变量 `PAT_1`，详见 [环境变量配置](#环境变量配置)。每次更改环境变量后需要重新触发部署使变量生效。
+> **注意**：GitHub 数据源需要 `PAT_1`；CNB 公开数据源无需令牌。详见 [环境变量配置](#环境变量配置)。
 
 ### 手动部署
 
@@ -43,7 +43,7 @@
 
 ## 环境变量配置
 
-本项目需要在 EdgeOne Pages 中配置以下环境变量：
+GitHub 数据源需要令牌，CNB 公开数据源无需令牌：
 
 ### 必需环境变量
 
@@ -54,6 +54,9 @@
 
 ### 可选环境变量
 
+- **`CNB_API_TOKEN`**：CNB 访问令牌
+  - 公开卡片通过 CNB 主站 Web JSON 接口读取，不要求令牌
+  - 令牌仅作为未来受限 Open API 功能的后备，不会随主站公开请求发送
 - **`PREFERRED_ORIGIN`**：自定义域名前缀
   - 用于首页展示的 API 示例 URL
   - 例如：`https://github-readme-stats.mintimate.cn`
@@ -104,6 +107,18 @@ Go 版本入口位于 `cloud-functions/index.go`，采用 EdgeOne Pages Cloud Fu
 - `/api/status/pat-info` - PAT 状态详情
 
 Go Cloud Functions 是当前主实现，Node Functions 已移除。当前 Go 版本优先覆盖核心数据与 SVG 输出，常用主题、布局和展示参数会继续按原项目行为补齐。
+
+### CNB 数据源
+
+在普通卡片 URL 中加入 `platform=cnb` 即可切换到 CNB；不传该参数时仍使用 GitHub，原有链接无需修改。
+
+```md
+![CNB Stats](https://your-domain.example/api?platform=cnb&username=yourusername&show_icons=true)
+![CNB Languages](https://your-domain.example/api/top-langs?platform=cnb&username=yourusername&layout=compact)
+![CNB Repo](https://your-domain.example/api/pin?platform=cnb&username=yourusername&repo=group/repository)
+```
+
+CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/profile-summary`、`/api/contribution-calendar`、`/api/recent-activity` 和 `/api/repo-languages`。Gist 与组织统计没有等价数据源，继续仅支持 GitHub。CNB 语言接口只提供主/次语言而非字节数，语言卡按仓库出现次数加权。
 
 ## 获取 GitHub Token（Classic）
 

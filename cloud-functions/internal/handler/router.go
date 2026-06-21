@@ -7,7 +7,7 @@ import (
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/" {
+	if r.URL.Path == "/" && r.URL.Query().Get("username") == "" {
 		writeHomePage(w, r)
 		return
 	}

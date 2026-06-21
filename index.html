@@ -501,6 +501,12 @@
           0 0 0 2px var(--accent),
           0 12px 24px rgba(59, 130, 246, 0.2);
       }
+      .gallery-card.disabled {
+        opacity: 0.45;
+        filter: grayscale(0.85);
+        cursor: not-allowed;
+        pointer-events: none;
+      }
       .gallery-card img {
         max-width: 100%;
         max-height: 120px;
@@ -1134,7 +1140,14 @@
           <div class="config-section">
             <h3 class="config-section-title" data-i18n="basic-config">基础配置</h3>
             <div class="form-group">
-              <label for="username" data-i18n="username-label">GitHub 用户名</label>
+              <label for="platform" data-i18n="platform-label">数据平台</label>
+              <select id="platform" class="input-control">
+                <option value="github">GitHub</option>
+                <option value="cnb">CNB</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="username" data-i18n="username-label">用户名</label>
               <input
                 type="text"
                 id="username"
@@ -1148,7 +1161,7 @@
             <div class="form-group">
               <label for="card-type" data-i18n="card-type-label">卡片类型</label>
               <select id="card-type" class="input-control">
-                <option value="stats" data-i18n="opt-stats">GitHub 综合统计卡</option>
+                <option value="stats" data-i18n="opt-stats">综合统计卡</option>
                 <option value="top-langs" data-i18n="opt-top-langs">常用语言占比卡</option>
                 <option value="repo" data-i18n="opt-repo">仓库卡片 (Pin)</option>
                 <option value="gist" data-i18n="opt-gist">Gist 卡片</option>
@@ -2066,10 +2079,11 @@
           "gallery-title": "预设卡片展厅",
           "config-panel-title": "配置面板",
           "basic-config": "基础配置",
-          "username-label": "GitHub 用户名",
+          "platform-label": "数据平台",
+          "username-label": "用户名",
           "username-placeholder": "输入您的用户名",
           "card-type-label": "卡片类型",
-          "opt-stats": "GitHub 综合统计卡",
+          "opt-stats": "综合统计卡",
           "opt-top-langs": "常用语言占比卡",
           "opt-repo": "仓库卡片 (Pin)",
           "opt-gist": "Gist 卡片",
@@ -2174,10 +2188,11 @@
           "gallery-title": "Preset Gallery",
           "config-panel-title": "Configuration Panel",
           "basic-config": "Basic Configuration",
-          "username-label": "GitHub Username",
+          "platform-label": "Data Platform",
+          "username-label": "Username",
           "username-placeholder": "Enter your username",
           "card-type-label": "Card Type",
-          "opt-stats": "GitHub Stats Card",
+          "opt-stats": "Stats Card",
           "opt-top-langs": "Top Languages Card",
           "opt-repo": "Repository Card (Pin)",
           "opt-gist": "Gist Card",
@@ -2284,14 +2299,25 @@
 
       function renderGallery() {
         const username = elUsername.value.trim() || "Mintimate";
+        const platform = elPlatform.value;
         const isEn = (currentLang === "en");
+        const cnbUnsupported = new Set(["gist", "organization"]);
+
         galleryGrid.innerHTML = presets
           .map((p) => {
-            const imgUrl = p.getUrl(baseUrl, username);
+            let imgUrl = p.getUrl(baseUrl, username);
+            const isUnsupported = platform === "cnb" && cnbUnsupported.has(p.cardType);
+
+            if (platform === "cnb" && p.cardType !== "wakatime" && !isUnsupported) {
+              imgUrl += imgUrl.includes("?") ? "&platform=cnb" : "?platform=cnb";
+            }
+
             const badgeText = isEn ? (presetTranslationsEn[p.id]?.badge || p.badge) : p.badge;
             const labelText = isEn ? (presetTranslationsEn[p.id]?.label || p.label) : p.label;
+            const disabledClass = isUnsupported ? " disabled" : "";
+
             return `
-            <div class="gallery-card" data-preset-id="${p.id}" id="gallery-${p.id}">
+            <div class="gallery-card${disabledClass}" data-preset-id="${p.id}" id="gallery-${p.id}">
               <span class="gallery-card-badge">${badgeText}</span>
               <img src="${imgUrl}" alt="${labelText}" loading="lazy" />
               <span class="gallery-card-label">${labelText}</span>
@@ -2305,6 +2331,7 @@
           const cardEl = document.getElementById(`gallery-${p.id}`);
           if (cardEl) {
             cardEl.addEventListener("click", () => {
+              if (cardEl.classList.contains("disabled")) return;
               applyPreset(p);
             });
           }
@@ -2324,8 +2351,10 @@
         }
         if (preset.hasOwnProperty("langsCount")) {
           elLangsCount.value = preset.langsCount;
-          document.getElementById("wakatime-langs-count").value =
-            preset.langsCount;
+          const wkLangsCountEl = document.getElementById("wakatime-langs-count");
+          if (wkLangsCountEl) {
+            wkLangsCountEl.value = preset.langsCount;
+          }
         }
         if (preset.hasOwnProperty("repoName")) {
           elRepoName.value = preset.repoName;
@@ -2428,10 +2457,26 @@
 
       function updateGalleryImages() {
         const username = elUsername.value.trim() || "Mintimate";
+        const platform = elPlatform.value;
+        const cnbUnsupported = new Set(["gist", "organization"]);
+
         presets.forEach((p) => {
           const imgEl = document.querySelector(`#gallery-${p.id} img`);
-          if (imgEl) {
-            imgEl.src = p.getUrl(baseUrl, username);
+          const cardEl = document.getElementById(`gallery-${p.id}`);
+          if (imgEl && cardEl) {
+            const isUnsupported = platform === "cnb" && cnbUnsupported.has(p.cardType);
+
+            if (isUnsupported) {
+              cardEl.classList.add("disabled");
+            } else {
+              cardEl.classList.remove("disabled");
+            }
+
+            let imgUrl = p.getUrl(baseUrl, username);
+            if (platform === "cnb" && p.cardType !== "wakatime" && !isUnsupported) {
+              imgUrl += imgUrl.includes("?") ? "&platform=cnb" : "?platform=cnb";
+            }
+            imgEl.src = imgUrl;
           }
         });
       }
@@ -2470,6 +2515,7 @@
       });
 
       // Config form logic
+      const elPlatform = document.getElementById("platform");
       const elUsername = document.getElementById("username");
       const elCardType = document.getElementById("card-type");
       const elTheme = document.getElementById("theme");
@@ -2750,6 +2796,22 @@
           cardType === "top-langs" || cardType === "wakatime" ? "flex" : "none";
       }
 
+      function updatePlatformCompatibility() {
+        const cnbUnsupported = new Set([
+          "gist",
+          "organization",
+        ]);
+        for (const option of elCardType.options) {
+          option.disabled = elPlatform.value === "cnb" && cnbUnsupported.has(option.value);
+        }
+        if (elCardType.selectedOptions[0]?.disabled) {
+          elCardType.value = "stats";
+        }
+        updateLayoutOptions();
+        updateFieldsVisibility();
+        updateGalleryImages();
+      }
+
       function buildURL() {
         const username = elUsername.value.trim() || "Mintimate";
         const cardType = elCardType.value;
@@ -2758,6 +2820,10 @@
 
         let apiPath = "/api";
         const params = new URLSearchParams();
+
+        if (elPlatform.value === "cnb" && cardType !== "wakatime") {
+          params.set("platform", "cnb");
+        }
 
         if (cardType === "stats") {
           apiPath = "/api";
@@ -3020,6 +3086,7 @@
       });
 
       const allSelects = [
+        elPlatform,
         elCardType,
         elTheme,
         elLayout,
@@ -3028,6 +3095,9 @@
       allSelects.forEach((select) => {
         if (select) {
           select.addEventListener("change", () => {
+            if (select === elPlatform) {
+              updatePlatformCompatibility();
+            }
             if (select === elCardType) {
               updateLayoutOptions();
               updateFieldsVisibility();
@@ -3208,6 +3278,7 @@
 
       // Initial execution
       applyLanguage(savedLangPref);
+      updatePlatformCompatibility();
       updateFieldsVisibility();
       updatePreview();
     </script>
