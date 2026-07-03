@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -288,4 +289,64 @@ func handlePATInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "max-age=0, s-maxage=300")
 	_ = json.NewEncoder(w).Encode(info)
+}
+
+func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
+	avatarURL := r.URL.Query().Get("url")
+	if avatarURL == "" {
+		http.Error(w, "Missing url parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Safety restriction: only allow trusted domains to prevent SSRF attacks
+	allowed := false
+	trustedPrefixes := []string{
+		"https://cnb.cool/",
+		"https://github.com/",
+		"https://avatars.githubusercontent.com/",
+	}
+	for _, prefix := range trustedPrefixes {
+		if strings.HasPrefix(avatarURL, prefix) {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		http.Error(w, "Forbidden URL source", http.StatusForbidden)
+		return
+	}
+
+	req, err := http.NewRequestWithContext(r.Context(), "GET", avatarURL, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("User-Agent", "EdgeOne-Stats-Agent/1.0")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		http.Error(w, "Failed to fetch avatar from source", resp.StatusCode)
+		return
+	}
+
+	// Set CORS headers so frontend canvas and img elements can retrieve the resource freely
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+
+	contentType := resp.Header.Get("Content-Type")
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	} else {
+		w.Header().Set("Content-Type", "image/png")
+	}
+
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+
+	_, _ = io.Copy(w, resp.Body)
 }

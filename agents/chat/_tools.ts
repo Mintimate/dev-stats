@@ -338,7 +338,7 @@ export async function executeStatsTool(
         user: user ? {
           username: user.username,
           nickname: user.nickname,
-          avatar: user.avatar,
+          avatar: user.avatar ? (user.avatar.startsWith('http') ? user.avatar : `${CNB_BASE}${user.avatar}`) : '',
           follower_count: user.follower_count,
           follow_count: user.follow_count,
           public_repo_count: user.public_repo_count,

@@ -3645,9 +3645,19 @@
         } else if (currentUserProfile && currentUserProfile.avatar) {
           avatarUrl = currentUserProfile.avatar;
         } else if (config.platform === "cnb") {
-          avatarUrl = event.user?.avatar || "favicon.svg";
+          avatarUrl = event.user?.avatar || `https://cnb.cool/users/${encodeURIComponent(config.username || "youkun")}/avatar/s`;
         } else {
           avatarUrl = `https://github.com/${encodeURIComponent(config.username || "Mintimate")}.png`;
+        }
+        // CNB avatar relative path resolution (fallback for cached entries)
+        if (avatarUrl && avatarUrl !== "favicon.svg" && !avatarUrl.startsWith("http")) {
+          if (config.platform === "cnb") {
+            avatarUrl = `https://cnb.cool${avatarUrl.startsWith('/') ? '' : '/'}${avatarUrl}`;
+          }
+        }
+        // Wrap CNB URL into proxy endpoint to avoid CORS issues
+        if (avatarUrl && avatarUrl.startsWith("https://cnb.cool")) {
+          avatarUrl = `/api/avatar?url=${encodeURIComponent(avatarUrl)}`;
         }
         els.dbAvatar.onload = () => queueShareArtifactWarmup(80);
         els.dbAvatar.onerror = () => queueShareArtifactWarmup(80);
@@ -4284,7 +4294,18 @@
         return {
           platform: config.platform === "cnb" ? "CNB" : "GitHub",
           username,
-          avatarUrl: currentUserProfile?.avatar || els.dbAvatar?.src || "",
+          avatarUrl: (function() {
+            let src = currentUserProfile?.avatar || els.dbAvatar?.src || "";
+            if (src && !src.startsWith("http") && !src.endsWith("favicon.svg")) {
+              if (config.platform === "cnb") {
+                src = `https://cnb.cool${src.startsWith('/') ? '' : '/'}${src}`;
+              }
+            }
+            if (src && src.startsWith("https://cnb.cool")) {
+              src = `/api/avatar?url=${encodeURIComponent(src)}`;
+            }
+            return src;
+          })(),
           displayName: cleanMarkdown(cleanShareText(displayName)),
           handle: cleanMarkdown(cleanShareText(textFrom(els.dbUsername, `@${username}`))),
           score: cleanShareText(textFrom(els.dbScore, "--")),
