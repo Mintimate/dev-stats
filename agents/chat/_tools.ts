@@ -2,7 +2,6 @@ import { sseEvent } from '../_shared';
 import { tool } from '@openai/agents';
 
 const GITHUB_API = 'https://api.github.com';
-const GITHUB_RAW = 'https://raw.githubusercontent.com';
 const CNB_BASE = 'https://cnb.cool';
 
 export const STATS_TOOL_NAMES = [
@@ -252,23 +251,60 @@ export async function executeStatsTool(
   }
 
   if (name === 'fetch_github_profile_readme') {
+    // Use the GitHub REST API instead of raw.githubusercontent.com:
+    //   - raw.githubusercontent.com is frequently DNS-polluted / connection-stalled
+    //     from EdgeOne edge nodes in mainland China, causing 20s tool timeouts
+    //     even for users that clearly exist.
+    //   - api.github.com/repos/{u}/{u}/readme follows the default branch automatically
+    //     and returns base64-encoded content in one request.
+    // A 5s per-request timeout is enforced so a stalled socket can no longer eat
+    // the whole 20s tool budget.
     const username = String(input.username || '');
-    const branches = ['main', 'master'];
-    const attempts = [];
-    for (const branch of branches) {
-      const url = `${GITHUB_RAW}/${encodeURIComponent(username)}/${encodeURIComponent(username)}/${branch}/README.md`;
-      try {
-        const response = await fetch(url, { signal, headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' } });
-        attempts.push({ branch, status: response.status });
-        if (response.ok) {
-          const text = await response.text();
-          return { ok: true, url, branch, readme: text.slice(0, 24000), truncated: text.length > 24000 };
-        }
-      } catch (error) {
-        attempts.push({ branch, error: (error as Error).message });
+    const url = `${GITHUB_API}/repos/${encodeURIComponent(username)}/${encodeURIComponent(username)}/readme`;
+    try {
+      const response = await fetchWithTimeout(
+        url,
+        { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0', Accept: 'application/vnd.github+json' } },
+        5_000,
+        signal,
+      );
+      if (response.status === 404) {
+        return {
+          ok: false,
+          attempts: [{ url, status: 404 }],
+          message: 'Profile README not found: this user has no username/username repo, or the repo has no README.',
+        };
       }
+      if (!response.ok) {
+        return {
+          ok: false,
+          attempts: [{ url, status: response.status }],
+          message: `GitHub API returned ${response.status}`,
+        };
+      }
+      const data: any = await response.json();
+      const text = decodeBase64(String(data?.content || ''));
+      if (!text) {
+        return {
+          ok: false,
+          attempts: [{ url, status: 200, error: 'empty content' }],
+          message: 'README content was empty or could not be decoded.',
+        };
+      }
+      return {
+        ok: true,
+        url,
+        branch: String(data?.path || ''),
+        readme: text.slice(0, 24000),
+        truncated: text.length > 24000,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        attempts: [{ url, error: (error as Error).message }],
+        message: 'Failed to fetch profile README within 5s.',
+      };
     }
-    return { ok: false, attempts, message: 'Profile README not found on main or master.' };
   }
 
   if (name === 'inspect_cnb_user') {
@@ -399,10 +435,52 @@ async function fetchWithSandboxBrowser(url: string, sandbox: any, signal?: Abort
   }
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = 5_000, signal?: AbortSignal) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+  }
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', onAbort);
+  }
+}
+
 async function fetchJson(url: string, signal?: AbortSignal) {
-  const response = await fetch(url, { signal, headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' } });
+  const response = await fetchWithTimeout(url, { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' } }, 5_000, signal);
   if (!response.ok) throw new Error(`Request failed ${response.status}: ${url}`);
   return response.json();
+}
+
+function decodeBase64(text: string): string {
+  const clean = text.replace(/\s/g, '');
+  if (!clean) return '';
+  // GitHub README content is base64-encoded UTF-8. We must decode bytes first,
+  // then interpret them as UTF-8, otherwise non-ASCII characters (中文/emoji)
+  // turn into mojibake.
+  try {
+    if (typeof atob === 'function') {
+      const binary = atob(clean);
+      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+      return new TextDecoder('utf-8').decode(bytes);
+    }
+  } catch {
+    // fall through to Buffer path
+  }
+  try {
+    const BufferCtor = (globalThis as any).Buffer;
+    if (typeof BufferCtor !== 'undefined') {
+      return BufferCtor.from(clean, 'base64').toString('utf-8');
+    }
+  } catch {
+    // no Buffer available
+  }
+  return '';
 }
 
 function cleanHtml(value: string): string {
