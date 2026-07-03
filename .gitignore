@@ -6,6 +6,7 @@ node_modules
 coverage
 benchmarks
 vercel_token
+dist/
 
 # test
 tests
@@ -28,3 +29,5 @@ tests
 # AI 
 .agents/
 skills-lock.json
+.workbuddy/
+.codebuddy/
