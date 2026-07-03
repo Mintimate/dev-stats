@@ -40,6 +40,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		handleStatusUp(w, r)
 	case "/status/pat-info":
 		handlePATInfo(w, r)
+	case "/avatar":
+		handleAvatarProxy(w, r)
 	default:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusNotFound)
