@@ -59,6 +59,7 @@
     }
   },
   "agents": {
-    "framework": "claude-agent-sdk"
+    "framework": "openai-agents-sdk",
+    "externalNodeModules": ["openai", "@openai/agents"]
   }
 }

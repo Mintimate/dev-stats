@@ -1,10 +1,18 @@
 export function createLogger(name: string) {
+  function format(args: unknown[]): unknown[] {
+    const [first, ...rest] = args;
+    if (first && typeof first === 'object' && !Array.isArray(first)) {
+      return [`[${name}][${new Date().toISOString()}]`, first, ...rest];
+    }
+    return [`[${name}][${new Date().toISOString()}]`, ...args];
+  }
+
   return {
     log(...args: unknown[]) {
-      console.log(`[${name}][${new Date().toISOString()}]`, ...args);
+      console.log(...format(args));
     },
     error(...args: unknown[]) {
-      console.error(`[${name}][${new Date().toISOString()}]`, ...args);
+      console.error(...format(args));
     },
   };
 }

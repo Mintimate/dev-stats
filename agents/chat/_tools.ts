@@ -1,4 +1,5 @@
 import { sseEvent } from '../_shared';
+import { tool } from '@openai/agents';
 
 const GITHUB_API = 'https://api.github.com';
 const GITHUB_RAW = 'https://raw.githubusercontent.com';
@@ -13,7 +14,22 @@ export const STATS_TOOL_NAMES = [
   'compose_readme_draft',
 ] as const;
 
-export function getAnthropicTools() {
+export function createOpenAIAgentTools(options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any }) {
+  return getToolSchemas().map((schema) => tool({
+    name: schema.name,
+    description: schema.description,
+    parameters: cloneSchema(schema.input_schema) as any,
+    strict: false,
+    timeoutMs: 20_000,
+    timeoutBehavior: 'error_as_result',
+    execute: async (input) => {
+      const result = await executeStatsTool(schema.name, input as Record<string, unknown>, options);
+      return JSON.stringify(result);
+    },
+  }));
+}
+
+function getToolSchemas() {
   return [
     {
       name: 'inspect_github_user',
@@ -22,6 +38,7 @@ export function getAnthropicTools() {
         type: 'object',
         properties: { username: { type: 'string', description: 'GitHub username' } },
         required: ['username'],
+        additionalProperties: false,
       },
     },
     {
@@ -31,6 +48,7 @@ export function getAnthropicTools() {
         type: 'object',
         properties: { username: { type: 'string', description: 'GitHub username' } },
         required: ['username'],
+        additionalProperties: false,
       },
     },
     {
@@ -40,6 +58,7 @@ export function getAnthropicTools() {
         type: 'object',
         properties: { username: { type: 'string', description: 'CNB username or organization path' } },
         required: ['username'],
+        additionalProperties: false,
       },
     },
     {
@@ -49,6 +68,7 @@ export function getAnthropicTools() {
         type: 'object',
         properties: { url: { type: 'string', description: 'Public URL to fetch' } },
         required: ['url'],
+        additionalProperties: false,
       },
     },
     {
@@ -71,6 +91,7 @@ export function getAnthropicTools() {
           options: { type: 'object', additionalProperties: true },
         },
         required: ['platform', 'username', 'cards', 'theme', 'rationale', 'options'],
+        additionalProperties: false,
       },
     },
     {
@@ -82,17 +103,87 @@ export function getAnthropicTools() {
           title: { type: 'string' },
           markdown: { type: 'string' },
           summary: { type: 'string' },
+          promotional_summary: {
+            type: 'string',
+            description: 'A concise personal-branding summary from a promotional README perspective.',
+          },
+          objective_rating: {
+            type: 'string',
+            enum: ['夯', '顶流', '高级', '平庸', '入门'],
+            description: 'Objective public-profile rating. Use only one of: 夯, 顶流, 高级, 平庸, 入门.',
+          },
+          objective_summary: {
+            type: 'string',
+            description: 'Objective evidence-based summary explaining the rating and profile quality.',
+          },
+          roast_summary: {
+            type: 'string',
+            description: 'A sharp, sarcastic, and slightly toxic roast of the user profile based on public evidence. Be witty, technical, and humorous.',
+          },
+          score: {
+            type: 'number',
+            description: 'Dynamic user rating score between 0.00 and 100.00.',
+          },
+          badges: {
+            type: 'array',
+            items: { type: 'string' },
+            description: '3 to 5 witty Chinese developer labels, e.g., ["#大厂PR常客", "#开源实干派"]',
+          },
+          dimension_scores: {
+            type: 'object',
+            properties: {
+              maturity: { type: 'number', description: 'Account maturity score out of 20' },
+              original_projects: { type: 'number', description: 'Original repository/code quality score out of 20' },
+              contributions: { type: 'number', description: 'GitHub/CNB contributions count/quality score out of 20' },
+              influence: { type: 'number', description: 'Repository star/fork ecological influence score out of 20' },
+              activity: { type: 'number', description: 'Real activity authenticity score out of 20' },
+              community: { type: 'number', description: 'Community followers/engagement impact score out of 20' },
+            },
+            required: ['maturity', 'original_projects', 'contributions', 'influence', 'activity', 'community'],
+            additionalProperties: false,
+          },
+          top_repos: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'E.g., "umami-software/umami"' },
+                stars: { type: 'number', description: 'Star count of the repo' },
+                contributions_desc: { type: 'string', description: 'E.g. "3 commits, 2 PRs" or "Owner"' },
+              },
+              required: ['name', 'stars', 'contributions_desc'],
+              additionalProperties: false,
+            },
+            description: 'Top 3-6 starred repositories that the user owns or contributed to.',
+          },
         },
-        required: ['title', 'markdown', 'summary'],
+        required: [
+          'title',
+          'markdown',
+          'summary',
+          'promotional_summary',
+          'objective_rating',
+          'objective_summary',
+          'roast_summary',
+          'score',
+          'badges',
+          'dimension_scores',
+          'top_repos',
+        ],
+        additionalProperties: false,
       },
     },
   ];
 }
 
+function cloneSchema(schema: unknown) {
+  return JSON.parse(JSON.stringify(schema));
+}
+
 export async function executeStatsTool(
   name: string,
   input: Record<string, unknown>,
-  options: { sseQueue?: string[]; signal?: AbortSignal },
+  options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any },
 ) {
   const sseQueue = options.sseQueue ?? [];
   const signal = options.signal;
@@ -104,12 +195,59 @@ export async function executeStatsTool(
       `${GITHUB_API}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=12`,
       signal,
     );
+
+    let contributions: any[] = [];
+    try {
+      const prs = await fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr&per_page=60`, signal);
+      if (prs && Array.isArray(prs.items)) {
+        const repoMap = new Map<string, { prCount: number }>();
+        for (const item of prs.items) {
+          const repoUrl = item.repository_url;
+          const match = repoUrl?.match(/\/repos\/([^/]+\/[^/]+)$/);
+          if (match) {
+            const repoFullName = match[1];
+            const owner = repoFullName.split('/')[0];
+            if (owner.toLowerCase() !== username.toLowerCase()) {
+              const current = repoMap.get(repoFullName) || { prCount: 0 };
+              current.prCount++;
+              repoMap.set(repoFullName, current);
+            }
+          }
+        }
+        const topContributed = Array.from(repoMap.entries())
+          .sort((a, b) => b[1].prCount - a[1].prCount)
+          .slice(0, 6);
+
+        await Promise.all(
+          topContributed.map(async ([repoName, stats]) => {
+            try {
+              const detail = await fetchJson(`${GITHUB_API}/repos/${repoName}`, signal);
+              contributions.push({
+                name: repoName,
+                description: detail.description,
+                stargazers_count: detail.stargazers_count,
+                forks_count: detail.forks_count,
+                language: detail.language,
+                html_url: detail.html_url,
+                pr_count: stats.prCount,
+              });
+            } catch {
+              // Ignore failure for individual repos
+            }
+          })
+        );
+      }
+    } catch {
+      // Ignore errors for search queries (e.g. rate limits)
+    }
+
     return {
       platform: 'github',
-      user: pick(user, ['login', 'name', 'bio', 'company', 'blog', 'location', 'public_repos', 'followers', 'following', 'created_at', 'updated_at', 'html_url']),
+      user: pick(user, ['login', 'name', 'bio', 'company', 'blog', 'location', 'public_repos', 'followers', 'following', 'created_at', 'updated_at', 'html_url', 'avatar_url']),
       repos: Array.isArray(repos)
         ? repos.map((repo) => pick(repo, ['name', 'description', 'language', 'stargazers_count', 'forks_count', 'updated_at', 'html_url', 'topics']))
         : [],
+      contributions,
     };
   }
 
@@ -135,14 +273,61 @@ export async function executeStatsTool(
 
   if (name === 'inspect_cnb_user') {
     const username = String(input.username || '');
-    const url = `${CNB_BASE}/${encodeURIComponent(username)}`;
-    const response = await fetch(url, { signal, headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' } });
-    const text = await response.text();
-    return { platform: 'cnb', url, status: response.status, text: cleanHtml(text).slice(0, 6000) };
+    const userUrl = `${CNB_BASE}/users/${encodeURIComponent(username)}`;
+    const reposUrl = `${CNB_BASE}/users/${encodeURIComponent(username)}/repos?page=1&page_size=20&role=Owner&status=active`;
+    
+    const headers = {
+      'Accept': 'application/vnd.cnb.web+json',
+      'User-Agent': 'EdgeOne-Stats-Agent/1.0'
+    };
+
+    try {
+      const userResponse = await fetch(userUrl, { signal, headers });
+      if (userResponse.status === 404) {
+        return {
+          platform: 'cnb',
+          ok: false,
+          status: 404,
+          error: `CNB 用户 "${username}" 不存在 (404)。请注意：CNB 的用户名是区分大小写的，例如 "Mintimate" 与 "mintimate" 是不同的，请检查输入的大写字母。`
+        };
+      }
+      const user = userResponse.ok ? await userResponse.json() : null;
+
+      const reposResponse = await fetch(reposUrl, { signal, headers });
+      const repos = reposResponse.ok ? await reposResponse.json() : [];
+
+      return {
+        platform: 'cnb',
+        url: `${CNB_BASE}/u/${encodeURIComponent(username)}`,
+        user: user ? {
+          username: user.username,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          follower_count: user.follower_count,
+          follow_count: user.follow_count,
+          public_repo_count: user.public_repo_count,
+          stars_count: user.stars_count,
+          created_at: user.created_at
+        } : null,
+        repos: Array.isArray(repos) ? repos.map((r: any) => ({
+          name: r.name,
+          path: r.path,
+          description: r.description,
+          star_count: r.star_count,
+          fork_count: r.fork_count,
+          language: r.language
+        })) : []
+      };
+    } catch (e) {
+      return { platform: 'cnb', error: (e as Error).message };
+    }
   }
 
   if (name === 'browser_fetch') {
     const url = String(input.url || '');
+    const sandboxResult = await fetchWithSandboxBrowser(url, options.sandbox, signal);
+    if (sandboxResult) return sandboxResult;
+
     const response = await fetch(url, { signal, headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' } });
     const text = await response.text();
     return { url, status: response.status, text: cleanHtml(text).slice(0, 8000) };
@@ -160,12 +345,58 @@ export async function executeStatsTool(
       title: String(input.title || 'README Draft'),
       markdown: String(input.markdown || ''),
       summary: String(input.summary || ''),
+      promotional_summary: String(input.promotional_summary || input.summary || ''),
+      objective_rating: coerceRating(input.objective_rating),
+      objective_summary: String(input.objective_summary || input.summary || ''),
+      roast_summary: String(input.roast_summary || ''),
+      score: Number(input.score ?? 60.00),
+      badges: Array.isArray(input.badges) ? input.badges.map(String) : [],
+      dimension_scores: input.dimension_scores || {
+        maturity: 12,
+        original_projects: 12,
+        contributions: 12,
+        influence: 12,
+        activity: 12,
+        community: 12
+      },
+      top_repos: Array.isArray(input.top_repos) ? input.top_repos : [],
     };
     sseQueue.push(sseEvent({ type: 'readme_draft', ...payload }));
     return payload;
   }
 
   return { ok: false, error: `Unknown tool: ${name}` };
+}
+
+function coerceRating(value: unknown): string {
+  const text = String(value || '');
+  return ['夯', '顶流', '高级', '平庸', '入门'].includes(text) ? text : '入门';
+}
+
+async function fetchWithSandboxBrowser(url: string, sandbox: any, signal?: AbortSignal) {
+  const browser = sandbox?.browser;
+  if (!browser || !url || signal?.aborted) return null;
+
+  try {
+    if (typeof browser.goto === 'function') await browser.goto(url, { timeout: 20 });
+
+    let content = '';
+    if (typeof browser.getContent === 'function') {
+      content = String(await browser.getContent());
+    } else if (typeof browser.evaluate === 'function') {
+      content = String(await browser.evaluate('document.body ? document.body.innerText : document.documentElement.innerText'));
+    }
+
+    if (!content) return null;
+    return {
+      url,
+      status: 200,
+      source: 'sandbox_browser',
+      text: cleanHtml(content).slice(0, 8000),
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function fetchJson(url: string, signal?: AbortSignal) {
