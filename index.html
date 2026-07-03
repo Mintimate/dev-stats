@@ -3,3284 +3,1628 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>GitHub Readme Stats · EdgeOne</title>
+    <title>Stats Agent · GitHub/CNB 图标统计</title>
     <meta
       name="description"
-      content="基于 EdgeOne Pages Go Cloud Functions 部署的 GitHub Readme Stats 卡片生成工具，支持动态统计、最常使用语言、仓库卡片及 WakaTime 数据可视化展示。"
+      content="用 Agent 分析 GitHub 与 CNB 用户，并生成可配置的 README 图标统计卡片。"
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-
-    <!-- Anti-FOUC Theme Script -->
-    <script>
-      (function() {
-        const theme = localStorage.getItem('theme-pref') || 'system';
-        if (theme === 'system') {
-          const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-        } else {
-          document.documentElement.setAttribute('data-theme', theme);
-        }
-      })();
-    </script>
-
     <style>
       :root {
-        --bg: #070913;
-        --bg-gradient: radial-gradient(
-          circle at 50% 0%,
-          #0d162f 0%,
-          #070913 70%
-        );
-        --panel: rgba(13, 20, 38, 0.45);
-        --panel-border: rgba(255, 255, 255, 0.08);
-        --panel-hover: rgba(19, 29, 56, 0.6);
-        --text: #f3f4f6;
-        --muted: #9ca3af;
-        --accent: #3b82f6;
-        --accent-glow: rgba(59, 130, 246, 0.15);
-        --accent-hover: #60a5fa;
-        --ok: #10b981;
-        --ok-glow: rgba(16, 185, 129, 0.2);
-        --code-bg: #030712;
-
-        /* Theme specific variables */
-        --grid-color: rgba(255, 255, 255, 0.03);
-        --input-bg: rgba(3, 7, 18, 0.5);
-        --preview-bg: rgba(3, 7, 18, 0.3);
-        --badge-bg: rgba(3, 7, 18, 0.6);
-        --footer-bg: rgba(3, 7, 18, 0.4);
-        --code-header-bg: rgba(255, 255, 255, 0.02);
-        --btn-hover-bg: rgba(255, 255, 255, 0.05);
-        --card-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-      }
-
-      html[data-theme="light"] {
-        --bg: #f8fafc;
-        --bg-gradient: radial-gradient(
-          circle at 50% 0%,
-          #e2e8f0 0%,
-          #f8fafc 70%
-        );
-        --panel: rgba(255, 255, 255, 0.65);
-        --panel-border: rgba(15, 23, 42, 0.08);
-        --panel-hover: rgba(255, 255, 255, 0.85);
-        --text: #0f172a;
-        --muted: #64748b;
-        --accent: #2563eb;
-        --accent-glow: rgba(37, 99, 235, 0.1);
-        --accent-hover: #1d4ed8;
-        --ok: #059669;
-        --ok-glow: rgba(5, 150, 105, 0.15);
-        --code-bg: #f1f5f9;
-        
-        --grid-color: rgba(15, 23, 42, 0.04);
-        --input-bg: rgba(255, 255, 255, 0.8);
-        --preview-bg: rgba(255, 255, 255, 0.4);
-        --badge-bg: rgba(241, 245, 249, 0.8);
-        --footer-bg: rgba(255, 255, 255, 0.4);
-        --code-header-bg: rgba(15, 23, 42, 0.04);
-        --btn-hover-bg: rgba(15, 23, 42, 0.05);
-        --card-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
-      }
-
-      html {
-        background-color: var(--bg);
+        --bg: #f6f3ee;
+        --surface: #fffdf8;
+        --surface-2: #f0ece3;
+        --ink: #1e2528;
+        --muted: #667174;
+        --line: #d8d1c5;
+        --line-strong: #b8ab9b;
+        --green: #1f7a5c;
+        --green-2: #dff1e9;
+        --coral: #d75f48;
+        --amber: #ad741e;
+        --blue: #3267b1;
+        --code: #15191d;
+        --shadow: 0 14px 34px rgba(51, 43, 31, 0.12);
       }
 
       * {
         box-sizing: border-box;
-        margin: 0;
-        padding: 0;
+      }
+
+      html {
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       }
 
       body {
-        background: var(--bg-gradient);
-        color: var(--text);
-        font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+        margin: 0;
         min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        overflow-x: hidden;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0) 260px),
+          var(--bg);
       }
 
-      /* Grid Line Pattern Overlay */
-      body::before {
-        content: "";
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 600px;
-        background-image:
-          linear-gradient(var(--grid-color) 1px, transparent 1px),
-          linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
-        background-size: 40px 40px;
-        background-position: center top;
-        mask-image: linear-gradient(
-          to bottom,
-          rgba(0, 0, 0, 1),
-          rgba(0, 0, 0, 0)
-        );
-        -webkit-mask-image: linear-gradient(
-          to bottom,
-          rgba(0, 0, 0, 1),
-          rgba(0, 0, 0, 0)
-        );
-        z-index: -1;
-        pointer-events: none;
+      button,
+      input,
+      select {
+        font: inherit;
       }
 
-      main {
-        position: relative;
-        width: min(1320px, calc(100% - 40px));
+      button {
+        cursor: pointer;
+      }
+
+      .app {
+        width: min(1480px, calc(100% - 32px));
         margin: 0 auto;
-        padding: 48px 0 72px;
+        padding: 20px 0 36px;
       }
 
-      header {
-        text-align: center;
-        margin-bottom: 36px;
-        display: flex;
-        flex-direction: column;
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) auto;
         align-items: center;
         gap: 16px;
+        margin-bottom: 18px;
       }
 
-      .badge {
-        display: inline-flex;
+      .brand {
+        display: flex;
         align-items: center;
-        gap: 8px;
-        border: 1px solid var(--ok-glow);
-        background: rgba(16, 185, 129, 0.08);
-        color: var(--ok);
-        border-radius: 99px;
-        padding: 6px 14px;
-        font-size: 13px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-        animation: pulse 2s infinite alternate;
+        gap: 12px;
+        min-width: 0;
       }
 
-      .badge::before {
-        content: "";
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: currentColor;
-        box-shadow: 0 0 8px currentColor;
+      .mark {
+        display: grid;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--green);
+        font-weight: 800;
+        box-shadow: var(--shadow);
       }
 
       h1 {
-        font-family: "Outfit", sans-serif;
-        font-size: clamp(32px, 5vw, 56px);
-        font-weight: 800;
-        line-height: 1.1;
-        background: linear-gradient(135deg, #ffffff 40%, #a5b4fc 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        letter-spacing: -1px;
+        margin: 0;
+        font-size: clamp(22px, 3vw, 34px);
+        line-height: 1.08;
+        letter-spacing: 0;
       }
 
-      .lead {
-        max-width: 640px;
+      .sub {
+        margin: 4px 0 0;
         color: var(--muted);
-        font-size: 16px;
-        line-height: 1.6;
-        margin-top: 8px;
+        font-size: 14px;
       }
 
-      .dashboard {
+      .status-strip {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .nav-btn {
+        min-height: 32px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 253, 248, 0.76);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .nav-btn.active {
+        border-color: var(--green);
+        background: var(--green-2);
+        color: var(--green);
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 253, 248, 0.76);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .shell {
         display: grid;
-        grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
-        gap: 24px;
+        grid-template-columns: minmax(390px, 520px) minmax(0, 1fr);
+        gap: 16px;
         align-items: start;
       }
 
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--panel-border);
-        border-radius: 18px;
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        padding: 24px;
-        box-shadow: var(--card-shadow);
+      .view.hidden {
+        display: none !important;
       }
 
-      h2 {
-        font-family: "Outfit", sans-serif;
-        font-size: 20px;
-        font-weight: 600;
-        margin-bottom: 20px;
+      .agent-home {
+        display: grid;
+        grid-template-columns: minmax(0, 860px);
+        justify-content: center;
+      }
+
+      .agent-home .agent {
+        position: static;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 253, 248, 0.86);
+        box-shadow: var(--shadow);
+        min-width: 0;
+      }
+
+      .panel-head {
         display: flex;
         align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 54px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-head > div {
+        min-width: 0;
+      }
+
+      .panel-title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .panel-note {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+
+      .agent {
+        position: sticky;
+        top: 16px;
+        overflow: hidden;
+      }
+
+      .launch-form {
+        display: grid;
+        gap: 14px;
+        padding: 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .launch-grid {
+        display: grid;
+        grid-template-columns: 240px minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .task-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
       }
 
-      h2::before {
-        content: "";
-        width: 4px;
-        height: 16px;
-        background: var(--accent);
-        border-radius: 2px;
-        box-shadow: 0 0 10px var(--accent);
-      }
-
-      .form-group {
-        margin-bottom: 20px;
-      }
-
-      .form-group label {
-        display: block;
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--muted);
-        margin-bottom: 8px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      .input-control {
-        width: 100%;
-        background: var(--input-bg);
-        border: 1px solid var(--panel-border);
+      .task-btn {
+        display: grid;
+        gap: 5px;
+        min-height: 76px;
+        padding: 12px;
+        border: 1px solid rgba(78, 166, 129, 0.42);
         border-radius: 8px;
-        color: var(--text);
-        padding: 10px 14px;
+        background: #101418;
+        color: var(--ink);
+        text-align: left;
+        font-weight: 900;
+      }
+
+      .task-btn strong {
+        color: #e9fff5;
         font-size: 14px;
-        font-family: inherit;
-        transition: all 0.2s ease;
       }
 
-      .input-control:focus {
+      .task-btn span {
+        color: #8aa69a;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .task-btn:hover,
+      .task-btn:focus-visible {
+        border-color: #55d89a;
+        background: #13251e;
         outline: none;
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--accent-glow);
       }
 
-      select.input-control {
-        appearance: none;
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: right 14px center;
-        background-size: 16px 16px;
-        padding-right: 40px;
-        cursor: pointer;
-      }
-
-      .checkbox-grid {
+      .agent-actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 16px;
-        margin-top: 8px;
-      }
-
-      label.checkbox-control {
-        display: flex;
-        align-items: center;
         gap: 10px;
-        cursor: pointer;
-        font-size: 14px;
-        color: var(--muted);
-        user-select: none;
-        transition: color 0.2s ease;
-        white-space: nowrap;
+        padding: 0 14px 14px;
       }
 
-      label.checkbox-control input {
-        appearance: none;
-        -webkit-appearance: none;
-        width: 18px;
-        height: 18px;
-        border: 1px solid var(--panel-border);
-        border-radius: 6px;
-        background: var(--input-bg);
-        cursor: pointer;
+      .terminal {
         display: grid;
-        place-content: center;
-        transition: all 0.2s ease;
-        flex-shrink: 0;
-      }
-
-      label.checkbox-control input:checked {
-        background: var(--accent);
-        border-color: var(--accent);
-        box-shadow: 0 0 8px var(--accent-glow);
-      }
-
-      label.checkbox-control input:checked::before {
-        content: "";
-        width: 10px;
-        height: 10px;
-        background: white;
-        clip-path: polygon(
-          28% 38%,
-          41% 53%,
-          75% 24%,
-          86% 34%,
-          40% 78%,
-          18% 50%
-        );
-      }
-
-      label.checkbox-control:hover {
-        color: var(--text);
-      }
-
-      /* Preview Panel styling */
-      .preview-pane {
-        display: flex;
-        flex-direction: column;
-        gap: 24px;
-      }
-
-      .preview-box {
-        background: var(--preview-bg);
-        border: 1px solid var(--panel-border);
-        border-radius: 16px;
-        padding: 32px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 360px;
-        position: relative;
+        gap: 0;
+        margin: 14px;
         overflow: hidden;
-      }
-
-      .preview-box::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background-image:
-          linear-gradient(var(--grid-color) 1px, transparent 1px),
-          linear-gradient(
-            90deg,
-            var(--grid-color) 1px,
-            transparent 1px
-          );
-        background-size: 28px 28px;
-        mask-image: radial-gradient(circle at center, black, transparent 78%);
-        pointer-events: none;
-      }
-
-      .section-heading {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 20px;
-      }
-
-      .section-heading h2 {
-        margin-bottom: 0;
-      }
-
-      .preview-status {
-        color: var(--muted);
-        font:
-          500 12px "SFMono-Regular",
-          Consolas,
-          monospace;
-        white-space: nowrap;
-      }
-
-      .preview-error {
-        display: none;
-        max-width: 360px;
-        color: #fca5a5;
-        font-size: 14px;
-        line-height: 1.6;
-        text-align: center;
-        z-index: 2;
-      }
-
-      .preview-box.has-error .preview-error {
-        display: block;
-      }
-
-      /* Grid for preview layout card sizes */
-      #preview-image {
-        max-width: 100%;
-        max-height: 520px;
-        height: auto;
-        border-radius: 6px;
-        z-index: 1;
-        transition: opacity 0.2s ease;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-      }
-
-      /* Spinner Loader */
-      .loader {
-        position: absolute;
-        width: 40px;
-        height: 40px;
-        border: 3px solid var(--panel-border);
-        border-top-color: var(--accent);
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        display: none;
-        z-index: 2;
-      }
-
-      .preview-box.loading #preview-image {
-        opacity: 0.3;
-      }
-
-      .preview-box.has-error #preview-image {
-        display: none;
-      }
-
-      .preview-box.loading .loader {
-        display: block;
-      }
-
-      /* Presets & Gallery */
-      .gallery-section {
-        margin-bottom: 36px;
-      }
-      .gallery-title {
-        font-family: "Outfit", sans-serif;
-        font-size: 22px;
-        font-weight: 700;
-        margin-bottom: 16px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .gallery-title::before {
-        content: "";
-        width: 4px;
-        height: 18px;
-        background: var(--accent);
-        border-radius: 2px;
-        box-shadow: 0 0 10px var(--accent);
-      }
-      .gallery-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 20px;
-      }
-      .gallery-card {
-        background: var(--panel);
-        border: 1px solid var(--panel-border);
-        border-radius: 16px;
-        padding: 18px;
-        cursor: pointer;
-        position: relative;
-        overflow: hidden;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        align-items: center;
-        justify-content: center;
-        min-height: 180px;
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-      }
-      .gallery-card:hover {
-        transform: translateY(-4px);
-        border-color: var(--accent);
-        box-shadow: 0 12px 24px rgba(59, 130, 246, 0.15);
-      }
-      .gallery-card.active {
-        border-color: var(--accent);
-        background: rgba(59, 130, 246, 0.05);
-        box-shadow:
-          0 0 0 2px var(--accent),
-          0 12px 24px rgba(59, 130, 246, 0.2);
-      }
-      .gallery-card.disabled {
-        opacity: 0.45;
-        filter: grayscale(0.85);
-        cursor: not-allowed;
-        pointer-events: none;
-      }
-      .gallery-card img {
-        max-width: 100%;
-        max-height: 120px;
-        object-fit: contain;
-        border-radius: 6px;
-        pointer-events: none;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        transition: transform 0.3s ease;
-        background: transparent;
-      }
-      .gallery-card:hover img {
-        transform: scale(1.03);
-      }
-      .gallery-card-badge {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        background: var(--badge-bg);
-        border: 1px solid var(--panel-border);
-        padding: 4px 8px;
-        border-radius: 6px;
-        font-size: 11px;
-        color: var(--muted);
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-      .gallery-card.active .gallery-card-badge {
-        color: #ffffff;
-        background: var(--accent);
-        border-color: var(--accent);
-      }
-      .gallery-card-label {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--muted);
-        transition: color 0.2s ease;
-      }
-      .gallery-card.active .gallery-card-label,
-      .gallery-card:hover .gallery-card-label {
-        color: var(--text);
-      }
-
-      /* Code Block Output */
-      .output-box {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-
-      .code-container {
-        position: relative;
+        border: 1px solid #26352f;
         border-radius: 8px;
-        background: var(--code-bg);
-        border: 1px solid var(--panel-border);
-        overflow: hidden;
+        background: #0b0f12;
+        color: #d9f7e7;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
       }
 
-      .code-header {
+      .terminal-head {
         display: flex;
+        align-items: center;
         justify-content: space-between;
-        align-items: center;
-        background: var(--code-header-bg);
-        padding: 8px 16px;
-        border-bottom: 1px solid var(--panel-border);
-      }
-
-      .code-header span {
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 1px;
-      }
-
-      .copy-btn {
-        background: transparent;
-        border: none;
-        color: var(--muted);
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-        padding: 4px 8px;
-        border-radius: 4px;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .copy-btn:hover {
-        background: var(--btn-hover-bg);
-        color: var(--text);
-      }
-
-      .copy-btn.copied {
-        color: var(--ok);
-      }
-
-      pre {
-        padding: 16px;
-        overflow-x: auto;
-        max-height: 180px;
-      }
-
-      code {
-        font-family:
-          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-        font-size: 13.5px;
-        color: #e5e7eb;
-        line-height: 1.5;
-        white-space: pre-wrap;
-        word-break: break-all;
-      }
-
-      /* Endpoint docs section */
-      .docs-section {
-        margin-top: 48px;
-      }
-
-      .docs-toggle {
-        width: 100%;
-        background: var(--panel);
-        border: 1px solid var(--panel-border);
-        color: var(--text);
-        padding: 18px 24px;
-        border-radius: 12px;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-family: "Outfit", sans-serif;
-        font-size: 16px;
-        font-weight: 600;
-        transition: background 0.2s;
-      }
-
-      .docs-toggle:hover {
-        background: var(--panel-hover);
-      }
-
-      .docs-content {
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.3s cubic-bezier(0, 1, 0, 1);
-      }
-
-      .docs-content.open {
-        max-height: 2000px;
-        transition: max-height 0.5s ease-in;
-      }
-
-      .endpoint-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: 16px;
-        padding: 24px 0;
-      }
-
-      .endpoint-card {
-        background: var(--panel);
-        border: 1px solid var(--panel-border);
-        border-radius: 10px;
-        padding: 16px;
-        display: flex;
-        flex-direction: column;
         gap: 12px;
-        transition:
-          transform 0.2s,
-          border-color 0.2s;
+        min-height: 48px;
+        padding: 10px 12px;
+        border-bottom: 1px solid #26352f;
+        background: #11171b;
       }
 
-      .endpoint-card:hover {
-        transform: translateY(-2px);
-        border-color: rgba(59, 130, 246, 0.4);
-        background: var(--panel-hover);
-      }
-
-      .endpoint-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .endpoint-path {
-        font-family: monospace;
-        font-size: 14px;
-        font-weight: 700;
-        color: var(--text);
-      }
-
-      .endpoint-method {
-        font-size: 11px;
-        font-weight: 800;
-        color: var(--accent);
-        background: var(--accent-glow);
-        padding: 3px 6px;
-        border-radius: 4px;
-      }
-
-      .endpoint-desc {
-        font-size: 13px;
-        color: var(--muted);
-        line-height: 1.4;
-      }
-
-      .endpoint-link {
-        align-self: flex-start;
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--accent);
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-
-      .endpoint-link:hover {
-        color: var(--accent-hover);
-      }
-
-      footer {
-        width: 100%;
-        border-top: 1px solid var(--panel-border);
-        padding: 24px 0;
-        background: var(--footer-bg);
-        margin-top: auto;
-      }
-
-      .footer-content {
-        width: min(1200px, calc(100% - 32px));
-        margin: 0 auto;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 14px;
-        color: var(--muted);
-      }
-
-      .footer-links {
-        display: flex;
-        gap: 20px;
-      }
-
-      .footer-links a {
-        color: var(--muted);
-        text-decoration: none;
-        transition: color 0.2s;
-      }
-
-      .footer-links a:hover {
-        color: var(--text);
-      }
-
-      /* Animations */
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      @keyframes pulse {
-        0% {
-          box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
-        }
-        70% {
-          box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
-        }
-        100% {
-          box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-        }
-      }
-
-      /* Responsive */
-      @media (max-width: 1080px) {
-        .dashboard {
-          grid-template-columns: 350px minmax(0, 1fr);
-        }
-      }
-
-      @media (max-width: 860px) {
-        .dashboard {
-          grid-template-columns: 1fr;
-        }
-        main {
-          padding: 40px 0 60px;
-        }
-      }
-
-      @media (max-width: 480px) {
-        main {
-          width: min(100% - 20px, 1320px);
-          padding-top: 28px;
-        }
-        header {
-          margin-bottom: 28px;
-        }
-        .card {
-          padding: 18px;
-          border-radius: 14px;
-        }
-        .checkbox-grid {
-          grid-template-columns: 1fr;
-        }
-        .preview-box {
-          min-height: 240px;
-          padding: 16px;
-        }
-        .section-heading {
-          align-items: flex-start;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .footer-content {
-          flex-direction: column;
-          gap: 12px;
-          text-align: center;
-        }
-      }
-
-      /* Custom Config Styles */
-      .config-section {
-        border-bottom: 1px solid var(--panel-border);
-        padding-bottom: 18px;
-        margin-bottom: 18px;
-      }
-      .config-section:last-of-type {
-        border-bottom: none;
-        padding-bottom: 0;
-        margin-bottom: 0;
-      }
-      .config-section-title {
-        font-family: "Outfit", sans-serif;
-        font-size: 15px;
-        font-weight: 600;
-        color: var(--text);
-        margin-bottom: 14px;
-        display: flex;
+      .status-led {
+        display: inline-flex;
         align-items: center;
         gap: 8px;
+        color: #8aa69a;
+        font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       }
-      .config-section-title::before {
+
+      .status-led::before {
         content: "";
-        width: 3px;
-        height: 12px;
-        background: var(--accent);
-        border-radius: 1px;
-        box-shadow: 0 0 6px var(--accent);
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #5b665f;
       }
-      .form-group-row {
+
+      .status-led.running::before {
+        background: #d2a62d;
+        box-shadow: 0 0 0 4px rgba(210, 166, 45, 0.14);
+      }
+
+      .status-led.done::before {
+        background: #55d89a;
+        box-shadow: 0 0 0 4px rgba(85, 216, 154, 0.12);
+      }
+
+      .status-led.error::before {
+        background: #ef6b57;
+        box-shadow: 0 0 0 4px rgba(239, 107, 87, 0.12);
+      }
+
+      .run-meta {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+        color: #7f9188;
+        font: 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      }
+
+      .run-meta span {
+        min-height: 24px;
+        padding: 5px 7px;
+        border: 1px solid #26352f;
+        border-radius: 6px;
+        background: #0b0f12;
+      }
+
+      .target-line {
+        padding: 10px 12px;
+        border-bottom: 1px solid #26352f;
+        color: #a6c2b3;
+        font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        overflow-wrap: anywhere;
+      }
+
+      .pipeline {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 0;
+        padding: 12px;
+        border-bottom: 1px solid #26352f;
+      }
+
+      .pipe-step {
+        position: relative;
+        display: grid;
+        gap: 6px;
+        min-height: 70px;
+        padding: 9px;
+        border: 1px solid #26352f;
+        border-right: 0;
+        background: #0f1417;
+      }
+
+      .pipe-step:first-child {
+        border-radius: 8px 0 0 8px;
+      }
+
+      .pipe-step:last-child {
+        border-right: 1px solid #26352f;
+        border-radius: 0 8px 8px 0;
+      }
+
+      .pipe-step::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #5b665f;
+      }
+
+      .pipe-step strong {
+        color: #d9f7e7;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .pipe-step span {
+        color: #7f9188;
+        font-size: 11px;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+      }
+
+      .pipe-step.running {
+        border-color: #66501b;
+        background: #19170e;
+      }
+
+      .pipe-step.running::before {
+        background: #d2a62d;
+        box-shadow: 0 0 0 4px rgba(210, 166, 45, 0.14);
+      }
+
+      .pipe-step.done {
+        border-color: #2e684d;
+        background: #0f1d18;
+      }
+
+      .pipe-step.done::before {
+        background: #55d89a;
+      }
+
+      .pipe-step.error {
+        border-color: #703629;
+        background: #21110e;
+      }
+
+      .pipe-step.error::before {
+        background: #ef6b57;
+      }
+
+      .event-stream {
+        display: grid;
+        gap: 10px;
+        min-height: 190px;
+        max-height: 260px;
+        overflow: auto;
+        padding: 12px;
+        background: repeating-linear-gradient(0deg, #0b0f12, #0b0f12 29px, #0f1518 30px);
+      }
+
+      .event-line {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        gap: 10px;
+        color: #a6c2b3;
+        font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        overflow-wrap: anywhere;
+      }
+
+      .event-line code {
+        color: #55d89a;
+        font: inherit;
+        text-transform: uppercase;
+      }
+
+      .event-line.error code {
+        color: #ef6b57;
+      }
+
+      .result-panel {
+        display: grid;
         gap: 12px;
+        margin: 0 14px 14px;
+        padding: 14px;
+        border: 1px solid #26352f;
+        border-radius: 8px;
+        background: #101418;
+        color: #d9f7e7;
       }
-      /* Details element accordion styling */
-      .colors-details {
-        border: none;
-      }
-      .colors-details summary {
-        list-style: none;
-        cursor: pointer;
-        outline: none;
+
+      .result-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 12px;
       }
-      .colors-details summary::-webkit-details-marker {
-        display: none;
+
+      .result-title {
+        margin: 0;
+        color: #f0fff7;
+        font-size: 14px;
+        font-weight: 900;
       }
-      .colors-details summary .arrow-indicator {
-        font-size: 11px;
+
+      .result-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .result-summary {
+        margin: 0;
+        color: #9bb5a8;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .result-code {
+        margin: 0;
+        max-height: 300px;
+        overflow: auto;
+        border: 1px solid #26352f;
+        border-radius: 8px;
+        padding: 12px;
+        background: #080b0d;
+        color: #e7fff0;
+        font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .stats-preview {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 360px);
+        gap: 12px;
+        align-items: stretch;
+      }
+
+      .recipe-box {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid #26352f;
+        border-radius: 8px;
+        background: #080b0d;
+        color: #a6c2b3;
+        font-size: 12px;
+      }
+
+      .agent-preview-stage {
+        display: grid;
+        place-items: center;
+        min-height: 180px;
+        border: 1px solid #26352f;
+        border-radius: 8px;
+        background: #0b0f12;
+      }
+
+      .agent-preview-stage img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        background: white;
+      }
+
+      input:focus,
+      select:focus {
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px rgba(31, 122, 92, 0.13);
+      }
+
+      .btn {
+        min-height: 38px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 0 13px;
+        background: var(--surface);
+        color: var(--ink);
+        font-weight: 800;
+      }
+
+      .btn.primary {
+        border-color: var(--green);
+        background: var(--green);
+        color: white;
+      }
+
+      .btn.warn {
+        border-color: rgba(215, 95, 72, 0.5);
+        color: var(--coral);
+      }
+
+      .btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .workspace {
+        display: grid;
+        gap: 16px;
+        min-width: 0;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 12px;
+        padding: 14px;
+      }
+
+      .field {
+        display: grid;
+        gap: 7px;
+        min-width: 0;
+      }
+
+      .span-2 { grid-column: span 2; }
+      .span-3 { grid-column: span 3; }
+      .span-4 { grid-column: span 4; }
+      .span-5 { grid-column: span 5; }
+      .span-6 { grid-column: span 6; }
+      .span-8 { grid-column: span 8; }
+      .span-12 { grid-column: span 12; }
+
+      label {
         color: var(--muted);
-        transition: transform 0.2s ease;
+        font-size: 12px;
+        font-weight: 800;
       }
-      .colors-details[open] summary .arrow-indicator {
-        transform: rotate(90deg);
+
+      input,
+      select {
+        width: 100%;
+        min-height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0 10px;
+        background: #fffefa;
+        color: var(--ink);
+        outline: none;
       }
-      .color-picker-grid {
+
+      .segmented {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-        margin-top: 14px;
-      }
-      .color-input-wrapper {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
-      .color-input-wrapper input[type="color"] {
-        appearance: none;
-        -webkit-appearance: none;
-        width: 38px;
-        height: 38px;
-        border: 1px solid var(--panel-border);
+        gap: 4px;
+        min-height: 38px;
+        padding: 4px;
+        border: 1px solid var(--line);
         border-radius: 8px;
-        background: rgba(3, 7, 18, 0.5);
-        cursor: pointer;
-        padding: 0;
-        flex-shrink: 0;
-      }
-      .color-input-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
-        padding: 0;
-      }
-      .color-input-wrapper input[type="color"]::-webkit-color-swatch {
-        border: none;
-        border-radius: 7px;
-      }
-      .card-specific-section {
-        background: rgba(59, 130, 246, 0.03);
-        border: 1px solid rgba(59, 130, 246, 0.1);
-        border-radius: 12px;
-        padding: 16px;
+        background: var(--surface-2);
       }
 
-      @media (prefers-reduced-motion: reduce) {
-        *,
-        *::before,
-        *::after {
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-          scroll-behavior: auto !important;
-        }
-      }
-
-      /* Light Theme overrides for Title & Code text */
-      html[data-theme="light"] h1 {
-        background: linear-gradient(135deg, #0f172a 40%, #4f46e5 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-
-      html[data-theme="light"] code {
-        color: #1e293b;
-      }
-
-      /* Theme & Language Switcher Styles */
-      .theme-switch-wrapper {
-        position: absolute;
-        top: 24px;
-        right: 0;
-        z-index: 100;
-        display: flex;
-        gap: 12px;
-        align-items: center;
-      }
-
-      .theme-switch-container {
-        display: inline-flex;
-        background: var(--panel);
-        border: 1px solid var(--panel-border);
-        border-radius: 99px;
-        padding: 3px;
-        position: relative;
-        gap: 2px;
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      }
-
-      .theme-btn, .lang-btn {
+      .segmented button {
+        border: 0;
+        border-radius: 6px;
         background: transparent;
-        border: none;
         color: var(--muted);
-        padding: 6px 14px;
-        font-size: 13px;
-        font-weight: 600;
-        border-radius: 99px;
-        cursor: pointer;
+        font-weight: 800;
+      }
+
+      .segmented button.active {
+        background: var(--surface);
+        color: var(--green);
+        box-shadow: 0 1px 4px rgba(51, 43, 31, 0.12);
+      }
+
+      .toggle-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(140px, 1fr));
+        gap: 8px;
+      }
+
+      .check {
         display: flex;
         align-items: center;
-        gap: 6px;
-        transition: all 0.2s ease;
-        user-select: none;
-        z-index: 1;
-        text-decoration: none;
+        gap: 8px;
+        min-height: 38px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fffefa;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 700;
       }
 
-      .theme-btn svg {
-        width: 15px;
-        height: 15px;
-        fill: none;
-        stroke: currentColor;
-        stroke-width: 2;
-        stroke-linecap: round;
-        stroke-linejoin: round;
+      .check input {
+        width: 16px;
+        min-height: 16px;
+        accent-color: var(--green);
       }
 
-      .theme-btn:hover, .lang-btn:hover {
-        color: var(--text);
+      .preview-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+        gap: 16px;
       }
 
-      .theme-btn.active, .lang-btn.active {
-        color: #ffffff;
-        background: var(--accent);
-        box-shadow: 0 2px 8px var(--accent-glow);
+      .preview-stage {
+        min-height: 360px;
+        padding: 16px;
+        display: grid;
+        place-items: center;
+        background:
+          linear-gradient(90deg, rgba(216, 209, 197, 0.45) 1px, transparent 1px),
+          linear-gradient(rgba(216, 209, 197, 0.45) 1px, transparent 1px),
+          #ebe5da;
+        background-size: 28px 28px;
       }
 
-      @media (max-width: 860px) {
-        .theme-switch-wrapper {
+      .preview-stage img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        background: white;
+      }
+
+      .output {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        min-height: 360px;
+      }
+
+      .codebox {
+        margin: 0;
+        min-height: 220px;
+        max-height: 360px;
+        overflow: auto;
+        padding: 14px;
+        background: var(--code);
+        color: #eef3ea;
+        font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .mini-list {
+        display: grid;
+        gap: 8px;
+        padding: 14px;
+        border-top: 1px solid var(--line);
+      }
+
+      .url-line {
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fffefa;
+        color: var(--muted);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 980px) {
+        .shell,
+        .preview-grid,
+        .topbar {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .agent {
           position: static;
-          display: flex;
-          justify-content: center;
-          gap: 12px;
-          margin-bottom: 24px;
+        }
+
+        .status-strip {
+          justify-content: flex-start;
+        }
+
+        .controls {
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
+
+        .span-2,
+        .span-3,
+        .span-4,
+        .span-5,
+        .span-6,
+        .span-8 {
+          grid-column: span 6;
         }
       }
 
-      /* Support & Author Card Styles */
-      .support-card {
-        margin-top: 24px;
-      }
-      
-      .support-card h2 {
-        margin-bottom: 16px;
-      }
+      @media (max-width: 620px) {
+        .app {
+          width: min(100% - 20px, 1480px);
+          padding-top: 12px;
+        }
 
-      .support-links {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
+        .controls {
+          grid-template-columns: 1fr;
+        }
 
-      .support-btn {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 12px 18px;
-        border: 1px solid var(--panel-border);
-        border-radius: 12px;
-        background: var(--input-bg);
-        color: var(--text);
-        text-decoration: none;
-        transition: all 0.2s ease;
-      }
+        .span-2,
+        .span-3,
+        .span-4,
+        .span-5,
+        .span-6,
+        .span-8,
+        .span-12 {
+          grid-column: span 1;
+        }
 
-      .support-btn svg {
-        width: 18px;
-        height: 18px;
-        flex-shrink: 0;
-        stroke: currentColor;
-        stroke-width: 2;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        fill: none;
-        transition: color 0.2s ease;
-      }
+        .toggle-grid {
+          grid-template-columns: 1fr;
+        }
 
-      .support-btn span {
-        font-size: 14px;
-        font-weight: 600;
-      }
-
-      .support-btn .support-desc {
-        font-size: 12px;
-        color: var(--muted);
-        font-weight: 400;
-        margin-left: auto;
-      }
-
-      .support-btn:hover {
-        transform: translateY(-2px);
-        border-color: var(--accent);
-        box-shadow: 0 4px 12px var(--accent-glow);
-        background: var(--panel-hover);
-      }
-
-      .blog-btn:hover svg {
-        color: #3b82f6;
-      }
-
-      .bilibili-btn:hover svg {
-        color: #00aeec;
-      }
-
-      .afdian-btn:hover svg {
-        color: #946ce6;
+        .launch-grid,
+        .task-grid,
+        .pipeline,
+        .stats-preview {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
   <body>
-    <main>
-      <div class="theme-switch-wrapper">
-        <!-- Language Switcher -->
-        <div class="theme-switch-container" id="lang-switch-container">
-          <button class="lang-btn" data-lang-val="zh" data-i18n-title="lang-zh-title" title="简体中文">
-            <span>中文</span>
-          </button>
-          <button class="lang-btn" data-lang-val="en" data-i18n-title="lang-en-title" title="English">
-            <span>EN</span>
-          </button>
+    <main class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark">GS</div>
+          <div>
+            <h1>Stats Agent</h1>
+            <p class="sub">GitHub / CNB README 图标统计配置台</p>
+          </div>
         </div>
-        <!-- Theme Switcher -->
-        <div class="theme-switch-container">
-          <button class="theme-btn" data-theme-val="light" data-i18n-title="theme-light-title" title="亮色模式">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-            <span data-i18n="theme-light">亮色</span>
-          </button>
-          <button class="theme-btn" data-theme-val="system" data-i18n-title="theme-system-title" title="系统默认">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-            <span data-i18n="theme-system">系统</span>
-          </button>
-          <button class="theme-btn" data-theme-val="dark" data-i18n-title="theme-dark-title" title="暗色模式">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-            <span data-i18n="theme-dark">暗色</span>
-          </button>
+        <div class="status-strip">
+          <button class="nav-btn active" type="button" data-view="agent">Agent 首页</button>
+          <button class="nav-btn" type="button" data-view="manual">手动 Stats</button>
+          <span class="pill" id="platform-pill">GitHub</span>
+          <span class="pill" id="card-pill">Stats Card</span>
+          <span class="pill" id="status-pill">Ready</span>
         </div>
-      </div>
-      <header>
-        <span class="badge" data-i18n="badge-gocf">Go Cloud Functions</span>
-        <h1 data-i18n="app-title">GitHub Readme Stats · EdgeOne</h1>
-        <p class="lead" data-i18n="lead-desc">
-          在 Tencent EdgeOne Pages Edge
-          边缘侧极致加速的统计卡片生成器，提供极速响应的动态 SVG 数据渲染服务。
-        </p>
       </header>
 
-      <!-- Demo Gallery Section -->
-      <section class="gallery-section">
-        <h2 class="gallery-title" data-i18n="gallery-title">预设卡片展厅</h2>
-        <div class="gallery-grid" id="gallery-grid">
-          <!-- Populated by JavaScript -->
-        </div>
+      <section class="agent-home view" id="agent-view">
+        <aside class="panel agent">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Agent Console</h2>
+              <span class="panel-note">选择目标后启动自动分析，过程只显示工具进度和最终结果</span>
+            </div>
+            <button class="btn" id="new-chat" type="button">New</button>
+          </div>
+          <form class="launch-form" id="agent-form">
+            <div class="launch-grid">
+              <div class="field">
+                <label>平台</label>
+                <div class="segmented" id="agent-platform-tabs">
+                  <button type="button" data-platform="github" class="active">GitHub</button>
+                  <button type="button" data-platform="cnb">CNB</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="agent-username">用户名 / 组织</label>
+                <input id="agent-username" value="mintimate" autocomplete="off" />
+              </div>
+            </div>
+            <div class="task-grid">
+              <button class="task-btn" type="button" data-agent-run="readme">
+                <strong>Generate README</strong>
+                <span>浏览主页、读取 Profile README，并输出可复制 Markdown</span>
+              </button>
+              <button class="task-btn" type="button" data-agent-run="stats">
+                <strong>Build Stats Stack</strong>
+                <span>分析公开资料，生成可应用到手动面板的卡片方案</span>
+              </button>
+            </div>
+          </form>
+
+          <div class="terminal">
+            <div class="terminal-head">
+              <div class="status-led" id="agent-led">IDLE</div>
+              <div class="run-meta">
+                <span id="run-id">run: --</span>
+                <span id="run-elapsed">00.0s</span>
+              </div>
+            </div>
+            <div class="target-line" id="target-line">TARGET https://github.com/mintimate</div>
+            <div class="pipeline" id="pipeline">
+              <div class="pipe-step" data-step="browser"><strong>Browser</strong><span>idle</span></div>
+              <div class="pipe-step" data-step="profile"><strong>Profile</strong><span>idle</span></div>
+              <div class="pipe-step" data-step="readme"><strong>README</strong><span>idle</span></div>
+              <div class="pipe-step" data-step="recipe"><strong>Stats Recipe</strong><span>idle</span></div>
+              <div class="pipe-step" data-step="draft"><strong>Draft</strong><span>idle</span></div>
+            </div>
+            <div class="event-stream" id="event-stream">
+              <div class="event-line"><code>READY</code><span>select platform, set username, run agent</span></div>
+            </div>
+          </div>
+
+          <div class="result-panel hidden" id="result-panel">
+            <div class="result-head">
+              <div>
+                <h3 class="result-title" id="result-title">Result</h3>
+                <p class="result-summary" id="result-summary"></p>
+              </div>
+              <div class="result-actions">
+                <button class="btn primary hidden" id="copy-readme" type="button">Copy README</button>
+                <button class="btn hidden" id="download-readme" type="button">Download README.md</button>
+                <button class="btn hidden" id="apply-recipe" type="button">Apply to Manual Stats</button>
+              </div>
+            </div>
+            <pre class="result-code hidden" id="readme-draft"></pre>
+            <div class="stats-preview hidden" id="stats-result">
+              <div class="recipe-box" id="recipe-box"></div>
+              <div class="agent-preview-stage">
+                <img id="agent-preview-img" alt="Recommended stats preview" />
+              </div>
+            </div>
+          </div>
+          <div class="agent-actions">
+            <button class="btn warn" id="stop-agent" type="button" disabled>Stop</button>
+          </div>
+        </aside>
       </section>
 
-      <div class="dashboard">
-        <!-- Configuration Card -->
-        <section class="card">
-          <h2 data-i18n="config-panel-title">配置面板</h2>
-
-          <!-- Group 1: 基础配置 -->
-          <div class="config-section">
-            <h3 class="config-section-title" data-i18n="basic-config">基础配置</h3>
-            <div class="form-group">
-              <label for="platform" data-i18n="platform-label">数据平台</label>
-              <select id="platform" class="input-control">
-                <option value="github">GitHub</option>
-                <option value="cnb">CNB</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="username" data-i18n="username-label">用户名</label>
-              <input
-                type="text"
-                id="username"
-                class="input-control"
-                value="Mintimate"
-                placeholder="输入您的用户名"
-                data-i18n-placeholder="username-placeholder"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="card-type" data-i18n="card-type-label">卡片类型</label>
-              <select id="card-type" class="input-control">
-                <option value="stats" data-i18n="opt-stats">综合统计卡</option>
-                <option value="top-langs" data-i18n="opt-top-langs">常用语言占比卡</option>
-                <option value="repo" data-i18n="opt-repo">仓库卡片 (Pin)</option>
-                <option value="gist" data-i18n="opt-gist">Gist 卡片</option>
-                <option value="wakatime" data-i18n="opt-wakatime">WakaTime 统计卡</option>
-                <option value="streak" data-i18n="opt-streak">连续贡献卡 (Streak)</option>
-                <option value="profile-summary" data-i18n="opt-profile-summary">
-                  个人概览卡 (Profile Summary)
-                </option>
-                <option value="contribution-calendar" data-i18n="opt-contribution-calendar">
-                  贡献日历卡 (Contribution Calendar)
-                </option>
-                <option value="recent-activity" data-i18n="opt-recent-activity">
-                  最近动态卡 (Recent Activity)
-                </option>
-                <option value="repo-languages" data-i18n="opt-repo-languages">
-                  仓库语言占比卡 (Repo Languages)
-                </option>
-                <option value="organization" data-i18n="opt-organization">
-                  组织统计卡 (Organization Stats)
-                </option>
-              </select>
-            </div>
-
-            <!-- Dynamic Repo Card fields -->
-            <div class="form-group" id="repo-field" style="display: none">
-              <label for="repo-name" data-i18n="repo-name-label">仓库名称</label>
-              <input
-                type="text"
-                id="repo-name"
-                class="input-control"
-                value="github-readme-stats-eo"
-                placeholder="输入仓库名"
-                data-i18n-placeholder="repo-name-placeholder"
-              />
-            </div>
-
-            <!-- Dynamic Gist Card fields -->
-            <div class="form-group" id="gist-field" style="display: none">
-              <label for="gist-id" data-i18n="gist-id-label">Gist ID</label>
-              <input
-                type="text"
-                id="gist-id"
-                class="input-control"
-                value="bbfce31e0217a3689c8d961a356cb10d"
-                placeholder="输入 Gist ID"
-                data-i18n-placeholder="gist-id-placeholder"
-              />
-            </div>
-
-            <div class="form-group" id="org-field" style="display: none">
-              <label for="org-name" data-i18n="org-name-label">GitHub 组织</label>
-              <input
-                type="text"
-                id="org-name"
-                class="input-control"
-                value="github"
-                placeholder="输入组织名"
-                data-i18n-placeholder="org-name-placeholder"
-              />
-            </div>
-          </div>
-
-          <!-- Group 2: 外观样式 -->
-          <div class="config-section">
-            <h3 class="config-section-title" data-i18n="appearance-config">外观与排版</h3>
-            <div class="form-group">
-              <label for="theme" data-i18n="theme-label">卡片主题</label>
-              <select id="theme" class="input-control">
-                <option value="default">Default (明亮蓝色)</option>
-                <option value="dark">Dark (暗黑质感)</option>
-                <option value="radical">Radical (极客粉蓝)</option>
-                <option value="synthwave">Synthwave (赛博朋克)</option>
-                <option value="transparent">Transparent (半透明无背景)</option>
-              </select>
-            </div>
-
-            <!-- Layout field (only for top-langs & wakatime) -->
-            <div class="form-group" id="layout-field" style="display: none">
-              <label for="layout" data-i18n="layout-label">展示布局</label>
-              <select id="layout" class="input-control">
-                <option value="compact">Compact (紧凑列表)</option>
-                <option value="normal">Normal (进度条)</option>
-                <option value="donut">Donut (环形图)</option>
-                <option value="donut-vertical">
-                  Donut Vertical (垂直环图)
-                </option>
-                <option value="pie">Pie (饼图)</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="custom-title" data-i18n="custom-title-label">自定义标题</label>
-              <input
-                type="text"
-                id="custom-title"
-                class="input-control"
-                value=""
-                placeholder="默认标题"
-                data-i18n-placeholder="custom-title-placeholder"
-              />
-            </div>
-
-            <div class="form-group-row">
-              <div class="form-group">
-                <label for="border-radius" data-i18n="border-radius-label">边框圆角</label>
-                <input
-                  type="number"
-                  id="border-radius"
-                  class="input-control"
-                  value="4.5"
-                  min="0"
-                  max="30"
-                  step="0.5"
-                />
+      <section class="workspace view hidden" id="manual-view">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Options</h2>
+                <span class="panel-note">参数变化会立即刷新预览和 Markdown</span>
               </div>
-              <div class="form-group">
-                <label for="card-width" data-i18n="card-width-label">卡片宽度 (px)</label>
-                <input
-                  type="number"
-                  id="card-width"
-                  class="input-control"
-                  value="0"
-                  min="0"
-                  placeholder="默认"
-                  data-i18n-placeholder="default-placeholder"
-                />
-              </div>
-              <div class="form-group">
-                <label for="line-height" data-i18n="line-height-label">行高 (px)</label>
-                <input
-                  type="number"
-                  id="line-height"
-                  class="input-control"
-                  value="25"
-                  min="15"
-                  max="50"
-                />
-              </div>
+              <button class="btn" id="reset-options" type="button">Reset</button>
             </div>
-          </div>
-
-          <!-- Group 3: 自定义配色 -->
-          <div class="config-section">
-            <details class="colors-details">
-              <summary class="config-section-title">
-                <span data-i18n="custom-colors">自定义配色</span> <span class="arrow-indicator">▶</span>
-              </summary>
-              <div class="color-picker-grid">
-                <div class="form-group">
-                  <label for="title-color" data-i18n="title-color-label">标题颜色</label>
-                  <div class="color-input-wrapper">
-                    <input
-                      type="color"
-                      id="title-color-picker"
-                      value="#3b82f6"
-                    />
-                    <input
-                      type="text"
-                      id="title-color"
-                      class="input-control"
-                      placeholder="6位16进制"
-                      data-i18n-placeholder="hex-placeholder"
-                    />
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="text-color" data-i18n="text-color-label">文本颜色</label>
-                  <div class="color-input-wrapper">
-                    <input
-                      type="color"
-                      id="text-color-picker"
-                      value="#f3f4f6"
-                    />
-                    <input
-                      type="text"
-                      id="text-color"
-                      class="input-control"
-                      placeholder="6位16进制"
-                      data-i18n-placeholder="hex-placeholder"
-                    />
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="icon-color" data-i18n="icon-color-label">图标颜色</label>
-                  <div class="color-input-wrapper">
-                    <input
-                      type="color"
-                      id="icon-color-picker"
-                      value="#3b82f6"
-                    />
-                    <input
-                      type="text"
-                      id="icon-color"
-                      class="input-control"
-                      placeholder="6位16进制"
-                      data-i18n-placeholder="hex-placeholder"
-                    />
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="bg-color" data-i18n="bg-color-label">背景颜色</label>
-                  <div class="color-input-wrapper">
-                    <input type="color" id="bg-color-picker" value="#070913" />
-                    <input
-                      type="text"
-                      id="bg-color"
-                      class="input-control"
-                      placeholder="6位16进制"
-                      data-i18n-placeholder="hex-placeholder"
-                    />
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="border-color" data-i18n="border-color-label">边框颜色</label>
-                  <div class="color-input-wrapper">
-                    <input
-                      type="color"
-                      id="border-color-picker"
-                      value="#ffffff"
-                    />
-                    <input
-                      type="text"
-                      id="border-color"
-                      class="input-control"
-                      placeholder="6位16进制"
-                      data-i18n-placeholder="hex-placeholder"
-                    />
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="ring-color" data-i18n="ring-color-label">圆环颜色</label>
-                  <div class="color-input-wrapper">
-                    <input
-                      type="color"
-                      id="ring-color-picker"
-                      value="#3b82f6"
-                    />
-                    <input
-                      type="text"
-                      id="ring-color"
-                      class="input-control"
-                      placeholder="6位16进制"
-                      data-i18n-placeholder="hex-placeholder"
-                    />
-                  </div>
+            <div class="controls">
+              <div class="field span-3">
+                <label>平台</label>
+                <div class="segmented" id="platform-tabs">
+                  <button type="button" data-platform="github" class="active">GitHub</button>
+                  <button type="button" data-platform="cnb">CNB</button>
                 </div>
               </div>
-            </details>
-          </div>
 
-          <!-- Group 4: 显示选项 -->
-          <div class="config-section">
-            <h3 class="config-section-title" data-i18n="display-animations">显示与动画</h3>
-            <div class="checkbox-grid">
-              <label class="checkbox-control" id="opt-show-icons">
-                <input type="checkbox" id="show-icons" checked />
-                <span data-i18n="show-icons-label">显示图标</span>
-              </label>
-              <label class="checkbox-control" id="opt-hide-border">
-                <input type="checkbox" id="hide-border" />
-                <span data-i18n="hide-border-label">隐藏边框</span>
-              </label>
-              <label class="checkbox-control" id="opt-hide-title">
-                <input type="checkbox" id="hide-title" />
-                <span data-i18n="hide-title-label">隐藏标题</span>
-              </label>
-              <label class="checkbox-control" id="opt-text-bold">
-                <input type="checkbox" id="text-bold" checked />
-                <span data-i18n="text-bold-label">粗体文本</span>
-              </label>
-              <label class="checkbox-control" id="opt-disable-animations">
-                <input type="checkbox" id="disable-animations" />
-                <span data-i18n="disable-animations-label">禁用动画</span>
-              </label>
-              <label
-                class="checkbox-control"
-                id="opt-show-owner"
-                style="display: none"
-              >
-                <input type="checkbox" id="show-owner" />
-                <span data-i18n="show-owner-label">显示拥有者</span>
-              </label>
-              <label
-                class="checkbox-control"
-                id="opt-hide-progress"
-                style="display: none"
-              >
-                <input type="checkbox" id="hide-progress" />
-                <span data-i18n="hide-progress-label">隐藏进度条</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Group 5: 专属高级配置 -->
-          <!-- Stats Card specific -->
-          <div
-            class="config-section card-specific-section"
-            id="stats-specific-fields"
-            style="display: none"
-          >
-            <h3 class="config-section-title" data-i18n="stats-options-title">综合统计卡选项</h3>
-            <div class="checkbox-grid" style="margin-bottom: 16px">
-              <label class="checkbox-control">
-                <input type="checkbox" id="include-all-commits" />
-                <span data-i18n="all-commits-label">所有提交</span>
-              </label>
-              <label class="checkbox-control">
-                <input type="checkbox" id="show-prs-merged" />
-                <span data-i18n="merged-prs-label">合并的PR</span>
-              </label>
-              <label class="checkbox-control">
-                <input type="checkbox" id="show-discussions-started" />
-                <span data-i18n="started-discussions-label">发起的讨论</span>
-              </label>
-              <label class="checkbox-control">
-                <input type="checkbox" id="show-discussions-answered" />
-                <span data-i18n="answered-discussions-label">解答的讨论</span>
-              </label>
-              <label class="checkbox-control">
-                <input type="checkbox" id="hide-rank" />
-                <span data-i18n="hide-rank-label">隐藏评级</span>
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="rank-icon" data-i18n="rank-icon-label">Rank 图标样式</label>
-              <select id="rank-icon" class="input-control">
-                <option value="default" data-i18n="rank-opt-default">Default (评级字母)</option>
-                <option value="github" data-i18n="rank-opt-github">GitHub 图标</option>
-                <option value="percentile" data-i18n="rank-opt-percentile">Percentile (百分比数值)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="exclude-repo" data-i18n="exclude-repos-label">排除的仓库 (逗号分隔)</label>
-              <input
-                type="text"
-                id="exclude-repo"
-                class="input-control"
-                placeholder="例如: repo1,repo2"
-                data-i18n-placeholder="excl-repos-placeholder"
-              />
-            </div>
-            <div class="form-group">
-              <label for="commits-year" data-i18n="stats-year-label">统计年份 (例如: 2024)</label>
-              <input
-                type="text"
-                id="commits-year"
-                class="input-control"
-                placeholder="例如: 2024"
-                data-i18n-placeholder="year-placeholder"
-              />
-            </div>
-          </div>
-
-          <!-- Top Langs specific -->
-          <div
-            class="config-section card-specific-section"
-            id="top-langs-specific-fields"
-            style="display: none"
-          >
-            <h3 class="config-section-title" data-i18n="langs-options-title">语言占比卡选项</h3>
-            <div
-              class="form-group"
-              id="langs-count-field"
-              style="display: none"
-            >
-              <label for="langs-count" data-i18n="langs-count-label">展示语言数量</label>
-              <input
-                type="number"
-                id="langs-count"
-                class="input-control"
-                value="6"
-                min="1"
-                max="20"
-              />
-            </div>
-            <div class="form-group">
-              <label for="exclude-repo-langs" data-i18n="exclude-repos-label">排除的仓库 (逗号分隔)</label>
-              <input
-                type="text"
-                id="exclude-repo-langs"
-                class="input-control"
-                placeholder="例如: repo1,repo2"
-                data-i18n-placeholder="excl-repos-placeholder"
-              />
-            </div>
-            <div class="form-group">
-              <label for="hide-langs" data-i18n="hide-langs-label">隐藏的语言 (逗号分隔)</label>
-              <input
-                type="text"
-                id="hide-langs"
-                class="input-control"
-                placeholder="例如: html,css"
-                data-i18n-placeholder="hide-langs-placeholder"
-              />
-            </div>
-            <div class="form-group-row">
-              <div class="form-group">
-                <label for="size-weight" data-i18n="size-weight-label">大小权重</label>
-                <input
-                  type="number"
-                  id="size-weight"
-                  class="input-control"
-                  value="1"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                />
+              <div class="field span-3">
+                <label for="username">用户名 / 组织</label>
+                <input id="username" value="mintimate" autocomplete="off" />
               </div>
-              <div class="form-group">
-                <label for="count-weight" data-i18n="count-weight-label">数量权重</label>
-                <input
-                  type="number"
-                  id="count-weight"
-                  class="input-control"
-                  value="0"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                />
+
+              <div class="field span-3">
+                <label for="card-type">卡片</label>
+                <select id="card-type">
+                  <option value="stats">Stats Card</option>
+                  <option value="top-langs">Top Languages</option>
+                  <option value="streak">Streak</option>
+                  <option value="profile-summary">Profile Summary</option>
+                  <option value="contribution-calendar">Contribution Calendar</option>
+                  <option value="recent-activity">Recent Activity</option>
+                  <option value="pin">Pinned Repo</option>
+                  <option value="repo-languages">Repo Languages</option>
+                  <option value="org">Organization</option>
+                </select>
+              </div>
+
+              <div class="field span-3">
+                <label for="theme">主题</label>
+                <select id="theme">
+                  <option value="github_dark">github_dark</option>
+                  <option value="default">default</option>
+                  <option value="transparent">transparent</option>
+                  <option value="tokyonight">tokyonight</option>
+                  <option value="dracula">dracula</option>
+                  <option value="catppuccin_mocha">catppuccin_mocha</option>
+                  <option value="rose_pine">rose_pine</option>
+                  <option value="vue">vue</option>
+                  <option value="vue-dark">vue-dark</option>
+                  <option value="radical">radical</option>
+                  <option value="graywhite">graywhite</option>
+                  <option value="ambient_gradient">ambient_gradient</option>
+                </select>
+              </div>
+
+              <div class="field span-3 repo-field">
+                <label for="repo">仓库</label>
+                <input id="repo" value="github-readme-stats-eo" autocomplete="off" />
+              </div>
+
+              <div class="field span-3">
+                <label for="custom-title">标题</label>
+                <input id="custom-title" placeholder="留空使用默认标题" />
+              </div>
+
+              <div class="field span-2">
+                <label for="layout">布局</label>
+                <select id="layout">
+                  <option value="normal">normal</option>
+                  <option value="compact">compact</option>
+                  <option value="donut">donut</option>
+                  <option value="donut-vertical">donut-vertical</option>
+                </select>
+              </div>
+
+              <div class="field span-2">
+                <label for="langs-count">语言数</label>
+                <input id="langs-count" type="number" min="1" max="20" value="8" />
+              </div>
+
+              <div class="field span-2">
+                <label for="activity-count">动态数</label>
+                <input id="activity-count" type="number" min="1" max="20" value="5" />
+              </div>
+
+              <div class="field span-2">
+                <label for="card-width">宽度</label>
+                <input id="card-width" type="number" min="0" max="1200" value="0" />
+              </div>
+
+              <div class="field span-12">
+                <label>显示</label>
+                <div class="toggle-grid">
+                  <label class="check"><input id="show-icons" type="checkbox" checked />show_icons</label>
+                  <label class="check"><input id="hide-border" type="checkbox" />hide_border</label>
+                  <label class="check"><input id="include-all" type="checkbox" />include_all_commits</label>
+                  <label class="check"><input id="show-prs" type="checkbox" />prs_merged</label>
+                  <label class="check"><input id="hide-title" type="checkbox" />hide_title</label>
+                  <label class="check"><input id="hide-rank" type="checkbox" />hide_rank</label>
+                  <label class="check"><input id="disable-animations" type="checkbox" />disable_animations</label>
+                  <label class="check"><input id="text-bold" type="checkbox" checked />text_bold</label>
+                </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <!-- WakaTime specific -->
-          <div
-            class="config-section card-specific-section"
-            id="wakatime-specific-fields"
-            style="display: none"
-          >
-            <h3 class="config-section-title" data-i18n="wakatime-options-title">WakaTime选项</h3>
-            <div class="form-group">
-              <label for="wakatime-hide-langs" data-i18n="hide-langs-label">隐藏的语言 (逗号分隔)</label>
-              <input
-                type="text"
-                id="wakatime-hide-langs"
-                class="input-control"
-                placeholder="例如: html,css"
-                data-i18n-placeholder="hide-langs-placeholder"
-              />
-            </div>
-            <div class="form-group">
-              <label for="wakatime-api-domain" data-i18n="custom-api-domain">自定义 API 域名</label>
-              <input
-                type="text"
-                id="wakatime-api-domain"
-                class="input-control"
-                placeholder="例如: wakatime.com"
-                data-i18n-placeholder="waka-domain-placeholder"
-              />
-            </div>
-          </div>
+          <section class="preview-grid">
+            <section class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title">Preview</h2>
+                  <span class="panel-note" id="preview-note">/api</span>
+                </div>
+                <button class="btn" id="open-preview" type="button">Open</button>
+              </div>
+              <div class="preview-stage">
+                <img id="preview-img" alt="Statistics card preview" />
+              </div>
+            </section>
 
-          <!-- Recent Activity specific -->
-          <div
-            class="config-section card-specific-section"
-            id="recent-activity-specific-fields"
-            style="display: none"
-          >
-            <h3 class="config-section-title" data-i18n="recent-options-title">最近动态选项</h3>
-            <div
-              class="form-group"
-              id="activity-count-field"
-              style="display: none"
-            >
-              <label for="activity-count" data-i18n="activity-count-label">展示动态数量</label>
-              <input
-                type="number"
-                id="activity-count"
-                class="input-control"
-                value="5"
-                min="1"
-                max="10"
-              />
-            </div>
-          </div>
+            <section class="panel output">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title">Markdown</h2>
+                  <span class="panel-note">可直接放入 README</span>
+                </div>
+                <button class="btn primary" id="copy-markdown" type="button">Copy</button>
+              </div>
+              <pre class="codebox" id="markdown"></pre>
+              <div class="mini-list">
+                <div class="url-line" id="url-line"></div>
+                <button class="btn" id="copy-url" type="button">Copy URL</button>
+              </div>
+            </section>
+          </section>
         </section>
-
-        <!-- Preview & Output Pane -->
-        <section class="preview-pane">
-          <div class="card">
-            <div class="section-heading">
-              <h2 data-i18n="preview-title">实时预览</h2>
-              <span
-                class="preview-status"
-                id="preview-status"
-                aria-live="polite"
-                data-i18n="status-ready"
-                >准备加载</span
-              >
-            </div>
-            <div class="preview-box" id="preview-box">
-              <div class="loader"></div>
-              <img id="preview-image" alt="Realtime preview" />
-              <p class="preview-error" id="preview-error" data-i18n="preview-error-desc">
-                卡片加载失败，请检查用户名或接口参数。
-              </p>
-            </div>
-          </div>
-
-          <div class="card output-box">
-            <h2 data-i18n="get-code-title">获取代码</h2>
-
-            <div class="code-container">
-              <div class="code-header">
-                <span data-i18n="markdown-ref">Markdown 引用</span>
-                <button class="copy-btn" id="copy-markdown-btn">
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <rect
-                      x="9"
-                      y="9"
-                      width="13"
-                      height="13"
-                      rx="2"
-                      ry="2"
-                    ></rect>
-                    <path
-                      d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
-                    ></path>
-                  </svg>
-                  <span class="copy-btn-text" data-i18n="copy">复制</span>
-                </button>
-              </div>
-              <pre><code id="markdown-code"></code></pre>
-            </div>
-
-            <div class="code-container">
-              <div class="code-header">
-                <span data-i18n="direct-url">直链 URL</span>
-                <button class="copy-btn" id="copy-url-btn">
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"
-                    ></path>
-                    <path
-                      d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
-                    ></path>
-                  </svg>
-                  <span class="copy-btn-text" data-i18n="copy">复制</span>
-                </button>
-              </div>
-            <pre><code id="raw-url"></code></pre>
-          </div>
-
-          <!-- Author Support Card -->
-          <div class="card support-card">
-            <h2 data-i18n="about-author">关于作者</h2>
-            <div class="support-links">
-              <a href="https://www.mintimate.cn" target="_blank" rel="noreferrer" class="support-btn blog-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
-                <span data-i18n="author-blog">作者博客</span>
-                <span class="support-desc" data-i18n="author-blog-desc">技术分享与教程</span>
-              </a>
-              <a href="https://space.bilibili.com/355567627" target="_blank" rel="noreferrer" class="support-btn bilibili-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="13" rx="2" ry="2"/><path d="m17 2-3 5M7 2l3 5M8 14h.01M16 14h.01"/></svg>
-                <span data-i18n="follow-bilibili">关注 B 站</span>
-                <span class="support-desc" data-i18n="follow-bilibili-desc">视频内容与动态</span>
-              </a>
-              <a href="https://ifdian.net/a/mintimate" target="_blank" rel="noreferrer" class="support-btn afdian-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span data-i18n="sponsor-author">赞助支持</span>
-                <span class="support-desc" data-i18n="sponsor-author-desc">用爱发电，支持项目</span>
-              </a>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <!-- Toggleable Reference API Docs -->
-      <section class="docs-section">
-        <button class="docs-toggle" id="docs-toggle">
-          <span data-i18n="view-api-docs">查看所有底层 API 参考</span>
-          <svg
-            id="docs-toggle-arrow"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            style="transform: rotate(0deg); transition: transform 0.2s"
-          >
-            <path d="M6 9l6 6 6-6"></path>
-          </svg>
-        </button>
-        <div class="docs-content" id="docs-content">
-          <div class="endpoint-grid" id="endpoint-grid"></div>
-        </div>
-      </section>
     </main>
 
-    <footer>
-      <div class="footer-content">
-        <span data-i18n="powered-by">Powered by Tencent EdgeOne Pages · 极速边缘节点</span>
-        <div class="footer-links">
-          <a
-            href="https://github.com/Mintimate/github-readme-stats-eo"
-            target="_blank"
-            rel="noreferrer"
-            data-i18n="github-repo"
-            >GitHub 仓库</a
-          >
-          <a
-            href="https://github.com/anuraghazra/github-readme-stats"
-            target="_blank"
-            rel="noreferrer"
-            data-i18n="upstream-repo"
-            >Upstream 原版</a
-          >
-        </div>
-      </div>
-    </footer>
-
     <script>
-      const baseUrl = window.location.origin;
-
-      const presets = [
-        {
-          id: "stats",
-          label: "GitHub 综合统计卡",
-          badge: "综合统计",
-          cardType: "stats",
-          theme: "dark",
-          showIcons: true,
-          textBold: true,
-          hideBorder: false,
-          customTitle: "",
-          getUrl: (baseUrl, username) =>
-            `${baseUrl}/api?username=${username}&show_icons=true&theme=dark`,
-        },
-        {
-          id: "top-langs",
-          label: "常用语言占比卡",
-          badge: "常用语言",
-          cardType: "top-langs",
-          theme: "radical",
-          layout: "compact",
-          langsCount: 6,
-          hideProgress: false,
-          hideBorder: false,
-          customTitle: "",
-          getUrl: (baseUrl, username) =>
-            `${baseUrl}/api/top-langs?username=${username}&layout=compact&langs_count=6&theme=radical`,
-        },
-        {
-          id: "streak",
-          label: "连续贡献卡",
-          badge: "连续贡献",
-          cardType: "streak",
-          theme: "synthwave",
-          hideBorder: false,
-          customTitle: "",
-          getUrl: (baseUrl, username) =>
-            `${baseUrl}/api/streak?username=${username}&theme=synthwave`,
-        },
-        {
-          id: "wakatime",
-          label: "WakaTime 统计卡",
-          badge: "WakaTime",
-          cardType: "wakatime",
-          theme: "tokyonight",
-          layout: "compact",
-          langsCount: 5,
-          hideProgress: false,
-          hideBorder: false,
-          customTitle: "",
-          getUrl: (baseUrl, username) =>
-            `${baseUrl}/api/wakatime?username=ffflabs&layout=compact&langs_count=5&theme=tokyonight`,
-        },
-        {
-          id: "repo",
-          label: "仓库卡片 (Pin)",
-          badge: "仓库卡片",
-          cardType: "repo",
-          repoName: "github-readme-stats-eo",
-          theme: "default",
-          showOwner: true,
-          hideBorder: false,
-          customTitle: "",
-          getUrl: (baseUrl, username) =>
-            `${baseUrl}/api/pin?username=${username}&repo=github-readme-stats-eo`,
-        },
-        {
-          id: "gist",
-          label: "Gist 详情卡片",
-          badge: "Gist",
-          cardType: "gist",
-          gistId: "bbfce31e0217a3689c8d961a356cb10d",
-          theme: "dracula",
-          showOwner: true,
-          hideBorder: false,
-          customTitle: "",
-          getUrl: (baseUrl, username) =>
-            `${baseUrl}/api/gist?id=bbfce31e0217a3689c8d961a356cb10d&theme=dracula`,
-        },
-        {
-          id: "profile-summary",
-          label: "个人概览卡",
-          badge: "个人概览",
-          cardType: "profile-summary",
-          theme: "shadow_blue",
-          hideBorder: false,
-          customTitle: "",
-          getUrl: (baseUrl, username) =>
-            `${baseUrl}/api/profile-summary?username=${username}&theme=shadow_blue`,
-        },
-        {
-          id: "contribution-calendar",
-          label: "贡献日历卡",
-          badge: "贡献日历",
-          cardType: "contribution-calendar",
-          theme: "github_dark_dimmed",
-          hideBorder: false,
-          customTitle: "",
-          getUrl: (baseUrl, username) =>
-            `${baseUrl}/api/contribution-calendar?username=${username}&theme=github_dark_dimmed`,
-        },
-        {
-          id: "recent-activity",
-          label: "最近动态卡",
-          badge: "最近动态",
-          cardType: "recent-activity",
-          theme: "one_dark_pro",
-          activityCount: 5,
-          hideBorder: false,
-          customTitle: "",
-          getUrl: (baseUrl, username) =>
-            `${baseUrl}/api/recent-activity?username=${username}&activity_count=5&theme=one_dark_pro`,
-        },
-        {
-          id: "repo-languages",
-          label: "仓库语言占比卡",
-          badge: "仓库语言",
-          cardType: "repo-languages",
-          repoName: "github-readme-stats-eo",
-          langsCount: 6,
-          theme: "rose_pine",
-          hideBorder: false,
-          customTitle: "",
-          getUrl: (baseUrl, username) =>
-            `${baseUrl}/api/repo-languages?username=${username}&repo=github-readme-stats-eo&langs_count=6&theme=rose_pine`,
-        },
-        {
-          id: "organization",
-          label: "组织统计卡",
-          badge: "组织统计",
-          cardType: "organization",
-          orgName: "github",
-          theme: "ambient_gradient",
-          hideBorder: false,
-          customTitle: "",
-          getUrl: (baseUrl, username) =>
-            `${baseUrl}/api/org?org=github&theme=ambient_gradient`,
-        },
-      ];
-
-      const presetTranslationsEn = {
-        "stats": { label: "GitHub Stats Card", badge: "Stats" },
-        "top-langs": { label: "Top Languages Card", badge: "Languages" },
-        "streak": { label: "Contribution Streak Card", badge: "Streak" },
-        "wakatime": { label: "WakaTime Stats Card", badge: "WakaTime" },
-        "repo": { label: "Repository Card (Pin)", badge: "Pin Repo" },
-        "gist": { label: "Gist Details Card", badge: "Gist" },
-        "profile-summary": { label: "Profile Summary Card", badge: "Summary" },
-        "contribution-calendar": { label: "Contribution Calendar Card", badge: "Calendar" },
-        "recent-activity": { label: "Recent Activity Card", badge: "Recent Activity" },
-        "repo-languages": { label: "Repo Languages Card", badge: "Languages" },
-        "organization": { label: "Organization Stats Card", badge: "Org Stats" }
+      const state = {
+        platform: "github",
+        agentMode: "readme",
+        view: "agent",
       };
 
-      const endpoints = [
-        {
-          path: "/api",
-          label: "GitHub 综合统计卡",
-          query: "?username=Mintimate&show_icons=true",
-          desc: "渲染用户的 Github 各项状态指标（Star、提交、PR、Issue等）。",
-        },
-        {
-          path: "/api/top-langs",
-          label: "常用语言占比卡",
-          query: "?username=Mintimate&layout=compact",
-          desc: "展示用户使用最多的编程语言比例，支持多种图形及排版。",
-        },
-        {
-          path: "/api/pin",
-          label: "仓库卡片 (Pin)",
-          query: "?username=Mintimate&repo=github-readme-stats-eo",
-          desc: "突出展示某个指定的开源软件仓库的信息卡片。",
-        },
-        {
-          path: "/api/gist",
-          label: "Gist 详情卡片",
-          query: "?id=bbfce31e0217a3689c8d961a356cb10d",
-          desc: "获取并优雅展示指定 Gist 代码片段的状态。",
-        },
-        {
-          path: "/api/wakatime",
-          label: "WakaTime 统计卡",
-          query: "?username=ffflabs&layout=compact",
-          desc: "挂载 WakaTime 开发者时长报告，生成占比与编码时间图。",
-        },
-        {
-          path: "/api/streak",
-          label: "连续贡献卡",
-          query: "?username=Mintimate",
-          desc: "展示当前连续贡献、最长连续贡献与年度贡献总数。",
-        },
-        {
-          path: "/api/profile-summary",
-          label: "开发者概览卡",
-          query: "?username=Mintimate",
-          desc: "汇总仓库、Followers、Star、Commit 与活跃年份。",
-        },
-        {
-          path: "/api/contribution-calendar",
-          label: "贡献日历卡",
-          query: "?username=Mintimate",
-          desc: "以热力图展示最近一年的 GitHub 贡献。",
-        },
-        {
-          path: "/api/recent-activity",
-          label: "最近动态卡",
-          query: "?username=Mintimate&activity_count=5",
-          desc: "展示最近公开 Commit、PR、Issue 与 Release。",
-        },
-        {
-          path: "/api/repo-languages",
-          label: "仓库语言卡",
-          query: "?username=Mintimate&repo=github-readme-stats-eo",
-          desc: "展示指定仓库的语言字节占比。",
-        },
-        {
-          path: "/api/org",
-          label: "组织统计卡",
-          query: "?org=github",
-          desc: "汇总组织仓库、成员、Star、Fork 与 Issue。",
-        },
-        {
-          path: "/api/status/up",
-          label: "PAT 可用性检查",
-          query: "?type=json",
-          desc: "调试专用接口，用来检测后台 GitHub Token (PAT) 的有效性。",
-        },
-      ];
-
-      const endpointTranslationsEn = {
-        "/api": {
-          label: "GitHub Stats Card",
-          desc: "Renders user's GitHub stats metrics (Stars, Commits, PRs, Issues, etc.)."
-        },
-        "/api/top-langs": {
-          label: "Top Languages Card",
-          desc: "Displays user's most used programming languages, supporting multiple layouts."
-        },
-        "/api/pin": {
-          label: "Repository Card (Pin)",
-          desc: "Features a specific pinned GitHub repository information card."
-        },
-        "/api/gist": {
-          label: "Gist Details Card",
-          desc: "Retrieves and beautifully displays the status of a specified Gist code snippet."
-        },
-        "/api/wakatime": {
-          label: "WakaTime Stats Card",
-          desc: "Displays user's WakaTime development hour reports and programming language time graphs."
-        },
-        "/api/streak": {
-          label: "Contribution Streak Card",
-          desc: "Displays user's current streak, longest streak, and total contributions."
-        },
-        "/api/profile-summary": {
-          label: "Developer Profile Summary Card",
-          desc: "Summarizes user's repositories, followers, stars, commits, and active years."
-        },
-        "/api/contribution-calendar": {
-          label: "Contribution Calendar Card",
-          desc: "Displays a heat map calendar of the user's contributions over the past year."
-        },
-        "/api/recent-activity": {
-          label: "Recent Activity Card",
-          desc: "Displays user's recent public Commits, PRs, Issues, and Releases."
-        },
-        "/api/repo-languages": {
-          label: "Repository Languages Card",
-          desc: "Displays the breakdown of language bytes for a specific repository."
-        },
-        "/api/org": {
-          label: "Organization Stats Card",
-          desc: "Summarizes organization repositories, members, stars, forks, and issues."
-        },
-        "/api/status/up": {
-          label: "PAT Availability Check",
-          desc: "Dedicated debug API to check target backend GitHub Token (PAT) validity."
-        }
+      const els = {
+        navButtons: document.querySelectorAll("[data-view]"),
+        agentView: document.querySelector("#agent-view"),
+        manualView: document.querySelector("#manual-view"),
+        agentForm: document.querySelector("#agent-form"),
+        agentPlatformTabs: document.querySelector("#agent-platform-tabs"),
+        agentUsername: document.querySelector("#agent-username"),
+        runButtons: document.querySelectorAll("[data-agent-run]"),
+        runId: document.querySelector("#run-id"),
+        runElapsed: document.querySelector("#run-elapsed"),
+        agentLed: document.querySelector("#agent-led"),
+        targetLine: document.querySelector("#target-line"),
+        eventStream: document.querySelector("#event-stream"),
+        pipeSteps: document.querySelectorAll(".pipe-step"),
+        resultPanel: document.querySelector("#result-panel"),
+        resultTitle: document.querySelector("#result-title"),
+        resultSummary: document.querySelector("#result-summary"),
+        readmeDraft: document.querySelector("#readme-draft"),
+        copyReadme: document.querySelector("#copy-readme"),
+        downloadReadme: document.querySelector("#download-readme"),
+        applyRecipe: document.querySelector("#apply-recipe"),
+        statsResult: document.querySelector("#stats-result"),
+        recipeBox: document.querySelector("#recipe-box"),
+        agentPreviewImg: document.querySelector("#agent-preview-img"),
+        platformTabs: document.querySelector("#platform-tabs"),
+        username: document.querySelector("#username"),
+        cardType: document.querySelector("#card-type"),
+        theme: document.querySelector("#theme"),
+        repo: document.querySelector("#repo"),
+        customTitle: document.querySelector("#custom-title"),
+        layout: document.querySelector("#layout"),
+        langsCount: document.querySelector("#langs-count"),
+        activityCount: document.querySelector("#activity-count"),
+        cardWidth: document.querySelector("#card-width"),
+        showIcons: document.querySelector("#show-icons"),
+        hideBorder: document.querySelector("#hide-border"),
+        includeAll: document.querySelector("#include-all"),
+        showPrs: document.querySelector("#show-prs"),
+        hideTitle: document.querySelector("#hide-title"),
+        hideRank: document.querySelector("#hide-rank"),
+        disableAnimations: document.querySelector("#disable-animations"),
+        textBold: document.querySelector("#text-bold"),
+        previewImg: document.querySelector("#preview-img"),
+        previewNote: document.querySelector("#preview-note"),
+        markdown: document.querySelector("#markdown"),
+        urlLine: document.querySelector("#url-line"),
+        platformPill: document.querySelector("#platform-pill"),
+        cardPill: document.querySelector("#card-pill"),
+        statusPill: document.querySelector("#status-pill"),
+        openPreview: document.querySelector("#open-preview"),
+        copyMarkdown: document.querySelector("#copy-markdown"),
+        copyUrl: document.querySelector("#copy-url"),
+        resetOptions: document.querySelector("#reset-options"),
+        stopAgent: document.querySelector("#stop-agent"),
+        newChat: document.querySelector("#new-chat"),
       };
 
-      const i18n = {
-        zh: {
-          "badge-gocf": "Go Cloud Functions",
-          "app-title": "GitHub Readme Stats · EdgeOne",
-          "lead-desc": "在 Tencent EdgeOne Pages Edge 边缘侧极致加速的统计卡片生成器，提供极速响应的动态 SVG 数据渲染服务。",
-          "gallery-title": "预设卡片展厅",
-          "config-panel-title": "配置面板",
-          "basic-config": "基础配置",
-          "platform-label": "数据平台",
-          "username-label": "用户名",
-          "username-placeholder": "输入您的用户名",
-          "card-type-label": "卡片类型",
-          "opt-stats": "综合统计卡",
-          "opt-top-langs": "常用语言占比卡",
-          "opt-repo": "仓库卡片 (Pin)",
-          "opt-gist": "Gist 卡片",
-          "opt-wakatime": "WakaTime 统计卡",
-          "opt-streak": "连续贡献卡 (Streak)",
-          "opt-profile-summary": "个人概览卡 (Profile Summary)",
-          "opt-contribution-calendar": "贡献日历卡 (Contribution Calendar)",
-          "opt-recent-activity": "最近动态卡 (Recent Activity)",
-          "opt-repo-languages": "仓库语言占比卡 (Repo Languages)",
-          "opt-organization": "组织统计卡 (Organization Stats)",
-          "repo-name-label": "仓库名称",
-          "repo-name-placeholder": "输入仓库名",
-          "gist-id-label": "Gist ID",
-          "gist-id-placeholder": "输入 Gist ID",
-          "org-name-label": "GitHub 组织",
-          "org-name-placeholder": "输入组织名",
-          "appearance-config": "外观与排版",
-          "theme-label": "卡片主题",
-          "layout-label": "展示布局",
-          "custom-title-label": "自定义标题",
-          "custom-title-placeholder": "默认标题",
-          "border-radius-label": "边框圆角",
-          "card-width-label": "卡片宽度 (px)",
-          "default-placeholder": "默认",
-          "line-height-label": "行高 (px)",
-          "custom-colors": "自定义配色",
-          "title-color-label": "标题颜色",
-          "hex-placeholder": "6位16进制",
-          "text-color-label": "文本颜色",
-          "icon-color-label": "图标颜色",
-          "bg-color-label": "背景颜色",
-          "border-color-label": "边框颜色",
-          "ring-color-label": "圆环颜色",
-          "display-animations": "显示与动画",
-          "show-icons-label": "显示图标",
-          "hide-border-label": "隐藏边框",
-          "hide-title-label": "隐藏标题",
-          "text-bold-label": "粗体文本",
-          "disable-animations-label": "禁用动画",
-          "show-owner-label": "显示拥有者",
-          "hide-progress-label": "隐藏进度条",
-          "stats-options-title": "综合统计卡选项",
-          "all-commits-label": "所有提交",
-          "merged-prs-label": "合并的PR",
-          "started-discussions-label": "发起的讨论",
-          "answered-discussions-label": "解答的讨论",
-          "hide-rank-label": "隐藏评级",
-          "rank-icon-label": "Rank 图标样式",
-          "rank-opt-default": "Default (评级字母)",
-          "rank-opt-github": "GitHub 图标",
-          "rank-opt-percentile": "Percentile (百分比数值)",
-          "exclude-repos-label": "排除的仓库 (逗号分隔)",
-          "excl-repos-placeholder": "例如: repo1,repo2",
-          "stats-year-label": "统计年份 (例如: 2024)",
-          "year-placeholder": "例如: 2024",
-          "langs-options-title": "语言占比卡选项",
-          "langs-count-label": "展示语言数量",
-          "hide-langs-label": "隐藏的语言 (逗号分隔)",
-          "hide-langs-placeholder": "例如: html,css",
-          "size-weight-label": "大小权重",
-          "count-weight-label": "数量权重",
-          "wakatime-options-title": "WakaTime 选项",
-          "custom-api-domain": "自定义 API 域名",
-          "waka-domain-placeholder": "例如: wakatime.com",
-          "recent-options-title": "最近动态选项",
-          "activity-count-label": "展示动态数量",
-          "preview-title": "实时预览",
-          "status-ready": "准备加载",
-          "status-loading": "加载中…",
-          "status-failed": "加载失败",
-          "preview-error-desc": "卡片加载失败，请检查用户名或接口参数。",
-          "get-code-title": "获取代码",
-          "markdown-ref": "Markdown 引用",
-          "direct-url": "直链 URL",
-          "copy": "复制",
-          "copied": "已复制!",
-          "about-author": "关于作者",
-          "author-blog": "作者博客",
-          "author-blog-desc": "技术分享与教程",
-          "follow-bilibili": "关注 B 站",
-          "follow-bilibili-desc": "视频内容与动态",
-          "sponsor-author": "赞助支持",
-          "sponsor-author-desc": "用爱发电，支持项目",
-          "view-api-docs": "查看所有底层 API 参考",
-          "powered-by": "Powered by Tencent EdgeOne Pages · 极速边缘节点",
-          "github-repo": "GitHub 仓库",
-          "upstream-repo": "Upstream 原版",
-          
-          "lang-zh-title": "简体中文",
-          "lang-en-title": "English",
-          "theme-light-title": "亮色模式",
-          "theme-system-title": "系统默认",
-          "theme-dark-title": "暗色模式",
-          "theme-light": "亮色",
-          "theme-system": "系统",
-          "theme-dark": "暗色"
-        },
-        en: {
-          "badge-gocf": "Go Cloud Functions",
-          "app-title": "GitHub Readme Stats · EdgeOne",
-          "lead-desc": "A fast statistics card generator deployed on Tencent EdgeOne Pages Edge, providing ultra-responsive dynamic SVG rendering services.",
-          "gallery-title": "Preset Gallery",
-          "config-panel-title": "Configuration Panel",
-          "basic-config": "Basic Configuration",
-          "platform-label": "Data Platform",
-          "username-label": "Username",
-          "username-placeholder": "Enter your username",
-          "card-type-label": "Card Type",
-          "opt-stats": "Stats Card",
-          "opt-top-langs": "Top Languages Card",
-          "opt-repo": "Repository Card (Pin)",
-          "opt-gist": "Gist Card",
-          "opt-wakatime": "WakaTime Card",
-          "opt-streak": "Streak Card",
-          "opt-profile-summary": "Profile Summary Card",
-          "opt-contribution-calendar": "Contribution Calendar Card",
-          "opt-recent-activity": "Recent Activity Card",
-          "opt-repo-languages": "Repo Languages Card",
-          "opt-organization": "Organization Stats Card",
-          "repo-name-label": "Repository Name",
-          "repo-name-placeholder": "Enter repository name",
-          "gist-id-label": "Gist ID",
-          "gist-id-placeholder": "Enter Gist ID",
-          "org-name-label": "GitHub Organization",
-          "org-name-placeholder": "Enter organization name",
-          "appearance-config": "Appearance & Layout",
-          "theme-label": "Card Theme",
-          "layout-label": "Layout Style",
-          "custom-title-label": "Custom Title",
-          "custom-title-placeholder": "Default Title",
-          "border-radius-label": "Border Radius",
-          "card-width-label": "Card Width (px)",
-          "default-placeholder": "Default",
-          "line-height-label": "Line Height (px)",
-          "custom-colors": "Custom Colors",
-          "title-color-label": "Title Color",
-          "hex-placeholder": "6-digit hex",
-          "text-color-label": "Text Color",
-          "icon-color-label": "Icon Color",
-          "bg-color-label": "Background Color",
-          "border-color-label": "Border Color",
-          "ring-color-label": "Ring Color",
-          "display-animations": "Display & Animations",
-          "show-icons-label": "Show Icons",
-          "hide-border-label": "Hide Border",
-          "hide-title-label": "Hide Title",
-          "text-bold-label": "Bold Text",
-          "disable-animations-label": "Disable Animations",
-          "show-owner-label": "Show Owner",
-          "hide-progress-label": "Hide Progress Bar",
-          "stats-options-title": "GitHub Stats Options",
-          "all-commits-label": "All Commits",
-          "merged-prs-label": "Merged PRs",
-          "started-discussions-label": "Started Discussions",
-          "answered-discussions-label": "Answered Discussions",
-          "hide-rank-label": "Hide Rank",
-          "rank-icon-label": "Rank Icon Style",
-          "rank-opt-default": "Default (Rank Letter)",
-          "rank-opt-github": "GitHub Icon",
-          "rank-opt-percentile": "Percentile (Numeric)",
-          "exclude-repos-label": "Exclude Repos (comma-separated)",
-          "excl-repos-placeholder": "e.g., repo1,repo2",
-          "stats-year-label": "Stats Year (e.g., 2024)",
-          "year-placeholder": "e.g., 2024",
-          "langs-options-title": "Languages Card Options",
-          "langs-count-label": "Languages Limit",
-          "hide-langs-label": "Hide Languages (comma-separated)",
-          "hide-langs-placeholder": "e.g., html,css",
-          "size-weight-label": "Size Weight",
-          "count-weight-label": "Count Weight",
-          "wakatime-options-title": "WakaTime Options",
-          "custom-api-domain": "Custom API Domain",
-          "waka-domain-placeholder": "e.g., wakatime.com",
-          "recent-options-title": "Recent Activity Options",
-          "activity-count-label": "Activity Limit",
-          "preview-title": "Live Preview",
-          "status-ready": "Ready to load",
-          "status-loading": "Loading...",
-          "status-failed": "Load failed",
-          "preview-error-desc": "Failed to load card. Please check the username or API parameters.",
-          "get-code-title": "Retrieve Code",
-          "markdown-ref": "Markdown Code",
-          "direct-url": "Direct Link",
-          "copy": "Copy",
-          "copied": "Copied!",
-          "about-author": "About Author",
-          "author-blog": "Author's Blog",
-          "author-blog-desc": "Tech articles and tutorials",
-          "follow-bilibili": "Bilibili Channel",
-          "follow-bilibili-desc": "Video content and updates",
-          "sponsor-author": "Sponsor/Donate",
-          "sponsor-author-desc": "Support projects and developer",
-          "view-api-docs": "View Underlaying API Documentation",
-          "powered-by": "Powered by Tencent EdgeOne Pages · Ultra Fast Edge",
-          "github-repo": "GitHub Repo",
-          "upstream-repo": "Upstream Original",
-          
-          "lang-zh-title": "简体中文",
-          "lang-en-title": "English",
-          "theme-light-title": "Light Mode",
-          "theme-system-title": "System Default",
-          "theme-dark-title": "Dark Mode",
-          "theme-light": "Light",
-          "theme-system": "System",
-          "theme-dark": "Dark"
-        }
-      };
-
-      let currentLang = "zh";
-
-      // Render Gallery
-      const galleryGrid = document.getElementById("gallery-grid");
-
-      function renderGallery() {
-        const username = elUsername.value.trim() || "Mintimate";
-        const platform = elPlatform.value;
-        const isEn = (currentLang === "en");
-        const cnbUnsupported = new Set(["gist", "organization"]);
-
-        galleryGrid.innerHTML = presets
-          .map((p) => {
-            let imgUrl = p.getUrl(baseUrl, username);
-            const isUnsupported = platform === "cnb" && cnbUnsupported.has(p.cardType);
-
-            if (platform === "cnb" && p.cardType !== "wakatime" && !isUnsupported) {
-              imgUrl += imgUrl.includes("?") ? "&platform=cnb" : "?platform=cnb";
-            }
-
-            const badgeText = isEn ? (presetTranslationsEn[p.id]?.badge || p.badge) : p.badge;
-            const labelText = isEn ? (presetTranslationsEn[p.id]?.label || p.label) : p.label;
-            const disabledClass = isUnsupported ? " disabled" : "";
-
-            return `
-            <div class="gallery-card${disabledClass}" data-preset-id="${p.id}" id="gallery-${p.id}">
-              <span class="gallery-card-badge">${badgeText}</span>
-              <img src="${imgUrl}" alt="${labelText}" loading="lazy" />
-              <span class="gallery-card-label">${labelText}</span>
-            </div>
-          `;
-          })
-          .join("");
-
-        // Bind click events to gallery cards
-        presets.forEach((p) => {
-          const cardEl = document.getElementById(`gallery-${p.id}`);
-          if (cardEl) {
-            cardEl.addEventListener("click", () => {
-              if (cardEl.classList.contains("disabled")) return;
-              applyPreset(p);
-            });
-          }
-        });
-      }
-
-      function applyPreset(preset) {
-        elCardType.value = preset.cardType;
-
-        // Update layout options since it depends on cardType
-        updateLayoutOptions();
-
-        elTheme.value = preset.theme;
-
-        if (preset.hasOwnProperty("layout")) {
-          elLayout.value = preset.layout;
-        }
-        if (preset.hasOwnProperty("langsCount")) {
-          elLangsCount.value = preset.langsCount;
-          const wkLangsCountEl = document.getElementById("wakatime-langs-count");
-          if (wkLangsCountEl) {
-            wkLangsCountEl.value = preset.langsCount;
-          }
-        }
-        if (preset.hasOwnProperty("repoName")) {
-          elRepoName.value = preset.repoName;
-        }
-        if (preset.hasOwnProperty("orgName")) {
-          elOrgName.value = preset.orgName;
-        }
-        if (preset.hasOwnProperty("gistId")) {
-          elGistId.value = preset.gistId;
-        }
-        if (preset.hasOwnProperty("activityCount")) {
-          elActivityCount.value = preset.activityCount;
-        }
-
-        // Reset all color fields to empty
-        colors.forEach((c) => {
-          colorEls[c].textEl.value = "";
-          colorEls[c].pickerEl.value = "#3b82f6";
-        });
-
-        // Reset styling controls
-        document.getElementById("border-radius").value =
-          preset.borderRadius || "4.5";
-        document.getElementById("card-width").value = preset.cardWidth || "0";
-        document.getElementById("line-height").value =
-          preset.lineHeight || "25";
-
-        // Sync checkboxes
-        elShowIcons.checked = preset.showIcons !== false;
-        elTextBold.checked = preset.textBold !== false;
-        elHideBorder.checked = preset.hideBorder === true;
-        document.getElementById("hide-title").checked =
-          preset.hideTitle === true;
-        document.getElementById("disable-animations").checked =
-          preset.disableAnimations === true;
-        elShowOwner.checked = preset.showOwner === true;
-        elHideProgress.checked = preset.hideProgress === true;
-
-        // Stats specific checkboxes
-        document.getElementById("include-all-commits").checked =
-          preset.includeAllCommits === true;
-        document.getElementById("show-prs-merged").checked =
-          preset.showPrsMerged === true;
-        document.getElementById("show-discussions-started").checked =
-          preset.showDiscussionsStarted === true;
-        document.getElementById("show-discussions-answered").checked =
-          preset.showDiscussionsAnswered === true;
-        document.getElementById("hide-rank").checked = preset.hideRank === true;
-        document.getElementById("rank-icon").value =
-          preset.rankIcon || "default";
-        document.getElementById("exclude-repo").value =
-          preset.excludeRepo || "";
-        document.getElementById("commits-year").value =
-          preset.commitsYear || "";
-
-        // Top Langs / Wakatime specific inputs
-        document.getElementById("exclude-repo-langs").value =
-          preset.excludeRepo || "";
-        document.getElementById("hide-langs").value = preset.hideLangs || "";
-        document.getElementById("size-weight").value = preset.sizeWeight || "1";
-        document.getElementById("count-weight").value =
-          preset.countWeight || "0";
-        document.getElementById("wakatime-hide-langs").value =
-          preset.wakatimeHideLangs || "";
-        document.getElementById("wakatime-api-domain").value =
-          preset.wakatimeApiDomain || "";
-
-        elCustomTitle.value = preset.customTitle || "";
-
-        // Trigger updates
-        updateFieldsVisibility();
-        updatePreview();
-      }
-
-      function highlightMatchingPreset() {
-        const cardType = elCardType.value;
-        const theme = elTheme.value;
-        const layout = elLayout.value;
-        const hideBorder = elHideBorder.checked;
-
-        // Clear all active classes
-        document
-          .querySelectorAll(".gallery-card")
-          .forEach((card) => card.classList.remove("active"));
-
-        // Find match
-        const match = presets.find((p) => {
-          if (p.cardType !== cardType) return false;
-          if (p.theme !== theme) return false;
-          if (p.hasOwnProperty("layout") && p.layout !== layout) return false;
-          if (p.hideBorder !== hideBorder) return false;
-          return true;
-        });
-
-        if (match) {
-          const activeCard = document.getElementById(`gallery-${match.id}`);
-          if (activeCard) activeCard.classList.add("active");
-        }
-      }
-
-      function updateGalleryImages() {
-        const username = elUsername.value.trim() || "Mintimate";
-        const platform = elPlatform.value;
-        const cnbUnsupported = new Set(["gist", "organization"]);
-
-        presets.forEach((p) => {
-          const imgEl = document.querySelector(`#gallery-${p.id} img`);
-          const cardEl = document.getElementById(`gallery-${p.id}`);
-          if (imgEl && cardEl) {
-            const isUnsupported = platform === "cnb" && cnbUnsupported.has(p.cardType);
-
-            if (isUnsupported) {
-              cardEl.classList.add("disabled");
-            } else {
-              cardEl.classList.remove("disabled");
-            }
-
-            let imgUrl = p.getUrl(baseUrl, username);
-            if (platform === "cnb" && p.cardType !== "wakatime" && !isUnsupported) {
-              imgUrl += imgUrl.includes("?") ? "&platform=cnb" : "?platform=cnb";
-            }
-            imgEl.src = imgUrl;
-          }
-        });
-      }
-
-      // Draw API Table
-      function renderEndpoints() {
-        const isEn = (currentLang === "en");
-        document.getElementById("endpoint-grid").innerHTML = endpoints
-          .map(function (ep) {
-            const url = baseUrl + ep.path + ep.query;
-            const labelText = isEn ? (endpointTranslationsEn[ep.path]?.label || ep.label) : ep.label;
-            const descText = isEn ? (endpointTranslationsEn[ep.path]?.desc || ep.desc) : ep.desc;
-            const linkText = isEn ? 'Open in new tab' : '在新标签页打开';
-            return (
-              '<div class="endpoint-card"><div class="endpoint-title"><span class="endpoint-path">' +
-              ep.path +
-              '</span><span class="endpoint-method">GET</span></div><p class="endpoint-desc">' +
-              labelText +
-              " — " +
-              descText +
-              '</p><a href="' +
-              url +
-              '" class="endpoint-link" target="_blank" rel="noreferrer">' + linkText + ' <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div>'
-            );
-          })
-          .join("");
-      }
-
-      // Toggle Doc
-      const docsToggle = document.getElementById("docs-toggle");
-      const docsContent = document.getElementById("docs-content");
-      const docsArrow = document.getElementById("docs-toggle-arrow");
-      docsToggle.addEventListener("click", () => {
-        const isOpen = docsContent.classList.toggle("open");
-        docsArrow.style.transform = isOpen ? "rotate(180deg)" : "rotate(0deg)";
-      });
-
-      // Config form logic
-      const elPlatform = document.getElementById("platform");
-      const elUsername = document.getElementById("username");
-      const elCardType = document.getElementById("card-type");
-      const elTheme = document.getElementById("theme");
-
-      // Supported themes from upstream github-readme-stats
-      const themes = [
-        { value: "default", name: "Default (明亮蓝色)" },
-        { value: "default_repocard", name: "Default Repocard" },
-        { value: "transparent", name: "Transparent (透明无背景)" },
-        { value: "shadow_red", name: "Shadow Red" },
-        { value: "shadow_green", name: "Shadow Green" },
-        { value: "shadow_blue", name: "Shadow Blue" },
-        { value: "dark", name: "Dark (暗黑质感)" },
-        { value: "radical", name: "Radical (极客粉蓝)" },
-        { value: "merko", name: "Merko" },
-        { value: "gruvbox", name: "Gruvbox" },
-        { value: "gruvbox_light", name: "Gruvbox Light" },
-        { value: "tokyonight", name: "Tokyonight" },
-        { value: "onedark", name: "Onedark" },
-        { value: "cobalt", name: "Cobalt" },
-        { value: "synthwave", name: "Synthwave (赛博朋克)" },
-        { value: "highcontrast", name: "High Contrast" },
-        { value: "dracula", name: "Dracula" },
-        { value: "prussian", name: "Prussian" },
-        { value: "monokai", name: "Monokai" },
-        { value: "vue", name: "Vue" },
-        { value: "vue-dark", name: "Vue Dark" },
-        { value: "shades-of-purple", name: "Shades of Purple" },
-        { value: "nightowl", name: "Nightowl" },
-        { value: "buefy", name: "Buefy" },
-        { value: "blue-green", name: "Blue Green" },
-        { value: "algolia", name: "Algolia" },
-        { value: "great-gatsby", name: "Great Gatsby" },
-        { value: "darcula", name: "Darcula" },
-        { value: "bear", name: "Bear" },
-        { value: "solarized-dark", name: "Solarized Dark" },
-        { value: "solarized-light", name: "Solarized Light" },
-        { value: "chartreuse-dark", name: "Chartreuse Dark" },
-        { value: "nord", name: "Nord" },
-        { value: "gotham", name: "Gotham" },
-        { value: "material-palenight", name: "Material Palenight" },
-        { value: "graywhite", name: "Graywhite" },
-        { value: "vision-friendly-dark", name: "Vision Friendly Dark" },
-        { value: "ayu-mirage", name: "Ayu Mirage" },
-        { value: "midnight-purple", name: "Midnight Purple" },
-        { value: "calm", name: "Calm" },
-        { value: "flag-india", name: "Flag India" },
-        { value: "omni", name: "Omni" },
-        { value: "react", name: "React" },
-        { value: "jolly", name: "Jolly" },
-        { value: "maroongold", name: "Maroongold" },
-        { value: "yeblu", name: "Yeblu" },
-        { value: "blueberry", name: "Blueberry" },
-        { value: "slateorange", name: "Slateorange" },
-        { value: "kacho_ga", name: "Kacho Ga" },
-        { value: "outrun", name: "Outrun" },
-        { value: "ocean_dark", name: "Ocean Dark" },
-        { value: "city_lights", name: "City Lights" },
-        { value: "github_dark", name: "Github Dark" },
-        { value: "github_dark_dimmed", name: "Github Dark Dimmed" },
-        { value: "discord_old_blurple", name: "Discord Old Blurple" },
-        { value: "aura_dark", name: "Aura Dark" },
-        { value: "panda", name: "Panda" },
-        { value: "noctis_minimus", name: "Noctis Minimus" },
-        { value: "cobalt2", name: "Cobalt2" },
-        { value: "swift", name: "Swift" },
-        { value: "aura", name: "Aura" },
-        { value: "apprentice", name: "Apprentice" },
-        { value: "moltack", name: "Moltack" },
-        { value: "codeSTACKr", name: "CodeSTACKr" },
-        { value: "rose_pine", name: "Rose Pine" },
-        { value: "catppuccin_latte", name: "Catppuccin Latte" },
-        { value: "catppuccin_mocha", name: "Catppuccin Mocha" },
-        { value: "date_night", name: "Date Night" },
-        { value: "one_dark_pro", name: "One Dark Pro" },
-        { value: "rose", name: "Rose" },
-        { value: "holi", name: "Holi" },
-        { value: "neon", name: "Neon" },
-        { value: "blue_navy", name: "Blue Navy" },
-        { value: "calm_pink", name: "Calm Pink" },
-        { value: "ambient_gradient", name: "Ambient Gradient (渐变配色)" },
-      ];
-
-      const themeTranslationsEn = {
-        "default": "Default (Bright Blue)",
-        "default_repocard": "Default Repocard",
-        "transparent": "Transparent (No Background)",
-        "dark": "Dark (Elegant Dark)",
-        "radical": "Radical (Pink/Blue)",
-        "synthwave": "Synthwave (Cyberpunk)",
-        "ambient_gradient": "Ambient Gradient"
-      };
-
-      // Populate theme options dynamically
-      function populateThemes() {
-        const isEn = (currentLang === "en");
-        const previous = elTheme.value || "dark";
-        elTheme.innerHTML = "";
-        themes.forEach((t) => {
-          const opt = document.createElement("option");
-          opt.value = t.value;
-          opt.textContent = isEn ? (themeTranslationsEn[t.value] || t.name.replace(/\s*\(.*?\)/, '')) : t.name;
-          if (t.value === previous) {
-            opt.selected = true;
-          }
-          elTheme.appendChild(opt);
-        });
-      }
-
-      const elLayout = document.getElementById("layout");
-      const elLangsCount = document.getElementById("langs-count");
-      const elCustomTitle = document.getElementById("custom-title");
-      const elRepoName = document.getElementById("repo-name");
-      const elGistId = document.getElementById("gist-id");
-      const elOrgName = document.getElementById("org-name");
-      const elActivityCount = document.getElementById("activity-count");
-
-      // Checkboxes
-      const elShowIcons = document.getElementById("show-icons");
-      const elHideBorder = document.getElementById("hide-border");
-      const elHideProgress = document.getElementById("hide-progress");
-      const elTextBold = document.getElementById("text-bold");
-      const elShowOwner = document.getElementById("show-owner");
-
-      // Field sections
-      const elLayoutField = document.getElementById("layout-field");
-      const elLangsCountField = document.getElementById("langs-count-field");
-      const elRepoField = document.getElementById("repo-field");
-      const elGistField = document.getElementById("gist-field");
-      const elOrgField = document.getElementById("org-field");
-      const elActivityCountField = document.getElementById(
-        "activity-count-field",
-      );
-
-      // Checkbox visual targets
-      const optShowIcons = document.getElementById("opt-show-icons");
-      const optHideProgress = document.getElementById("opt-hide-progress");
-      const optTextBold = document.getElementById("opt-text-bold");
-      const optShowOwner = document.getElementById("opt-show-owner");
-
-      // Output DOM
-      const previewBox = document.getElementById("preview-box");
-      const previewImage = document.getElementById("preview-image");
-      const previewStatus = document.getElementById("preview-status");
-      const markdownCode = document.getElementById("markdown-code");
-      const rawUrl = document.getElementById("raw-url");
-
-      const topLangLayouts = [
-        ["compact", "Compact (紧凑列表)"],
-        ["normal", "Normal (进度条)"],
-        ["donut", "Donut (环形图)"],
-        ["donut-vertical", "Donut Vertical (垂直环图)"],
-        ["pie", "Pie (饼图)"],
-      ];
-      const topLangLayoutsEn = [
-        ["compact", "Compact List"],
-        ["normal", "Normal (Progress Bar)"],
-        ["donut", "Donut Chart"],
-        ["donut-vertical", "Donut Vertical Chart"],
-        ["pie", "Pie Chart"],
-      ];
-      const wakatimeLayouts = topLangLayouts.slice(0, 2);
-
-      // Color pickers sync bidirectional behaviour
-      const colors = [
-        "title-color",
-        "text-color",
-        "icon-color",
-        "bg-color",
-        "border-color",
-        "ring-color",
-      ];
-      const colorEls = {};
-      colors.forEach((c) => {
-        const textEl = document.getElementById(c);
-        const pickerEl = document.getElementById(c + "-picker");
-        colorEls[c] = { textEl, pickerEl };
-
-        // sync picker -> text
-        pickerEl.addEventListener("input", () => {
-          textEl.value = pickerEl.value.replace("#", "").toLowerCase();
-          schedulePreview();
-        });
-
-        // sync text -> picker
-        textEl.addEventListener("input", () => {
-          const val = textEl.value.trim();
-          if (/^[0-9a-fA-F]{3}$/.test(val) || /^[0-9a-fA-F]{6}$/.test(val)) {
-            let hex = val;
-            if (hex.length === 3) {
-              hex = hex
-                .split("")
-                .map((x) => x + x)
-                .join("");
-            }
-            pickerEl.value = "#" + hex.toLowerCase();
-          }
-          schedulePreview();
-        });
-      });
-
-      function updateLayoutOptions() {
-        const previous = elLayout.value;
-        const isEn = (currentLang === "en");
-        const options =
-          elCardType.value === "wakatime" 
-            ? (isEn ? topLangLayoutsEn.slice(0, 2) : wakatimeLayouts) 
-            : (isEn ? topLangLayoutsEn : topLangLayouts);
-        elLayout.replaceChildren(
-          ...options.map(([value, label]) => {
-            const option = document.createElement("option");
-            option.value = value;
-            option.textContent = label;
-            return option;
-          }),
-        );
-        elLayout.value = options.some(([value]) => value === previous)
-          ? previous
-          : options[0][0];
-      }
-
-      function updateFieldsVisibility() {
-        const cardType = elCardType.value;
-
-        // Hide all card-specific sections first
-        document.getElementById("stats-specific-fields").style.display = "none";
-        document.getElementById("top-langs-specific-fields").style.display =
-          "none";
-        document.getElementById("wakatime-specific-fields").style.display =
-          "none";
-        document.getElementById(
-          "recent-activity-specific-fields",
-        ).style.display = "none";
-
-        // Hide other dynamic fields
-        elLayoutField.style.display = "none";
-        elLangsCountField.style.display = "none";
-        elRepoField.style.display = "none";
-        elGistField.style.display = "none";
-        elOrgField.style.display = "none";
-        elActivityCountField.style.display = "none";
-
-        // Show/hide based on cardType
-        if (cardType === "stats") {
-          document.getElementById("stats-specific-fields").style.display =
-            "block";
-        } else if (cardType === "top-langs") {
-          document.getElementById("top-langs-specific-fields").style.display =
-            "block";
-          elLayoutField.style.display = "block";
-          elLangsCountField.style.display = "block";
-        } else if (cardType === "repo") {
-          elRepoField.style.display = "block";
-        } else if (cardType === "gist") {
-          elGistField.style.display = "block";
-        } else if (cardType === "wakatime") {
-          document.getElementById("wakatime-specific-fields").style.display =
-            "block";
-          elLayoutField.style.display = "block";
-        } else if (cardType === "repo-languages") {
-          elRepoField.style.display = "block";
-          elLangsCountField.style.display = "block";
-        } else if (cardType === "organization") {
-          elOrgField.style.display = "block";
-        } else if (cardType === "recent-activity") {
-          document.getElementById(
-            "recent-activity-specific-fields",
-          ).style.display = "block";
-          elActivityCountField.style.display = "block";
-        }
-
-        // Show/hide checkboxes compatibility
-        optShowIcons.style.display = cardType === "stats" ? "flex" : "none";
-        optTextBold.style.display = cardType === "stats" ? "flex" : "none";
-        optShowOwner.style.display =
-          cardType === "repo" || cardType === "gist" ? "flex" : "none";
-        optHideProgress.style.display =
-          cardType === "top-langs" || cardType === "wakatime" ? "flex" : "none";
-      }
-
-      function updatePlatformCompatibility() {
-        const cnbUnsupported = new Set([
-          "gist",
-          "organization",
-        ]);
-        for (const option of elCardType.options) {
-          option.disabled = elPlatform.value === "cnb" && cnbUnsupported.has(option.value);
-        }
-        if (elCardType.selectedOptions[0]?.disabled) {
-          elCardType.value = "stats";
-        }
-        updateLayoutOptions();
-        updateFieldsVisibility();
-        updateGalleryImages();
-      }
-
-      function buildURL() {
-        const username = elUsername.value.trim() || "Mintimate";
-        const cardType = elCardType.value;
-        const theme = elTheme.value;
-        const customTitle = elCustomTitle.value.trim();
-
-        let apiPath = "/api";
-        const params = new URLSearchParams();
-
-        if (elPlatform.value === "cnb" && cardType !== "wakatime") {
-          params.set("platform", "cnb");
-        }
-
-        if (cardType === "stats") {
-          apiPath = "/api";
-          params.set("username", username);
-          if (elShowIcons.checked) params.set("show_icons", "true");
-          if (!elTextBold.checked) params.set("text_bold", "false");
-
-          if (document.getElementById("include-all-commits").checked)
-            params.set("include_all_commits", "true");
-          if (document.getElementById("show-prs-merged").checked)
-            params.set("show_prs_merged", "true");
-
-          const discStarted = document.getElementById(
-            "show-discussions-started",
-          ).checked;
-          const discAnswered = document.getElementById(
-            "show-discussions-answered",
-          ).checked;
-          if (discStarted && discAnswered)
-            params.set("show", "discussions_started,discussions_answered");
-          else if (discStarted) params.set("show", "discussions_started");
-          else if (discAnswered) params.set("show", "discussions_answered");
-
-          if (document.getElementById("hide-rank").checked)
-            params.set("hide_rank", "true");
-
-          const rankIcon = document.getElementById("rank-icon").value;
-          if (rankIcon !== "default") params.set("rank_icon", rankIcon);
-
-          const excl = document.getElementById("exclude-repo").value.trim();
-          if (excl) params.set("exclude_repo", excl);
-
-          const year = document.getElementById("commits-year").value.trim();
-          if (year) params.set("commits_year", year);
-        } else if (cardType === "top-langs") {
-          apiPath = "/api/top-langs";
-          params.set("username", username);
-          params.set("layout", elLayout.value);
-          params.set(
-            "langs_count",
-            String(Math.min(20, Math.max(1, Number(elLangsCount.value) || 6))),
-          );
-          if (elHideProgress.checked) params.set("hide_progress", "true");
-
-          const excl = document
-            .getElementById("exclude-repo-langs")
-            .value.trim();
-          if (excl) params.set("exclude_repo", excl);
-
-          const hid = document.getElementById("hide-langs").value.trim();
-          if (hid) params.set("hide", hid);
-
-          const sWeight = document.getElementById("size-weight").value.trim();
-          if (sWeight !== "1" && sWeight !== "")
-            params.set("size_weight", sWeight);
-
-          const cWeight = document.getElementById("count-weight").value.trim();
-          if (cWeight !== "0" && cWeight !== "")
-            params.set("count_weight", cWeight);
-        } else if (cardType === "repo") {
-          apiPath = "/api/pin";
-          params.set("username", username);
-          params.set(
-            "repo",
-            elRepoName.value.trim() || "github-readme-stats-eo",
-          );
-          if (elShowOwner.checked) params.set("show_owner", "true");
-        } else if (cardType === "gist") {
-          apiPath = "/api/gist";
-          params.set(
-            "id",
-            elGistId.value.trim() || "bbfce31e0217a3689c8d961a356cb10d",
-          );
-          if (elShowOwner.checked) params.set("show_owner", "true");
-        } else if (cardType === "wakatime") {
-          apiPath = "/api/wakatime";
-          params.set("username", username);
-          params.set(
-            "layout",
-            elLayout.value === "compact" ? "compact" : "normal",
-          );
-          const wkLangsCount =
-            document
-              .getElementById("wakatime-hide-langs")
-              .parentElement.parentElement.querySelector(
-                "#wakatime-langs-count",
-              )?.value || elLangsCount.value;
-          params.set(
-            "langs_count",
-            String(Math.min(10, Math.max(1, Number(wkLangsCount) || 5))),
-          );
-          if (elHideProgress.checked) params.set("hide_progress", "true");
-
-          const hid = document
-            .getElementById("wakatime-hide-langs")
-            .value.trim();
-          if (hid) params.set("hide", hid);
-
-          const apiDom = document
-            .getElementById("wakatime-api-domain")
-            .value.trim();
-          if (apiDom) params.set("api_domain", apiDom);
-        } else if (cardType === "streak") {
-          apiPath = "/api/streak";
-          params.set("username", username);
-        } else if (cardType === "profile-summary") {
-          apiPath = "/api/profile-summary";
-          params.set("username", username);
-        } else if (cardType === "contribution-calendar") {
-          apiPath = "/api/contribution-calendar";
-          params.set("username", username);
-        } else if (cardType === "recent-activity") {
-          apiPath = "/api/recent-activity";
-          params.set("username", username);
-          params.set(
-            "activity_count",
-            String(
-              Math.min(10, Math.max(1, Number(elActivityCount.value) || 5)),
-            ),
-          );
-        } else if (cardType === "repo-languages") {
-          apiPath = "/api/repo-languages";
-          params.set("username", username);
-          params.set(
-            "repo",
-            elRepoName.value.trim() || "github-readme-stats-eo",
-          );
-          params.set(
-            "langs_count",
-            String(Math.min(20, Math.max(1, Number(elLangsCount.value) || 6))),
-          );
-        } else if (cardType === "organization") {
-          apiPath = "/api/org";
-          params.set("org", elOrgName.value.trim() || "github");
-        }
-
-        // Common configurations
-        if (theme !== "default") {
-          params.set("theme", theme);
-        }
-        if (elHideBorder.checked) {
-          params.set("hide_border", "true");
-        }
-        if (document.getElementById("hide-title").checked) {
-          params.set("hide_title", "true");
-        }
-        if (document.getElementById("disable-animations").checked) {
-          params.set("disable_animations", "true");
-        }
-        if (customTitle) {
-          params.set("custom_title", customTitle);
-        }
-
-        // Styling dimensions
-        const borderRadius = document
-          .getElementById("border-radius")
-          .value.trim();
-        if (borderRadius !== "4.5" && borderRadius !== "") {
-          params.set("border_radius", borderRadius);
-        }
-        const cardWidth = document.getElementById("card-width").value.trim();
-        if (cardWidth !== "0" && cardWidth !== "") {
-          params.set("card_width", cardWidth);
-        }
-        const lineHeight = document.getElementById("line-height").value.trim();
-        if (lineHeight !== "25" && lineHeight !== "") {
-          params.set("line_height", lineHeight);
-        }
-
-        // Custom colors
-        colors.forEach((c) => {
-          const val = colorEls[c].textEl.value.trim();
-          if (val) {
-            params.set(c.replace("-", "_"), val);
-          }
-        });
-
-        const queryStr = params.toString() ? "?" + params.toString() : "";
-        return baseUrl + apiPath + queryStr;
-      }
-
-      function updatePreview() {
-        const fullUrl = buildURL();
-        previewBox.classList.add("loading");
-        previewBox.classList.remove("has-error");
-        previewStatus.textContent = currentLang === "zh" ? "加载中…" : "Loading...";
-        previewImage.src = fullUrl;
-
-        // Highlight matching preset
-        highlightMatchingPreset();
-
-        // Code update
-        const cardNameMap = {
-          stats: "GitHub Stats",
-          "top-langs": "Top Languages",
-          repo: "Pinned Repo",
-          gist: "Gist Card",
-          wakatime: "WakaTime Stats",
-          streak: "Contribution Streak",
-          "profile-summary": "Profile Summary",
-          "contribution-calendar": "Contribution Calendar",
-          "recent-activity": "Recent Activity",
-          "repo-languages": "Repository Languages",
-          organization: "Organization Stats",
+      let currentUrl = "";
+      let currentMarkdown = "";
+      let agentController = null;
+      let lastRecipe = null;
+      let currentReadmeDraft = "";
+      let activeRunId = "";
+      let runStartedAt = 0;
+      let runTimer = null;
+      let assistantText = "";
+
+      function collectState() {
+        return {
+          platform: state.platform,
+          username: els.username.value.trim(),
+          card: els.cardType.value,
+          repo: els.repo.value.trim(),
+          theme: els.theme.value,
+          custom_title: els.customTitle.value.trim(),
+          layout: els.layout.value,
+          langs_count: Number(els.langsCount.value || 0),
+          activity_count: Number(els.activityCount.value || 0),
+          card_width: Number(els.cardWidth.value || 0),
+          show_icons: els.showIcons.checked,
+          hide_border: els.hideBorder.checked,
+          include_all_commits: els.includeAll.checked,
+          prs_merged: els.showPrs.checked,
+          hide_title: els.hideTitle.checked,
+          hide_rank: els.hideRank.checked,
+          disable_animations: els.disableAnimations.checked,
+          text_bold: els.textBold.checked,
+          agent_mode: state.agentMode,
         };
-        const activeName = cardNameMap[elCardType.value] || "Card";
-
-        markdownCode.textContent = "![" + activeName + "](" + fullUrl + ")";
-        rawUrl.textContent = fullUrl;
       }
 
-      // Hide loading spinner when image successfully loads or fails
-      previewImage.addEventListener("load", () => {
-        previewBox.classList.remove("loading");
-        previewBox.classList.remove("has-error");
-        previewStatus.textContent =
-          previewImage.naturalWidth +
-          " × " +
-          previewImage.naturalHeight +
-          " SVG";
-      });
-      previewImage.addEventListener("error", () => {
-        previewBox.classList.remove("loading");
-        previewBox.classList.add("has-error");
-        previewStatus.textContent = currentLang === "zh" ? "加载失败" : "Load failed";
-      });
-
-      let previewTimer;
-      function schedulePreview() {
-        clearTimeout(previewTimer);
-        previewTimer = setTimeout(() => {
-          updatePreview();
-          updateGalleryImages();
-        }, 250);
+      function profileUrlFor(config) {
+        const name = encodeURIComponent(config.username || "mintimate");
+        return config.platform === "cnb" ? `https://cnb.cool/${name}` : `https://github.com/${name}`;
       }
 
-      // Bind events to trigger visual updates
-      const allInputs = [
-        elUsername,
-        elRepoName,
-        elGistId,
-        elOrgName,
-        elLangsCount,
-        elActivityCount,
-        elCustomTitle,
-        document.getElementById("border-radius"),
-        document.getElementById("card-width"),
-        document.getElementById("line-height"),
-        document.getElementById("wakatime-hide-langs"),
-        document.getElementById("wakatime-api-domain"),
-        document.getElementById("exclude-repo"),
-        document.getElementById("commits-year"),
-        document.getElementById("exclude-repo-langs"),
-        document.getElementById("hide-langs"),
-        document.getElementById("size-weight"),
-        document.getElementById("count-weight"),
-      ];
-      allInputs.forEach((input) => {
-        if (input) input.addEventListener("input", schedulePreview);
-      });
+      function endpointFor(card) {
+        if (card === "stats") return "/api";
+        if (card === "org") return "/api/org";
+        return `/api/${card}`;
+      }
 
-      const allSelects = [
-        elPlatform,
-        elCardType,
-        elTheme,
-        elLayout,
-        document.getElementById("rank-icon"),
-      ];
-      allSelects.forEach((select) => {
-        if (select) {
-          select.addEventListener("change", () => {
-            if (select === elPlatform) {
-              updatePlatformCompatibility();
-            }
-            if (select === elCardType) {
-              updateLayoutOptions();
-              updateFieldsVisibility();
-            }
-            updatePreview();
+      function buildUrl() {
+        const config = collectState();
+        const url = new URL(endpointFor(config.card), window.location.origin);
+        const isOrg = config.card === "org";
+
+        if (isOrg) url.searchParams.set("org", config.username || "edgeone");
+        else url.searchParams.set("username", config.username || "mintimate");
+
+        if (config.platform !== "github") url.searchParams.set("platform", config.platform);
+        if (config.theme) url.searchParams.set("theme", config.theme);
+        if (config.custom_title) url.searchParams.set("custom_title", config.custom_title);
+        if (config.show_icons) url.searchParams.set("show_icons", "true");
+        if (config.hide_border) url.searchParams.set("hide_border", "true");
+        if (config.hide_title) url.searchParams.set("hide_title", "true");
+        if (config.hide_rank) url.searchParams.set("hide_rank", "true");
+        if (config.disable_animations) url.searchParams.set("disable_animations", "true");
+        if (!config.text_bold) url.searchParams.set("text_bold", "false");
+        if (config.card_width > 0) url.searchParams.set("card_width", String(config.card_width));
+
+        if (config.card === "stats") {
+          if (config.include_all_commits) url.searchParams.set("include_all_commits", "true");
+          if (config.prs_merged) url.searchParams.set("show", "prs_merged");
+        }
+
+        if (config.card === "top-langs" || config.card === "repo-languages" || config.card === "wakatime") {
+          url.searchParams.set("langs_count", String(config.langs_count || 8));
+          if (config.layout !== "normal") url.searchParams.set("layout", config.layout);
+        }
+
+        if (config.card === "recent-activity") url.searchParams.set("activity_count", String(config.activity_count || 5));
+
+        if (config.card === "pin" || config.card === "repo-languages") {
+          url.searchParams.set("repo", config.repo || "github-readme-stats-eo");
+        }
+
+        return url;
+      }
+
+      function buildMarkdown(url) {
+        const config = collectState();
+        const label = `${config.platform} ${config.card}`;
+        const target = config.platform === "cnb"
+          ? `https://cnb.cool/${encodeURIComponent(config.username || "")}`
+          : `https://github.com/${encodeURIComponent(config.username || "")}`;
+        return `[![${label}](${url.pathname}${url.search})](${target})`;
+      }
+
+      function render() {
+        const config = collectState();
+        const url = buildUrl();
+        currentUrl = `${url.pathname}${url.search}`;
+        currentMarkdown = buildMarkdown(url);
+
+        els.previewImg.src = currentUrl;
+        els.previewNote.textContent = currentUrl;
+        els.urlLine.textContent = currentUrl;
+        els.markdown.textContent = currentMarkdown;
+        els.platformPill.textContent = config.platform === "github" ? "GitHub" : "CNB";
+        els.cardPill.textContent = els.cardType.selectedOptions[0].textContent;
+        els.targetLine.textContent = `TARGET ${profileUrlFor(config)}`;
+
+        const needsRepo = config.card === "pin" || config.card === "repo-languages";
+        document.querySelectorAll(".repo-field").forEach((field) => field.classList.toggle("hidden", !needsRepo));
+      }
+
+      function setPlatform(platform) {
+        state.platform = platform;
+        document.querySelectorAll("#agent-platform-tabs button").forEach((button) => {
+          button.classList.toggle("active", button.dataset.platform === platform);
+        });
+        document.querySelectorAll("#platform-tabs button").forEach((button) => {
+          button.classList.toggle("active", button.dataset.platform === platform);
+        });
+        render();
+      }
+
+      function resetOptions() {
+        setPlatform("github");
+        els.username.value = "mintimate";
+        els.cardType.value = "stats";
+        els.theme.value = "github_dark";
+        els.repo.value = "github-readme-stats-eo";
+        els.customTitle.value = "";
+        els.layout.value = "normal";
+        els.langsCount.value = "8";
+        els.activityCount.value = "5";
+        els.cardWidth.value = "0";
+        els.showIcons.checked = true;
+        els.hideBorder.checked = false;
+        els.includeAll.checked = false;
+        els.showPrs.checked = false;
+        els.hideTitle.checked = false;
+        els.hideRank.checked = false;
+        els.disableAnimations.checked = false;
+        els.textBold.checked = true;
+        render();
+      }
+
+      function setView(view) {
+        state.view = view;
+        els.agentView.classList.toggle("hidden", view !== "agent");
+        els.manualView.classList.toggle("hidden", view !== "manual");
+        els.navButtons.forEach((button) => button.classList.toggle("active", button.dataset.view === view));
+        location.hash = view === "manual" ? "manual" : "agent";
+      }
+
+      function syncManualFromAgent() {
+        setPlatform(state.platform);
+        els.username.value = els.agentUsername.value.trim() || "mintimate";
+        render();
+      }
+
+      function buildAgentMessage(mode) {
+        const config = collectState();
+        const profileUrl = profileUrlFor(config);
+        if (mode === "readme") {
+          return `请为 ${config.platform} 用户 ${config.username} 生成个人自我介绍 README。必须先调用浏览器工具打开并查看用户主页 ${profileUrl}，然后读取可用的公开资料和 Profile README，再输出完整 Markdown 草稿，并推荐适合 README 首页展示的 Stats 组合。`;
+        }
+        return `请为 ${config.platform} 用户 ${config.username} 推荐 README 首页 Stats 组合。必须先调用浏览器工具打开并查看用户主页 ${profileUrl}，再分析公开资料，最后调用 compose_stats_recipe 输出可应用的卡片和参数。`;
+      }
+
+      function normalizeToolName(name) {
+        if (!name) return "";
+        const raw = String(name);
+        const short = raw.includes("__") ? raw.split("__").pop() : raw;
+        if (short === "browser") return "browser_fetch";
+        return short;
+      }
+
+      function toolLabel(name) {
+        const labels = {
+          browser_fetch: "Browser",
+          inspect_github_user: "GitHub Profile",
+          inspect_cnb_user: "CNB Profile",
+          fetch_github_profile_readme: "Profile README",
+          compose_stats_recipe: "Stats Recipe",
+          compose_readme_draft: "README Draft",
+        };
+        return labels[normalizeToolName(name)] || normalizeToolName(name) || "Tool";
+      }
+
+      function stepForTool(name) {
+        const normalized = normalizeToolName(name);
+        if (normalized === "browser_fetch") return "browser";
+        if (normalized === "inspect_github_user" || normalized === "inspect_cnb_user") return "profile";
+        if (normalized === "fetch_github_profile_readme") return "readme";
+        if (normalized === "compose_stats_recipe") return "recipe";
+        if (normalized === "compose_readme_draft") return "draft";
+        return "";
+      }
+
+      function commandForTool(name, phase) {
+        const normalized = normalizeToolName(name);
+        if (normalized === "browser_fetch") return phase === "start" ? "FETCH" : "FETCHED";
+        if (normalized === "inspect_github_user" || normalized === "inspect_cnb_user") return phase === "start" ? "PROFILE" : "PROFILED";
+        if (normalized === "fetch_github_profile_readme") return phase === "start" ? "README" : "READ";
+        if (normalized === "compose_stats_recipe") return phase === "start" ? "RECIPE" : "COMPOSED";
+        if (normalized === "compose_readme_draft") return phase === "start" ? "DRAFT" : "RENDER";
+        return phase === "start" ? "TOOL" : "DONE";
+      }
+
+      function setRunState(status, label) {
+        els.agentLed.classList.remove("running", "done", "error");
+        if (status) els.agentLed.classList.add(status);
+        els.agentLed.textContent = label;
+      }
+
+      function setStep(step, status, detail) {
+        const node = document.querySelector(`[data-step="${CSS.escape(step)}"]`);
+        if (!node) return;
+        node.classList.remove("running", "done", "error");
+        if (status && status !== "idle") node.classList.add(status);
+        const label = node.querySelector("span");
+        if (label) label.textContent = detail || status || "idle";
+      }
+
+      function resetSteps() {
+        els.pipeSteps.forEach((node) => {
+          node.classList.remove("running", "done", "error");
+          const label = node.querySelector("span");
+          if (label) label.textContent = "idle";
+        });
+      }
+
+      function addEvent(command, text, type) {
+        const node = document.createElement("div");
+        node.className = `event-line ${type || ""}`.trim();
+        const code = document.createElement("code");
+        code.textContent = command;
+        const span = document.createElement("span");
+        span.textContent = text;
+        node.append(code, span);
+        els.eventStream.appendChild(node);
+        els.eventStream.scrollTop = els.eventStream.scrollHeight;
+      }
+
+      function resetRunPanel() {
+        assistantText = "";
+        currentReadmeDraft = "";
+        lastRecipe = null;
+        els.eventStream.innerHTML = "";
+        addEvent("READY", "select platform, set username, run agent");
+        resetSteps();
+        setRunState("", "IDLE");
+        els.runId.textContent = "run: --";
+        els.runElapsed.textContent = "00.0s";
+        els.resultPanel.classList.add("hidden");
+        els.resultSummary.textContent = "";
+        els.readmeDraft.textContent = "";
+        els.readmeDraft.classList.add("hidden");
+        els.copyReadme.classList.add("hidden");
+        els.downloadReadme.classList.add("hidden");
+        els.applyRecipe.classList.add("hidden");
+        els.statsResult.classList.add("hidden");
+        els.recipeBox.textContent = "";
+        els.agentPreviewImg.removeAttribute("src");
+      }
+
+      function startTimer() {
+        runStartedAt = performance.now();
+        clearInterval(runTimer);
+        runTimer = setInterval(() => {
+          const elapsed = (performance.now() - runStartedAt) / 1000;
+          els.runElapsed.textContent = `${elapsed.toFixed(1).padStart(4, "0")}s`;
+        }, 100);
+      }
+
+      function stopTimer() {
+        clearInterval(runTimer);
+        runTimer = null;
+        if (runStartedAt) {
+          const elapsed = (performance.now() - runStartedAt) / 1000;
+          els.runElapsed.textContent = `${elapsed.toFixed(1).padStart(4, "0")}s`;
+        }
+      }
+
+      function setAgentRunning(running) {
+        els.runButtons.forEach((button) => {
+          button.disabled = running;
+        });
+        els.stopAgent.disabled = !running;
+        els.statusPill.textContent = running ? "Running" : "Ready";
+      }
+
+      async function runAgent(mode) {
+        state.agentMode = mode;
+        syncManualFromAgent();
+        const config = collectState();
+        const message = buildAgentMessage(mode);
+
+        activeRunId = crypto.randomUUID();
+        resetRunPanel();
+        els.runId.textContent = `run: ${activeRunId.slice(0, 8)}`;
+        setRunState("running", "RUNNING");
+        startTimer();
+        addEvent("RUN", `${config.platform}/${config.username} ${mode === "readme" ? "Generate README" : "Build Stats Stack"}`);
+        addEvent("TARGET", profileUrlFor(config));
+        setAgentRunning(true);
+        agentController = new AbortController();
+
+        try {
+          const response = await fetch("/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "makers-conversation-id": activeRunId,
+            },
+            body: JSON.stringify({ message, state: collectState() }),
+            signal: agentController.signal,
           });
-        }
-      });
 
-      const allCheckboxes = [
-        elShowIcons,
-        elHideBorder,
-        elHideProgress,
-        elTextBold,
-        elShowOwner,
-        document.getElementById("hide-title"),
-        document.getElementById("disable-animations"),
-        document.getElementById("include-all-commits"),
-        document.getElementById("show-prs-merged"),
-        document.getElementById("show-discussions-started"),
-        document.getElementById("show-discussions-answered"),
-        document.getElementById("hide-rank"),
-      ];
-      allCheckboxes.forEach((checkbox) => {
-        if (checkbox) checkbox.addEventListener("change", updatePreview);
-      });
+          if (!response.ok || !response.body) throw new Error(await response.text());
 
-      // Copy features
-      function bindCopyBtn(btnId, codeId) {
-        const btn = document.getElementById(btnId);
-        btn.addEventListener("click", () => {
-          const text = document.getElementById(codeId).textContent;
-          navigator.clipboard
-            .writeText(text)
-            .then(() => {
-              const originalHTML = btn.innerHTML;
-              const copiedText = currentLang === "zh" ? "已复制!" : "Copied!";
-              btn.innerHTML =
-                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"></path></svg> ' + copiedText;
-              btn.classList.add("copied");
-              setTimeout(() => {
-                btn.innerHTML = originalHTML;
-                btn.classList.remove("copied");
-              }, 2000);
-            })
-            .catch((err) => {
-              console.error("Failed to copy text: ", err);
-            });
-        });
-      }
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
 
-      bindCopyBtn("copy-markdown-btn", "markdown-code");
-      bindCopyBtn("copy-url-btn", "raw-url");
-
-      // Theme Switcher Interactive Logic
-      const themeBtns = document.querySelectorAll(".theme-btn");
-      const savedThemePref = localStorage.getItem("theme-pref") || "system";
-
-      function applyTheme(themePref) {
-        // Set active class on buttons
-        themeBtns.forEach((btn) => {
-          if (btn.getAttribute("data-theme-val") === themePref) {
-            btn.classList.add("active");
-          } else {
-            btn.classList.remove("active");
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split("\n\n");
+            buffer = parts.pop() || "";
+            for (const part of parts) handleSsePart(part);
           }
-        });
-
-        // Set theme attribute
-        if (themePref === "system") {
-          const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
-        } else {
-          document.documentElement.setAttribute("data-theme", themePref);
+        } catch (error) {
+          if (error.name !== "AbortError") {
+            setRunState("error", "ERROR");
+            addEvent("ERROR", error.message || String(error), "error");
+          }
+        } finally {
+          setAgentRunning(false);
+          stopTimer();
+          if (els.agentLed.textContent === "RUNNING") setRunState("done", "DONE");
+          agentController = null;
         }
       }
 
-      // Initialize Theme
-      applyTheme(savedThemePref);
+      function handleSsePart(part) {
+        const line = part.split("\n").find((item) => item.startsWith("data: "));
+        if (!line) return;
+        const payload = line.slice(6);
+        if (payload === "[DONE]") return;
 
-      // Event Listeners for theme switch buttons
-      themeBtns.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const selected = btn.getAttribute("data-theme-val");
-          localStorage.setItem("theme-pref", selected);
-          applyTheme(selected);
-        });
-      });
-
-      // System Preference Change Listener
-      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
-        const currentPref = localStorage.getItem("theme-pref") || "system";
-        if (currentPref === "system") {
-          document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+        let event;
+        try {
+          event = JSON.parse(payload);
+        } catch {
+          return;
         }
-      });
 
-      // Language Switcher interactive logic
-      function applyLanguage(lang) {
-        currentLang = lang;
-        localStorage.setItem("lang-pref", lang);
-
-        // Update active class on buttons
-        const langBtns = document.querySelectorAll(".lang-btn");
-        langBtns.forEach((btn) => {
-          if (btn.getAttribute("data-lang-val") === lang) {
-            btn.classList.add("active");
-          } else {
-            btn.classList.remove("active");
-          }
-        });
-
-        // Translate data-i18n elements
-        const elements = document.querySelectorAll("[data-i18n]");
-        elements.forEach((el) => {
-          const key = el.getAttribute("data-i18n");
-          if (i18n[lang] && i18n[lang][key]) {
-            el.textContent = i18n[lang][key];
-          }
-        });
-
-        // Translate data-i18n-placeholder elements
-        const placeholders = document.querySelectorAll("[data-i18n-placeholder]");
-        placeholders.forEach((el) => {
-          const key = el.getAttribute("data-i18n-placeholder");
-          if (i18n[lang] && i18n[lang][key]) {
-            el.placeholder = i18n[lang][key];
-          }
-        });
-
-        // Translate data-i18n-title elements
-        const titles = document.querySelectorAll("[data-i18n-title]");
-        titles.forEach((el) => {
-          const key = el.getAttribute("data-i18n-title");
-          if (i18n[lang] && i18n[lang][key]) {
-            el.title = i18n[lang][key];
-          }
-        });
-
-        // Regenerate dynamically populated elements
-        populateThemes();
-        updateLayoutOptions();
-        renderGallery();
-        renderEndpoints();
-        updatePreviewStatusText();
-      }
-
-      function updatePreviewStatusText() {
-        if (previewBox.classList.contains("loading")) {
-          previewStatus.textContent = currentLang === "zh" ? "加载中…" : "Loading...";
-        } else if (previewBox.classList.contains("has-error")) {
-          previewStatus.textContent = currentLang === "zh" ? "加载失败" : "Load failed";
-        } else if (previewStatus.textContent === "准备加载" || previewStatus.textContent === "Ready to load") {
-          previewStatus.textContent = currentLang === "zh" ? "准备加载" : "Ready to load";
+        if (event.type === "ai_response") {
+          assistantText += event.content || "";
+        } else if (event.type === "thinking") {
+          addEvent("STATUS", event.content || "thinking");
+        } else if (event.type === "tool_call") {
+          const step = stepForTool(event.name);
+          if (step) setStep(step, "running", "running");
+          addEvent(commandForTool(event.name, "start"), toolLabel(event.name));
+        } else if (event.type === "tool_result") {
+          captureRecipe(event);
+          const step = stepForTool(event.name);
+          if (step) setStep(step, "done", "done");
+          addEvent(commandForTool(event.name, "done"), toolLabel(event.name));
+        } else if (event.type === "stats_recipe") {
+          captureRecipe({ name: "compose_stats_recipe", content: JSON.stringify(event) });
+          showStatsResult(event.recipe, event.rationale || event.recipe?.rationale);
+          setStep("recipe", "done", "ready");
+          addEvent("RENDER", `stats ${event.recipe?.cards?.join(", ") || "recipe"}`);
+        } else if (event.type === "readme_draft") {
+          showReadmeDraft(event);
+        } else if (event.type === "usage") {
+          addEvent("TOKENS", String(event.total_tokens || 0));
+        } else if (event.type === "error_message") {
+          setRunState("error", "ERROR");
+          addEvent("ERROR", event.content || "Agent error", "error");
         }
       }
 
-      // Event Listeners for language switch buttons
-      const langBtns = document.querySelectorAll(".lang-btn");
-      langBtns.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const selected = btn.getAttribute("data-lang-val");
-          applyLanguage(selected);
-          updatePreview();
-        });
+      function captureRecipe(event) {
+        if (event.name !== "compose_stats_recipe" || !event.content) return;
+        try {
+          const parsed = JSON.parse(event.content);
+          if (parsed.recipe) lastRecipe = parsed.recipe;
+        } catch {
+          lastRecipe = null;
+        }
+      }
+
+      function showReadmeDraft(event) {
+        currentReadmeDraft = event.markdown || "";
+        els.resultTitle.textContent = event.title || "README Draft";
+        els.resultSummary.textContent = event.summary || compactSummary(assistantText) || "README Markdown generated.";
+        els.readmeDraft.textContent = currentReadmeDraft;
+        els.resultPanel.classList.remove("hidden");
+        els.readmeDraft.classList.remove("hidden");
+        els.copyReadme.classList.remove("hidden");
+        els.downloadReadme.classList.remove("hidden");
+        if (lastRecipe) els.applyRecipe.classList.remove("hidden");
+        els.statsResult.classList.add("hidden");
+        setStep("draft", "done", "ready");
+        addEvent("RENDER", "README markdown");
+      }
+
+      function showStatsResult(recipe, summary) {
+        if (!recipe) return;
+        els.resultTitle.textContent = "Stats Stack";
+        els.resultSummary.textContent = summary || recipe.rationale || compactSummary(assistantText) || "Recommended stats configuration ready.";
+        els.recipeBox.textContent = JSON.stringify(recipe, null, 2);
+        els.resultPanel.classList.remove("hidden");
+        els.statsResult.classList.remove("hidden");
+        els.applyRecipe.classList.remove("hidden");
+        els.readmeDraft.classList.add("hidden");
+        els.copyReadme.classList.add("hidden");
+        els.downloadReadme.classList.add("hidden");
+
+        const original = collectState();
+        applyRecipeToControls(recipe, false);
+        els.agentPreviewImg.src = currentUrl;
+        els.cardType.value = original.card;
+        els.theme.value = original.theme;
+        render();
+      }
+
+      async function stopAgent() {
+        if (agentController) agentController.abort();
+        setRunState("error", "STOPPED");
+        addEvent("STOP", activeRunId ? activeRunId.slice(0, 8) : "--");
+        try {
+          await fetch("/stop", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "makers-conversation-id": activeRunId,
+            },
+            body: JSON.stringify({ conversation_id: activeRunId }),
+          });
+        } catch {
+          // Local abort is enough for the UI.
+        }
+      }
+
+      function applyRecipeToControls(recipe, switchView) {
+        if (!recipe) return;
+        const originalView = state.view;
+        setPlatform(recipe.platform || state.platform);
+        if (recipe.username) els.username.value = recipe.username;
+        if (recipe.username) els.agentUsername.value = recipe.username;
+        if (recipe.theme) els.theme.value = recipe.theme;
+        if (Array.isArray(recipe.cards) && recipe.cards[0]) els.cardType.value = recipe.cards[0];
+        const options = recipe.options || {};
+        if (options.repo) els.repo.value = options.repo;
+        if (options.custom_title) els.customTitle.value = options.custom_title;
+        if (options.layout) els.layout.value = options.layout;
+        if (options.langs_count) els.langsCount.value = options.langs_count;
+        if (typeof options.show_icons === "boolean") els.showIcons.checked = options.show_icons;
+        if (typeof options.hide_border === "boolean") els.hideBorder.checked = options.hide_border;
+        render();
+        if (switchView) setView("manual");
+        else setView(originalView);
+      }
+
+      function applyRecipe() {
+        applyRecipeToControls(lastRecipe, true);
+      }
+
+      async function copyText(text, label) {
+        try {
+          await navigator.clipboard.writeText(text);
+          els.statusPill.textContent = `${label} copied`;
+        } catch {
+          els.statusPill.textContent = "Copy failed";
+        }
+      }
+
+      function downloadReadme() {
+        if (!currentReadmeDraft) return;
+        const blob = new Blob([currentReadmeDraft], { type: "text/markdown;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "README.md";
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function compactSummary(text) {
+        return String(text || "").replace(/\s+/g, " ").trim().slice(0, 220);
+      }
+
+      els.platformTabs.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-platform]");
+        if (button) setPlatform(button.dataset.platform);
       });
 
-      // Initialize Language
-      const urlParams = new URLSearchParams(window.location.search);
-      let savedLangPref = urlParams.get("lang");
-      if (!savedLangPref) {
-        savedLangPref = localStorage.getItem("lang-pref");
-      }
-      if (!savedLangPref) {
-        const browserLang = (navigator.language || navigator.userLanguage || "zh").toLowerCase();
-        savedLangPref = browserLang.startsWith("en") ? "en" : "zh";
-      }
+      els.agentPlatformTabs.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-platform]");
+        if (button) setPlatform(button.dataset.platform);
+      });
 
-      // Initial execution
-      applyLanguage(savedLangPref);
-      updatePlatformCompatibility();
-      updateFieldsVisibility();
-      updatePreview();
+      document.querySelectorAll("input, select").forEach((input) => {
+        input.addEventListener("input", render);
+        input.addEventListener("change", render);
+      });
+
+      els.agentUsername.addEventListener("input", () => {
+        els.username.value = els.agentUsername.value;
+        render();
+      });
+      els.agentForm.addEventListener("submit", (event) => event.preventDefault());
+      els.runButtons.forEach((button) => {
+        button.addEventListener("click", () => runAgent(button.dataset.agentRun));
+      });
+      els.navButtons.forEach((button) => {
+        button.addEventListener("click", () => setView(button.dataset.view));
+      });
+      els.stopAgent.addEventListener("click", stopAgent);
+      els.applyRecipe.addEventListener("click", applyRecipe);
+      els.downloadReadme.addEventListener("click", downloadReadme);
+      els.resetOptions.addEventListener("click", resetOptions);
+      els.openPreview.addEventListener("click", () => window.open(currentUrl, "_blank", "noopener"));
+      els.copyMarkdown.addEventListener("click", () => copyText(currentMarkdown, "Markdown"));
+      els.copyUrl.addEventListener("click", () => copyText(currentUrl, "URL"));
+      els.copyReadme.addEventListener("click", () => copyText(currentReadmeDraft, "README"));
+      els.newChat.addEventListener("click", resetRunPanel);
+
+      if (location.hash === "#manual") setView("manual");
+      resetRunPanel();
+      render();
     </script>
   </body>
 </html>
