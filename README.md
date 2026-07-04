@@ -1,10 +1,10 @@
-# GitHub Readme Stats - EdgeOne Pages 版本
+# DevStats
 
 [English](README_EN.md) | 简体中文
 
-本项目基于 [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats) 核心代码，适配 [腾讯云 EdgeOne Pages](https://pages.edgeone.ai) 平台部署。
+本项目基于 [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats) 核心代码进行扩展，新增了 CNB 平台支持、AI 智能评估助手、开发者排行榜等功能，适配 [腾讯云 EdgeOne Pages](https://pages.edgeone.ai) 平台部署。
 
-原项目采用 Vercel 平台部署，本版本适配 EdgeOne Pages Cloud Functions，并开始提供 Go 运行时实现，提供相同的 API 接口和功能。
+原项目采用 Vercel 平台部署，本版本适配 EdgeOne Pages Cloud Functions，采用 Go 运行时实现后端，提供丰富的 Web 前端交互以及更低的响应延迟。
 
 ## 项目简介
 

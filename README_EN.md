@@ -1,10 +1,10 @@
-# GitHub Readme Stats - EdgeOne Pages Edition
+# DevStats
 
 English | [简体中文](README.md)
 
-This project is based on the core code of [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats), adapted for deployment on [Tencent EdgeOne Pages](https://pages.edgeone.ai).
+This project is an extended version of [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats), adding support for the CNB platform, AI evaluation agent, and developer leaderboards, fully adapted for deployment on [Tencent EdgeOne Pages](https://pages.edgeone.ai).
 
-The original project is deployed on Vercel. This version is adapted for EdgeOne Pages Cloud Functions and now includes a Go runtime implementation while keeping the same API interfaces and features.
+The original project is deployed on Vercel. This version is adapted for EdgeOne Pages Cloud Functions and now includes a Go runtime implementation, keeping the same API interfaces and features, alongside a rich interactive Web frontend.
 
 ## Features
 
