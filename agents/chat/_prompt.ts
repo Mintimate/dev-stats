@@ -42,11 +42,18 @@ export function buildSystemPrompt(): string {
 }
 
 export function buildUserInput(message: string, state: unknown): string {
+  // Whitelist known fields to avoid leaking arbitrary frontend state into the LLM context
+  const raw = (state ?? {}) as Record<string, unknown>;
+  const safeState: Record<string, unknown> = {};
+  const ALLOWED_KEYS = ['platform', 'username', 'agent_mode', 'card', 'theme', 'repo', 'layout', 'langs_count', 'show_icons', 'hide_border', 'include_all_commits'];
+  for (const key of ALLOWED_KEYS) {
+    if (key in raw) safeState[key] = raw[key];
+  }
   return [
     message,
     '',
     'Current frontend state:',
-    JSON.stringify(state ?? {}, null, 2),
+    JSON.stringify(safeState, null, 2),
     '',
     'For README generation, the final compose_readme_draft tool call must include promotional_summary, objective_rating, objective_summary, roast_summary, score, badges, dimension_scores, and top_repos.',
     'objective_rating must be exactly one of: 夯, 顶流, 高级, 平庸, 入门.',
@@ -54,3 +61,4 @@ export function buildUserInput(message: string, state: unknown): string {
     'When producing card Markdown, use relative image URLs like /api?username=... so the current deployed domain works.',
   ].join('\n');
 }
+
