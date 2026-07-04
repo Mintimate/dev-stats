@@ -257,6 +257,7 @@ function ReadmeReport({ result, config }: { result: ReadmeResult; config: Manual
             src={result.avatarUrl}
             alt="User avatar"
             crossOrigin="anonymous"
+            decoding="async"
             onError={(event) => {
               event.currentTarget.src = "favicon.svg";
             }}

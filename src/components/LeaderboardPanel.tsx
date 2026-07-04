@@ -166,6 +166,9 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
                       className="leaderboard-avatar"
                       src={avatarUrl}
                       alt={`${item.username} avatar`}
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority="low"
                       onError={handleAvatarError}
                     />
                     <span className={`platform-badge ${item.platform}`}>
