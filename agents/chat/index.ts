@@ -9,7 +9,7 @@ import {
 } from '@openai/agents';
 import { getStore } from '@edgeone/pages-blob';
 import { resolveModelName } from '../_model';
-import { createLogger, createSSEResponse, jsonResponse, sseEvent, truncateText } from '../_shared';
+import { createLogger, createSSEResponse, getGitHubToken, jsonResponse, sseEvent, truncateText } from '../_shared';
 import { buildSystemPrompt, buildUserInput } from './_prompt';
 import { createOpenAIAgentTools } from './_tools';
 
@@ -287,14 +287,14 @@ export async function onRequest(context: AgentContext) {
   if (!forceReanalyze) {
     const cached = await (context.tracer
       ? context.tracer.span(
-          'cache.lookup',
-          async (span: any) => {
-            const res = await readCache(cacheKey, cacheTtlMs);
-            span.setAttributes({ 'cache.hit': !!res });
-            return res;
-          },
-          { 'cache.key': cacheKey, 'agent.mode': agentMode },
-        )
+        'cache.lookup',
+        async (span: any) => {
+          const res = await readCache(cacheKey, cacheTtlMs);
+          span.setAttributes({ 'cache.hit': !!res });
+          return res;
+        },
+        { 'cache.key': cacheKey, 'agent.mode': agentMode },
+      )
       : readCache(cacheKey, cacheTtlMs));
     if (cached) {
       // Mark root span as cache hit
@@ -373,7 +373,7 @@ export async function onRequest(context: AgentContext) {
       const statusChunk = sseEvent({
         type: 'agent_status',
         status: 'model_ready',
-        model: modelName,
+        model: '腾讯云 TDP 社区模型',
         protocol: 'openai_agents_sdk',
         tools_enabled: true,
         thinking_enabled: false,
@@ -393,11 +393,18 @@ export async function onRequest(context: AgentContext) {
         'user.platform': platform,
         'user.username': username,
       });
+      const gitHubToken = getGitHubToken(env);
+      const cnbToken = env.CNB_API_TOKEN;
+
       try {
         if (platform === 'github') {
+          const headers: Record<string, string> = { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' };
+          if (gitHubToken) {
+            headers['Authorization'] = `token ${gitHubToken}`;
+          }
           const checkResponse = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
             signal,
-            headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' }
+            headers
           });
           if (checkResponse.status === 404) {
             validateSpan?.setAttributes({ 'user.exists': false, 'http.status_code': 404 });
@@ -425,12 +432,16 @@ export async function onRequest(context: AgentContext) {
             yield* yieldAndCollect(profileChunk);
           }
         } else if (platform === 'cnb') {
+          const headers: Record<string, string> = {
+            'Accept': 'application/vnd.cnb.web+json',
+            'User-Agent': 'EdgeOne-Stats-Agent/1.0'
+          };
+          if (cnbToken) {
+            headers['Authorization'] = `Bearer ${cnbToken}`;
+          }
           const checkResponse = await fetch(`https://cnb.cool/users/${encodeURIComponent(username)}`, {
             signal,
-            headers: {
-              'Accept': 'application/vnd.cnb.web+json',
-              'User-Agent': 'EdgeOne-Stats-Agent/1.0'
-            }
+            headers
           });
           if (checkResponse.status === 404) {
             validateSpan?.setAttributes({ 'user.exists': false, 'http.status_code': 404 });
@@ -482,6 +493,7 @@ export async function onRequest(context: AgentContext) {
         sandbox: context.sandbox,
         tracer,
         prefetchedProfile,
+        env,
       });
 
       const agent = new Agent({
@@ -597,29 +609,29 @@ export async function onRequest(context: AgentContext) {
         // Span: cache write — shows serialization + Blob persistence latency
         await (tracer
           ? tracer.span(
-              'cache.write',
-              async (span: any) => {
-                await writeCache(cacheKey, collectedEvents);
-                span.setAttributes({
-                  'cache.key': cacheKey,
-                  'cache.events_count': collectedEvents.length,
-                  'cache.mode': agentMode,
-                });
-                logger.log({ event: 'agent.cache.write', cache_key: cacheKey, events_count: collectedEvents.length });
-              },
-              { 'cache.key': cacheKey },
-            )
+            'cache.write',
+            async (span: any) => {
+              await writeCache(cacheKey, collectedEvents);
+              span.setAttributes({
+                'cache.key': cacheKey,
+                'cache.events_count': collectedEvents.length,
+                'cache.mode': agentMode,
+              });
+              logger.log({ event: 'agent.cache.write', cache_key: cacheKey, events_count: collectedEvents.length });
+            },
+            { 'cache.key': cacheKey },
+          )
           : writeCache(cacheKey, collectedEvents).then(() =>
-              logger.log({ event: 'agent.cache.write', cache_key: cacheKey, events_count: collectedEvents.length }),
-            ));
+            logger.log({ event: 'agent.cache.write', cache_key: cacheKey, events_count: collectedEvents.length }),
+          ));
         if (emittedReadmeDraft) {
           // Span: leaderboard update — shows scoring + Blob write latency
           await (tracer
             ? tracer.span(
-                'leaderboard.update',
-                () => updateLeaderboard(platform, username, collectedEvents),
-                { 'user.platform': platform, 'user.username': username },
-              )
+              'leaderboard.update',
+              () => updateLeaderboard(platform, username, collectedEvents),
+              { 'user.platform': platform, 'user.username': username },
+            )
             : updateLeaderboard(platform, username, collectedEvents));
         }
       }
@@ -670,9 +682,9 @@ function mapAgentEvent(event: RunStreamEvent): Array<Record<string, unknown>> {
     const name = item.name || item.toolName || raw.name;
     return name
       ? [
-          { type: 'tool_called', name, input: parseMaybeJson(raw.arguments) },
-          { type: 'tool_call', name, arguments: truncateText(raw.arguments ?? {}, 700) },
-        ]
+        { type: 'tool_called', name, input: parseMaybeJson(raw.arguments) },
+        { type: 'tool_call', name, arguments: truncateText(raw.arguments ?? {}, 700) },
+      ]
       : [];
   }
 

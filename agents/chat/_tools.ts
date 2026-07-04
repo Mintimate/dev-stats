@@ -1,4 +1,4 @@
-import { sseEvent } from '../_shared';
+import { getGitHubToken, sseEvent } from '../_shared';
 import { tool } from '@openai/agents';
 
 const GITHUB_API = 'https://api.github.com';
@@ -66,7 +66,7 @@ export const STATS_TOOL_NAMES = [
   'compose_readme_draft',
 ] as const;
 
-export function createOpenAIAgentTools(options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any; tracer?: any; prefetchedProfile?: Record<string, unknown> }) {
+export function createOpenAIAgentTools(options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any; tracer?: any; prefetchedProfile?: Record<string, unknown>; env?: Record<string, string | undefined> }) {
   return getToolSchemas().map((schema) => tool({
     name: schema.name,
     description: schema.description,
@@ -235,27 +235,33 @@ function cloneSchema(schema: unknown) {
 export async function executeStatsTool(
   name: string,
   input: Record<string, unknown>,
-  options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any; tracer?: any; prefetchedProfile?: Record<string, unknown> },
+  options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any; tracer?: any; prefetchedProfile?: Record<string, unknown>; env?: Record<string, string | undefined> },
 ) {
   const sseQueue = options.sseQueue ?? [];
   const signal = options.signal;
   const tracer = options.tracer;
 
+  const gitHubToken = getGitHubToken(options.env);
+  const gitHubHeaders: Record<string, string> = {};
+  if (gitHubToken) {
+    gitHubHeaders['Authorization'] = `token ${gitHubToken}`;
+  }
+
   if (name === 'inspect_github_user') {
     const username = String(input.username || '');
     // Re-use profile data fetched during the validation phase to save GitHub API quota (60 req/h anonymous).
     const user = options.prefetchedProfile ?? await (tracer
-      ? tracer.span('github.fetch_profile', () => fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}`, signal), { 'github.username': username })
-      : fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}`, signal));
+      ? tracer.span('github.fetch_profile', () => fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}`, gitHubHeaders, signal), { 'github.username': username })
+      : fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}`, gitHubHeaders, signal));
     const repos = await (tracer
-      ? tracer.span('github.fetch_repos', () => fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=12`, signal), { 'github.username': username })
-      : fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=12`, signal));
+      ? tracer.span('github.fetch_repos', () => fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=12`, gitHubHeaders, signal), { 'github.username': username })
+      : fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=12`, gitHubHeaders, signal));
 
     let contributions: any[] = [];
     try {
       const prs = await (tracer
-        ? tracer.span('github.search_prs', () => fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr&per_page=60`, signal), { 'github.username': username })
-        : fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr&per_page=60`, signal));
+        ? tracer.span('github.search_prs', () => fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr&per_page=60`, gitHubHeaders, signal), { 'github.username': username })
+        : fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr&per_page=60`, gitHubHeaders, signal));
       if (prs && Array.isArray(prs.items)) {
         const repoMap = new Map<string, { prCount: number }>();
         for (const item of prs.items) {
@@ -280,7 +286,7 @@ export async function executeStatsTool(
           await Promise.all(
             topContributed.map(async ([repoName, stats]) => {
               try {
-                const detail = await fetchJson(`${GITHUB_API}/repos/${repoName}`, signal);
+                const detail = await fetchJson(`${GITHUB_API}/repos/${repoName}`, gitHubHeaders, signal);
                 contributions.push({
                   name: repoName,
                   description: detail.description,
@@ -325,6 +331,10 @@ export async function executeStatsTool(
     // the whole 20s tool budget.
     const username = String(input.username || '');
     const url = `${GITHUB_API}/repos/${encodeURIComponent(username)}/${encodeURIComponent(username)}/readme`;
+    const headers: Record<string, string> = { 'User-Agent': 'EdgeOne-Stats-Agent/1.0', Accept: 'application/vnd.github+json' };
+    if (gitHubToken) {
+      headers['Authorization'] = `token ${gitHubToken}`;
+    }
     try {
       const response = await (tracer
         ? tracer.span(
@@ -332,7 +342,7 @@ export async function executeStatsTool(
             () =>
               fetchWithTimeout(
                 url,
-                { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0', Accept: 'application/vnd.github+json' } },
+                { headers },
                 5_000,
                 signal,
               ),
@@ -340,7 +350,7 @@ export async function executeStatsTool(
           )
         : fetchWithTimeout(
             url,
-            { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0', Accept: 'application/vnd.github+json' } },
+            { headers },
             5_000,
             signal,
           ));
@@ -392,6 +402,10 @@ export async function executeStatsTool(
       'Accept': 'application/vnd.cnb.web+json',
       'User-Agent': 'EdgeOne-Stats-Agent/1.0'
     };
+    const cnbToken = options.env?.CNB_API_TOKEN;
+    if (cnbToken) {
+      headers['Authorization'] = `Bearer ${cnbToken}`;
+    }
 
     try {
       const userResponse = await (tracer
@@ -539,8 +553,8 @@ async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs =
   }
 }
 
-async function fetchJson(url: string, signal?: AbortSignal) {
-  const response = await fetchWithTimeout(url, { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' } }, 5_000, signal);
+async function fetchJson(url: string, headers?: Record<string, string>, signal?: AbortSignal) {
+  const response = await fetchWithTimeout(url, { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0', ...headers } }, 5_000, signal);
   if (!response.ok) throw new Error(`Request failed ${response.status}: ${url}`);
   return response.json();
 }

@@ -12,7 +12,7 @@ export function buildSystemPrompt(): string {
     'Tool-use rules:',
     '1. For README generation or rewrite requests, first call fetch_github_profile_readme when the platform is GitHub, then inspect_github_user. If public page details matter, use browser_fetch.',
     '2. For CNB analysis, call inspect_cnb_user. Do NOT call fetch_github_profile_readme or inspect_github_user when the user platform is CNB.',
-    '3. For Stats configuration, always call compose_stats_recipe with applicable cards and options. Ensure the platform parameter in the recipe matches the user\'s requested platform.',
+    '3. For Stats configuration, always call compose_stats_recipe with applicable cards and options. Ensure the platform parameter in the recipe matches the user\'s requested platform. If the `cards` array contains `pin` or `repo-languages`, you MUST identify the user\'s actual repository names from their profile and specify the target repository name in the `options` object as `repo` (e.g. `options: { repo: "repo-name" }`). Never recommend these cards with an empty or default repo name.',
     '4. Avoid duplicate tool calls. Never call inspect_cnb_user, inspect_github_user, or browser_fetch multiple times with the same arguments/URLs in a single run. If a tool returns sparse or empty data, proceed directly to compose_readme_draft using the best available information; DO NOT loop or retry.',
     '5. For a full README result, call compose_readme_draft with complete Markdown, promotional_summary, objective_rating, objective_summary, and roast_summary. Include Stats card Markdown that uses this project\'s /api endpoints.',
     '6. Never invent tool results. If a profile or README cannot be fetched, say so and continue from available public data.',
