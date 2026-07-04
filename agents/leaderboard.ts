@@ -16,7 +16,7 @@ export async function onRequest(context: any) {
   // 1. Try reading the compiled index if not forcing a rebuild
   if (!forceRebuild) {
     try {
-      const entry = await store.get(leaderboardKey, { type: 'json' });
+      const entry = await store.get(leaderboardKey, { type: 'json', consistency: 'strong' });
       if (Array.isArray(entry)) {
         leaderboard = entry;
         indexExists = true;
@@ -32,10 +32,7 @@ export async function onRequest(context: any) {
   try {
     const { blobs } = await store.list();
     blobsList = blobs;
-    const cacheKeys = blobs.filter(b => {
-      const parts = b.key.split('/');
-      return parts.length === 4 && parts[0] === 'analysis' && parts[3] === 'readme.json';
-    });
+    const cacheKeys = blobs.filter(b => parseAnalysisCacheKey(b.key)?.mode === 'readme');
     cacheKeysCount = cacheKeys.length;
   } catch (err) {
     logger.error({ event: 'leaderboard.list_keys.error', error: String(err) });
@@ -60,10 +57,7 @@ export async function onRequest(context: any) {
     });
 
     const rebuiltList: any[] = [];
-    const cacheKeys = blobsList.filter(b => {
-      const parts = b.key.split('/');
-      return parts.length === 4 && parts[0] === 'analysis' && parts[3] === 'readme.json';
-    });
+    const cacheKeys = blobsList.filter(b => parseAnalysisCacheKey(b.key)?.mode === 'readme');
 
     // Process blobs in parallel batches of 5 for performance
     const BATCH_SIZE = 5;
@@ -71,9 +65,9 @@ export async function onRequest(context: any) {
       const batch = cacheKeys.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
         batch.map(async (blob: any) => {
-          const parts = blob.key.split('/');
-          const platform = parts[1];
-          const username = parts[2];
+          const parsedKey = parseAnalysisCacheKey(blob.key);
+          if (!parsedKey) return null;
+          const { platform, username } = parsedKey;
           const cacheEntry: any = await store.get(blob.key, { type: 'json' });
           return { platform, username, cacheEntry };
         })
@@ -81,6 +75,7 @@ export async function onRequest(context: any) {
 
       for (const result of results) {
         if (result.status !== 'fulfilled') continue;
+        if (!result.value) continue;
         const { platform, username, cacheEntry } = result.value;
         try {
           if (!cacheEntry || !Array.isArray(cacheEntry.events)) continue;
@@ -140,6 +135,9 @@ export async function onRequest(context: any) {
                   // ignore
                 }
               }
+              if (platform === 'github') {
+                displayUsername = await resolveGitHubLogin(displayUsername);
+              }
 
               if (avatar && !avatar.startsWith('http') && platform === 'cnb') {
                 avatar = `https://cnb.cool${avatar.startsWith('/') ? '' : '/'}${avatar}`;
@@ -194,4 +192,30 @@ export async function onRequest(context: any) {
     logger.error({ event: 'leaderboard.rebuild.failed', error: String(error) });
     return jsonResponse({ error: error.message || String(error) }, 500);
   }
+}
+
+function parseAnalysisCacheKey(key: string): { platform: string; username: string; mode: string } | null {
+  const parts = key.split('/');
+  if (parts.length === 4 && parts[0] === 'analysis') {
+    return { platform: parts[1], username: parts[2], mode: parts[3].replace(/\.json$/, '') };
+  }
+  if (parts.length === 5 && parts[0] === 'analysis' && /^v\d+$/.test(parts[1])) {
+    return { platform: parts[2], username: parts[3], mode: parts[4].replace(/\.json$/, '') };
+  }
+  return null;
+}
+
+async function resolveGitHubLogin(username: string): Promise<string> {
+  try {
+    const response = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
+      headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' },
+    });
+    if (response.ok) {
+      const profile = await response.json();
+      return profile.login || username;
+    }
+  } catch {
+    // ignore
+  }
+  return username;
 }
