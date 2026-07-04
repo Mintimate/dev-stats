@@ -1,9 +1,9 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": ".",
+  "outputDirectory": "dist",
   "build": {
     "command": "npm run build",
-    "output": "."
+    "output": "dist"
   },
   "routes": [],
   "headers": [],
