@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"dev-stats/cloud-functions/internal/card"
 	"dev-stats/cloud-functions/internal/service"
@@ -328,15 +329,21 @@ func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Header.Set("User-Agent", "EdgeOne-Stats-Agent/1.0")
 
-	resp, err := http.DefaultClient.Do(req)
+	// Use a dedicated client with a 5-second timeout to prevent 504 Gateway Timeouts on cold starts
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Do(req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		// If back-to-source fails or times out, redirect the client to the direct avatar URL as fallback
+		http.Redirect(w, r, avatarURL, http.StatusFound)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		http.Error(w, "Failed to fetch avatar from source", resp.StatusCode)
+		// Fallback to 302 redirect if the source returns a non-OK status code
+		http.Redirect(w, r, avatarURL, http.StatusFound)
 		return
 	}
 
