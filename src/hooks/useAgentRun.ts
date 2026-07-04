@@ -238,6 +238,8 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
       };
       setUsage(nextUsage);
       addEvent("TOKENS", `本轮消耗 ${nextUsage.total || 0} tokens。`);
+    } else if (event.type === "leaderboard_updated") {
+      window.dispatchEvent(new CustomEvent("devstats:leaderboard-updated"));
     } else if (event.type === "error_message") {
       const message = String(event.content || "Agent error");
       if (hasResultRef.current && /Max turns/i.test(message)) {

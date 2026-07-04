@@ -32,6 +32,8 @@ const QWEN_THINKING_MODEL_SETTINGS: ModelSettings = {
 
 const DEFAULT_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const CACHE_STORE_NAME = 'stats-agent-analysis-cache';
+const CACHE_SCHEMA_VERSION = 'v4';
+const AGENT_MAX_TURNS = 12;
 
 interface CacheEntry {
   cachedAt: number;
@@ -46,7 +48,7 @@ function buildCacheKey(platform: string, username: string, mode: string): string
     ? rawUsername.replace(/[^a-zA-Z0-9_.-]/g, '')
     : rawUsername.toLowerCase().replace(/[^a-z0-9_.-]/g, '');
   const safeMode = (mode || 'readme').toLowerCase().replace(/[^a-z0-9]/g, '');
-  return `analysis/${safePlatform}/${safeUsername}/${safeMode}.json`;
+  return `analysis/${CACHE_SCHEMA_VERSION}/${safePlatform}/${safeUsername}/${safeMode}.json`;
 }
 
 async function readCache(key: string, cacheTtlMs: number): Promise<CacheEntry | null> {
@@ -56,6 +58,41 @@ async function readCache(key: string, cacheTtlMs: number): Promise<CacheEntry | 
     if (!entry || typeof entry.cachedAt !== 'number') return null;
     if (Date.now() - entry.cachedAt > cacheTtlMs) return null;
     return entry;
+  } catch {
+    return null;
+  }
+}
+
+async function readCompatibleAnalysisCache(platform: string, username: string, mode: string, currentKey: string, cacheTtlMs: number): Promise<CacheEntry | null> {
+  const current = await readCache(currentKey, cacheTtlMs);
+  if (current) return current;
+
+  try {
+    const store = getStore(CACHE_STORE_NAME);
+    const safePlatform = (platform || 'github').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const safeMode = (mode || 'readme').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const safeUsername = safePlatform === 'cnb'
+      ? (username || '').replace(/[^a-zA-Z0-9_.-]/g, '')
+      : (username || '').toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+    const { blobs } = await store.list();
+    const candidates = blobs
+      .map((blob: any) => blob.key)
+      .filter((key: string) => key !== currentKey)
+      .map((key: string) => ({ key, parsed: parseAnalysisCacheKey(key) }))
+      .filter(({ parsed }: { parsed: ReturnType<typeof parseAnalysisCacheKey> }) =>
+        parsed &&
+        parsed.platform === safePlatform &&
+        parsed.mode === safeMode &&
+        parsed.username === safeUsername
+      );
+
+    let newest: CacheEntry | null = null;
+    for (const candidate of candidates) {
+      const entry = await readCache(candidate.key, cacheTtlMs);
+      if (!entry) continue;
+      if (!newest || entry.cachedAt > newest.cachedAt) newest = entry;
+    }
+    return newest;
   } catch {
     return null;
   }
@@ -103,7 +140,7 @@ async function updateLeaderboard(platform: string, username: string, events: str
     let leaderboard: any[] = [];
 
     try {
-      const entry = await store.get(leaderboardKey, { type: 'json' });
+      const entry = await store.get(leaderboardKey, { type: 'json', consistency: 'strong' });
       if (Array.isArray(entry)) {
         leaderboard = entry;
       }
@@ -115,7 +152,10 @@ async function updateLeaderboard(platform: string, username: string, events: str
     // 优先使用平台 API 校验时捕获的“权威大小写”用户名（写入 user_profile.username），
     // 而不是访客提交表单时的原始大小写，避免同一账号在榜单里因为大小写不同被当成两条记录、
     // 或者展示出和平台真实用户名不一致的大小写。旧缓存没有该字段时回退到原始 username。
-    const canonicalUsername = userProfile?.username || username;
+    let canonicalUsername = userProfile?.username || username;
+    if (platform === 'github') {
+      canonicalUsername = await resolveGitHubLogin(canonicalUsername);
+    }
     let avatar = userProfile?.avatar || readmeDraft.user?.avatar || '';
     if (avatar && !avatar.startsWith('http') && platform === 'cnb') {
       avatar = `https://cnb.cool${avatar.startsWith('/') ? '' : '/'}${avatar}`;
@@ -187,13 +227,32 @@ async function deleteCache(key: string): Promise<void> {
   }
 }
 
+async function deleteAnalysisCachesForUser(platform: string, username: string): Promise<void> {
+  try {
+    const store = getStore(CACHE_STORE_NAME);
+    const normalized = username.toLowerCase();
+    const { blobs } = await store.list();
+    await Promise.all(
+      blobs
+        .map((blob: any) => blob.key)
+        .filter((key: string) => {
+          const parsed = parseAnalysisCacheKey(key);
+          return parsed && parsed.platform === platform && parsed.mode === 'readme' && parsed.username.toLowerCase() === normalized;
+        })
+        .map((key: string) => store.delete(key).catch(() => undefined)),
+    );
+  } catch {
+    // ignore
+  }
+}
+
 async function removeFromLeaderboard(platform: string, username: string): Promise<void> {
   try {
     const store = getStore(CACHE_STORE_NAME);
     const leaderboardKey = 'leaderboard/readme_rankings.json';
     let leaderboard: any[] = [];
     try {
-      const entry = await store.get(leaderboardKey, { type: 'json' });
+      const entry = await store.get(leaderboardKey, { type: 'json', consistency: 'strong' });
       if (Array.isArray(entry)) {
         leaderboard = entry;
       }
@@ -213,6 +272,32 @@ async function removeFromLeaderboard(platform: string, username: string): Promis
   } catch (err) {
     logger.error({ event: 'leaderboard.remove.error', platform, username, error: String(err) });
   }
+}
+
+function parseAnalysisCacheKey(key: string): { platform: string; username: string; mode: string } | null {
+  const parts = key.split('/');
+  if (parts.length === 4 && parts[0] === 'analysis') {
+    return { platform: parts[1], username: parts[2], mode: parts[3].replace(/\.json$/, '') };
+  }
+  if (parts.length === 5 && parts[0] === 'analysis' && /^v\d+$/.test(parts[1])) {
+    return { platform: parts[2], username: parts[3], mode: parts[4].replace(/\.json$/, '') };
+  }
+  return null;
+}
+
+async function resolveGitHubLogin(username: string): Promise<string> {
+  try {
+    const response = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
+      headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' },
+    });
+    if (response.ok) {
+      const profile = await response.json();
+      return profile.login || username;
+    }
+  } catch {
+    // ignore
+  }
+  return username;
 }
 
 /** Minimal type definition for the EdgeOne Makers agent request context. */
@@ -293,13 +378,13 @@ export async function onRequest(context: AgentContext) {
       ? context.tracer.span(
         'cache.lookup',
         async (span: any) => {
-          const res = await readCache(cacheKey, cacheTtlMs);
+          const res = await readCompatibleAnalysisCache(platform, username, agentMode, cacheKey, cacheTtlMs);
           span.setAttributes({ 'cache.hit': !!res });
           return res;
         },
         { 'cache.key': cacheKey, 'agent.mode': agentMode },
       )
-      : readCache(cacheKey, cacheTtlMs));
+      : readCompatibleAnalysisCache(platform, username, agentMode, cacheKey, cacheTtlMs));
     if (cached) {
       // Mark root span as cache hit
       context.tracer?.setAttributes({
@@ -349,6 +434,7 @@ export async function onRequest(context: AgentContext) {
     let agentRunSpan: any = null;
     let agentRunSpanEnded = false;
     let prefetchedProfile: Record<string, unknown> | undefined;
+    let lastCNBInspect: Record<string, any> | null = null;
 
     logger.log({
       event: 'agent.run.start',
@@ -398,8 +484,6 @@ export async function onRequest(context: AgentContext) {
         'user.username': username,
       });
       const gitHubToken = getGitHubToken(env);
-      const cnbToken = env.CNB_API_TOKEN;
-
       try {
         if (platform === 'github') {
           const headers: Record<string, string> = { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' };
@@ -443,9 +527,6 @@ export async function onRequest(context: AgentContext) {
             'Accept': 'application/vnd.cnb.web+json',
             'User-Agent': 'EdgeOne-Stats-Agent/1.0'
           };
-          if (cnbToken) {
-            headers['Authorization'] = `Bearer ${cnbToken}`;
-          }
           const checkResponse = await fetch(`https://cnb.cool/users/${encodeURIComponent(username)}`, {
             signal,
             headers
@@ -526,7 +607,7 @@ export async function onRequest(context: AgentContext) {
         'agent.framework': 'openai-agents-sdk',
         'agent.model': modelName,
         'agent.mode': agentMode,
-        'agent.max_turns': 8,
+        'agent.max_turns': AGENT_MAX_TURNS,
         'user.platform': platform,
         'user.username': username,
       });
@@ -536,12 +617,19 @@ export async function onRequest(context: AgentContext) {
         stream: true,
         signal,
         session,
-        maxTurns: 8,
+        maxTurns: AGENT_MAX_TURNS,
       });
 
       let lastTotalTokens = 0;
       for await (const event of result.toStream()) {
         if (signal?.aborted) break;
+        const toolOutput = extractToolOutput(event);
+        if (toolOutput?.name === 'inspect_cnb_user') {
+          const parsed = parseMaybeJson(toolOutput.output);
+          if (parsed && typeof parsed === 'object' && (parsed as Record<string, unknown>).ok) {
+            lastCNBInspect = parsed as Record<string, any>;
+          }
+        }
         for (const sideEffect of drainSseQueue(sseQueue)) {
           if (sideEffect.includes('"type":"readme_draft"')) emittedReadmeDraft = true;
           if (sideEffect.includes('"type":"stats_recipe"')) emittedStatsRecipe = true;
@@ -581,6 +669,24 @@ export async function onRequest(context: AgentContext) {
         if (sideEffect.includes('"type":"readme_draft"')) emittedReadmeDraft = true;
         if (sideEffect.includes('"type":"stats_recipe"')) emittedStatsRecipe = true;
         yield* yieldAndCollect(sideEffect);
+      }
+
+      const finalToolEvent = eventFromFinalToolOutput(result.finalOutput, agentMode);
+      if (finalToolEvent) {
+        if (finalToolEvent.type === 'readme_draft' && !emittedReadmeDraft) {
+          emittedReadmeDraft = true;
+          yield* yieldAndCollect(sseEvent(finalToolEvent));
+        }
+        if (finalToolEvent.type === 'stats_recipe' && !emittedStatsRecipe) {
+          emittedStatsRecipe = true;
+          yield* yieldAndCollect(sseEvent(finalToolEvent));
+        }
+      }
+
+      if (agentMode === 'readme' && !emittedReadmeDraft && platform === 'cnb' && lastCNBInspect) {
+        const draft = sseEvent(createCNBReadmeDraftFromInspect(lastCNBInspect, username));
+        emittedReadmeDraft = true;
+        yield* yieldAndCollect(draft);
       }
 
       if (agentMode === 'readme' && !emittedReadmeDraft && assistantText.trim()) {
@@ -642,6 +748,7 @@ export async function onRequest(context: AgentContext) {
               { 'user.platform': platform, 'user.username': username },
             )
             : updateLeaderboard(platform, username, collectedEvents));
+          yield* yieldAndCollect(sseEvent({ type: 'leaderboard_updated', platform, username }));
         }
       }
     } catch (error) {
@@ -663,7 +770,9 @@ export async function onRequest(context: AgentContext) {
       // Clean up cache and rankings if the user is verified to be non-existent
       if (err.message && err.message.includes('不存在 (404)')) {
         await deleteCache(cacheKey);
+        await deleteAnalysisCachesForUser(platform, username);
         await removeFromLeaderboard(platform, username);
+        yield sseEvent({ type: 'leaderboard_updated', platform, username, removed: true });
       }
       yield sseEvent({ type: 'error_message', content: err.message });
     }
@@ -714,6 +823,15 @@ function mapAgentEvent(event: RunStreamEvent): Array<Record<string, unknown>> {
   return [];
 }
 
+function extractToolOutput(event: RunStreamEvent): { name: string; output: unknown } | null {
+  if (event.type !== 'run_item_stream_event' || event.name !== 'tool_output') return null;
+  const item = event.item as any;
+  const raw = item?.rawItem ?? {};
+  const name = item?.name || item?.toolName || raw.name;
+  if (!name) return null;
+  return { name: String(name), output: item?.output ?? raw.output ?? '' };
+}
+
 function normalizeOpenAIBaseUrl(value: string): string {
   return value
     .trim()
@@ -750,6 +868,109 @@ function drainSseQueue(queue: string[]): string[] {
   const items = [];
   while (queue.length) items.push(queue.shift()!);
   return items;
+}
+
+function eventFromFinalToolOutput(finalOutput: unknown, agentMode: 'readme' | 'stats'): Record<string, unknown> | null {
+  const parsed = parseMaybeJson(finalOutput);
+  if (!parsed || typeof parsed !== 'object') return null;
+  const payload = parsed as Record<string, unknown>;
+
+  if (payload.type === 'readme_draft' || payload.type === 'stats_recipe') {
+    return payload;
+  }
+
+  if (agentMode === 'readme' && payload.ok && typeof payload.markdown === 'string') {
+    return { type: 'readme_draft', ...payload };
+  }
+
+  if (agentMode === 'stats' && payload.ok && payload.recipe && typeof payload.recipe === 'object') {
+    return { type: 'stats_recipe', ...(payload.recipe as Record<string, unknown>) };
+  }
+
+  return null;
+}
+
+function createCNBReadmeDraftFromInspect(inspect: Record<string, any>, requestedUsername: string): Record<string, unknown> {
+  const user = inspect.user ?? {};
+  const totals = inspect.totals ?? {};
+  const repos = Array.isArray(inspect.top_repos)
+    ? inspect.top_repos
+    : Array.isArray(inspect.repos)
+      ? inspect.repos
+      : [];
+  const username = String(user.username || requestedUsername || 'CNBUser');
+  const nickname = String(user.nickname || user.name || username);
+  const repoCount = Number(totals.reported_repos ?? user.public_repo_count ?? repos.length ?? 0);
+  const sampledRepos = Number(totals.sampled_repos ?? repos.length ?? 0);
+  const stars = Number(totals.stars ?? user.stars_count ?? 0);
+  const forks = Number(totals.forks ?? 0);
+  const prs = Number(totals.pull_requests ?? 0);
+  const commits = Number(totals.commits ?? 0);
+  const issues = Number(totals.issues ?? 0);
+  const activeDays = Number(totals.active_days ?? 0);
+  const followers = Number(user.follower_count ?? 0);
+  const topRepos = repos.slice(0, 6).map((repo: any) => ({
+    name: String(repo.path || repo.name || ''),
+    stars: Number(repo.star_count ?? repo.mark_count ?? 0),
+    contributions_desc: `Owner · ${Number(repo.fork_count ?? 0)} forks${repo.language ? ` · ${repo.language}` : ''}`,
+  })).filter((repo: any) => repo.name);
+  const languages = Array.isArray(totals.languages)
+    ? totals.languages.map((item: any) => item.language).filter(Boolean).slice(0, 5)
+    : [];
+  const flagship = topRepos[0];
+  const score = Math.min(94, Math.max(62, 58 + Math.min(18, repoCount) + Math.min(10, stars / 3) + Math.min(8, forks / 5) + Math.min(8, prs / 5) + Math.min(6, followers / 10)));
+  const rating = score >= 90 ? '夯' : score >= 80 ? '顶流' : score >= 70 ? '高级' : '平庸';
+  const dimension = {
+    maturity: clampScore(10 + Math.min(8, repoCount / 3) + (user.verified ? 2 : 0)),
+    original_projects: clampScore(8 + Math.min(10, topRepos.length * 2) + Math.min(2, stars / 20)),
+    contributions: clampScore(8 + Math.min(8, prs / 4) + Math.min(4, commits / 50)),
+    influence: clampScore(7 + Math.min(7, stars / 5) + Math.min(4, forks / 8) + Math.min(2, followers / 20)),
+    activity: clampScore(8 + Math.min(10, activeDays / 8) + Math.min(2, commits / 100)),
+    community: clampScore(7 + Math.min(8, followers / 8) + Math.min(5, issues / 4)),
+  };
+  const markdown = [
+    `# ${nickname}`,
+    '',
+    `> CNB: [@${username}](https://cnb.cool/u/${encodeURIComponent(username)})`,
+    '',
+    `公开资料显示，${nickname} 在 CNB 上有 ${repoCount} 个公开仓库，本次采样到 ${sampledRepos} 个仓库，累计约 ${stars} stars / marks、${forks} forks。${flagship ? `代表项目包括 **${flagship.name}**。` : ''}`,
+    '',
+    '## 项目亮点',
+    '',
+    ...(topRepos.length
+      ? topRepos.map((repo: any) => `- [${repo.name}](https://cnb.cool/${repo.name}) · ${repo.stars} stars/marks · ${repo.contributions_desc}`)
+      : ['- 暂未采样到公开仓库列表，但用户主页资料可继续补充。']),
+    '',
+    '## 技术栈',
+    '',
+    languages.length ? languages.map((lang: string) => `- ${lang}`).join('\n') : '- CNB 公开数据未提供明确语言分布',
+    '',
+    '## CNB Stats',
+    '',
+    `![CNB Stats](/api?platform=cnb&username=${encodeURIComponent(username)}&show_icons=true)`,
+    '',
+    `![CNB Languages](/api/top-langs?platform=cnb&username=${encodeURIComponent(username)}&layout=compact)`,
+  ].join('\n');
+
+  return {
+    type: 'readme_draft',
+    ok: true,
+    title: `${username} README Draft`,
+    markdown,
+    summary: `${nickname} 的 CNB 资料已基于公开 API 汇总：${repoCount} 个公开仓库、${stars} stars/marks、${forks} forks。`,
+    promotional_summary: `${nickname} 活跃于 CNB 生态，公开仓库覆盖 ${languages.length ? languages.join('、') : '多个技术方向'}，具备持续产出和项目沉淀。`,
+    objective_rating: rating,
+    objective_summary: `基于 CNB 公开数据，该账号拥有 ${repoCount} 个公开仓库，本次采样 ${sampledRepos} 个，累计 ${stars} stars/marks、${forks} forks；${activeDays ? `今年有 ${activeDays} 个活跃日，` : ''}${prs || commits ? `公开活动包含 ${commits} commits 与 ${prs} PR。` : '活动数据较有限。'}整体不应判定为空白账号。`,
+    roast_summary: `这位不是“什么都没有留下”，只是 CNB 的公开数据得认真捞。仓库、fork 和活动都摆在那儿，直接说空白账号属于工具没戴眼镜。`,
+    score: Number(score.toFixed(2)),
+    badges: ['#CNB开发者', flagship ? '#项目沉淀型选手' : '#公开资料可挖', languages[0] ? `#${languages[0]}玩家` : '#开源观察中'],
+    dimension_scores: dimension,
+    top_repos: topRepos,
+  };
+}
+
+function clampScore(value: number): number {
+  return Math.max(1, Math.min(20, Math.round(value)));
 }
 
 function createFallbackReadmeDraft(text: string, state: unknown): Record<string, unknown> {

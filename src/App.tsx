@@ -329,7 +329,7 @@ function AgentResultPanel({
   const summary = readme?.summary || (agent.result.kind === "stats" ? agent.result.summary : "正在等待分析指标数据...");
 
   const profileUrl = config.platform === "cnb"
-    ? `https://cnb.cool/${config.username}`
+    ? `https://cnb.cool/u/${encodeURIComponent(config.username)}`
     : `https://github.com/${config.username}`;
 
   if (!resultVisible) return null;

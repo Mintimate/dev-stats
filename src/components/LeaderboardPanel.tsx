@@ -85,6 +85,14 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
     void fetchRankings();
   }, [fetchRankings]);
 
+  useEffect(() => {
+    function refreshAfterAnalysis() {
+      void fetchRankings();
+    }
+    window.addEventListener("devstats:leaderboard-updated", refreshAfterAnalysis);
+    return () => window.removeEventListener("devstats:leaderboard-updated", refreshAfterAnalysis);
+  }, [fetchRankings]);
+
   // 切换榜单或刷新数据后，避免停留在一个可能已经越界的页码上。
   useEffect(() => {
     setPage(1);
