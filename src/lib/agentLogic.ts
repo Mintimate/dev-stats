@@ -4,9 +4,9 @@ import type { AgentMode, ManualConfig, ReadmeResult, StatsRecipe, ToolchainState
 export function buildAgentMessage(config: ManualConfig, mode: AgentMode) {
   if (config.platform === "cnb") {
     if (mode === "readme") {
-      return `请为 CNB 用户 ${config.username} 生成个人自我介绍 README。请调用 inspect_cnb_user 获取其结构化公开资料，然后输出完整 Markdown 草稿并推荐适合的 Stats 组合。不要尝试用 browser_fetch 或任何 GitHub 接口。`;
+      return `请为 CNB 用户 ${config.username} 生成个人自我介绍 README。只调用一次 inspect_cnb_user 获取结构化公开资料，然后必须立即调用 compose_readme_draft 输出完整 Markdown 草稿、画像评分和推荐 Stats 组合。不要重复 inspect_cnb_user，不要尝试用 browser_fetch 或任何 GitHub 接口。`;
     }
-    return `请为 CNB 用户 ${config.username} 推荐 README Stats 组合。请调用 inspect_cnb_user 分析其公开项目资料，最后调用 compose_stats_recipe 输出配置。不要尝试用 browser_fetch 或任何 GitHub 接口。`;
+    return `请为 CNB 用户 ${config.username} 推荐 README Stats 组合。只调用一次 inspect_cnb_user 分析公开项目资料，然后必须立即调用 compose_stats_recipe 输出配置。不要重复 inspect_cnb_user，不要尝试用 browser_fetch 或任何 GitHub 接口。`;
   }
   if (mode === "readme") {
     return `请为 GitHub 用户 ${config.username} 生成个人自我介绍 README。请调用 fetch_github_profile_readme 获取 Profile README，并调用 inspect_github_user 分析公开资料，最后输出完整 Markdown 草稿并推荐适合的 Stats 组合。`;
@@ -140,24 +140,25 @@ export function normalizeReadmeResult(
   profile: UserProfile | null,
   assistantText: string,
 ) {
+  const isCnb = config.platform === "cnb";
   const avatarUrl = (!event.is_ghost && config.username && config.platform)
     ? `/api/avatar?platform=${config.platform}&username=${config.username}`
     : "/favicon.svg";
 
   const user = (event.user || {}) as UserProfile;
-  const markdown = String(event.markdown || "");
+  const markdown = sanitizePlatformCopy(String(event.markdown || ""), isCnb);
   const result: ReadmeResult = {
-    title: String(event.title || "README Draft"),
-    summary: String(event.summary || assistantText.replace(/\s+/g, " ").trim().slice(0, 220) || "README Markdown generated."),
+    title: sanitizePlatformCopy(String(event.title || "README Draft"), isCnb),
+    summary: sanitizePlatformCopy(String(event.summary || assistantText.replace(/\s+/g, " ").trim().slice(0, 220) || "README Markdown generated."), isCnb),
     markdown,
     user,
     is_ghost: Boolean(event.is_ghost),
     score: Number(event.score ?? 60),
     objective_rating: String(event.objective_rating || "入门"),
-    badges: Array.isArray(event.badges) ? (event.badges as string[]) : ["#极客开发者"],
-    objective_summary: String(event.objective_summary || "暂无客观画像评估。"),
-    roast_summary: String(event.roast_summary || "模型蓄力失败，暂无吐槽数据。"),
-    promotional_summary: String(event.promotional_summary || "--"),
+    badges: Array.isArray(event.badges) ? (event.badges as string[]).map((badge) => sanitizePlatformCopy(String(badge), isCnb)) : ["#极客开发者"],
+    objective_summary: sanitizePlatformCopy(String(event.objective_summary || "暂无客观画像评估。"), isCnb),
+    roast_summary: sanitizePlatformCopy(String(event.roast_summary || "模型蓄力失败，暂无吐槽数据。"), isCnb),
+    promotional_summary: sanitizePlatformCopy(String(event.promotional_summary || "--"), isCnb),
     dimension_scores: (event.dimension_scores as ReadmeResult["dimension_scores"]) || {
       maturity: 12,
       original_projects: 12,
@@ -166,15 +167,37 @@ export function normalizeReadmeResult(
       activity: 12,
       community: 12,
     },
-    top_repos: Array.isArray(event.top_repos) ? (event.top_repos as ReadmeResult["top_repos"]) : [],
+    top_repos: Array.isArray(event.top_repos)
+      ? (event.top_repos as ReadmeResult["top_repos"]).map((repo) => ({
+          ...repo,
+          contributions_desc: sanitizePlatformCopy(repo.contributions_desc || "", isCnb),
+        }))
+      : [],
     avatarUrl,
   };
   result.user = {
     ...user,
-    nickname: profile?.nickname || user.nickname || user.name || config.username || "--",
-    bio: profile?.bio || user.bio || "这位开发者很低调，什么都没有留下。",
+    nickname: sanitizePlatformCopy(profile?.nickname || user.nickname || user.name || config.username || "--", isCnb),
+    bio: sanitizePlatformCopy(profile?.bio || user.bio || "这位开发者很低调，什么都没有留下。", isCnb),
   };
   return result;
+}
+
+function sanitizePlatformCopy(value: string, isCnb: boolean) {
+  if (!isCnb) return value;
+  return String(value)
+    .replace(/GitHub\/CNB/g, "CNB")
+    .replace(/GitHub\s*\/\s*CNB/g, "CNB")
+    .replace(/GitHub 简介/g, "CNB 简介")
+    .replace(/GitHub 影响力/g, "CNB 影响力")
+    .replace(/GitHub 用户/g, "CNB 用户")
+    .replace(/GitHub 账号/g, "CNB 账号")
+    .replace(/GitHub 主页/g, "CNB 主页")
+    .replace(/GitHub 项目/g, "CNB 项目")
+    .replace(/GitHub 仓库/g, "CNB 仓库")
+    .replace(/GitHub 数据/g, "CNB 数据")
+    .replace(/GitHub 公开数据/g, "CNB 公开数据")
+    .replace(/GitHub/g, "CNB");
 }
 
 export function ghostResult(username: string) {

@@ -3,6 +3,21 @@ import { tool } from '@openai/agents';
 
 const GITHUB_API = 'https://api.github.com';
 const CNB_BASE = 'https://cnb.cool';
+const CNB_ACCEPT = 'application/vnd.cnb.api+json';
+
+type CNBRepoSummary = {
+  name: string;
+  path: string;
+  description: string;
+  star_count: number;
+  mark_count: number;
+  fork_count: number;
+  language: string;
+  second_language: string;
+  updated_at: string;
+  is_fork: boolean;
+  forked_from: string | null;
+};
 
 /** Max raw HTML size (in bytes) that cleanHtml will process to avoid ReDoS on malicious pages. */
 const MAX_HTML_CLEAN_BYTES = 200_000;
@@ -105,7 +120,7 @@ function getToolSchemas() {
     },
     {
       name: 'inspect_cnb_user',
-      description: 'Fetch a public CNB profile or organization page as text.',
+      description: 'Fetch structured public CNB profile, repository, and activity data for a username or organization path.',
       input_schema: {
         type: 'object',
         properties: { username: { type: 'string', description: 'CNB username or organization path' } },
@@ -394,62 +409,129 @@ export async function executeStatsTool(
   }
 
   if (name === 'inspect_cnb_user') {
-    const username = String(input.username || '');
-    const userUrl = `${CNB_BASE}/users/${encodeURIComponent(username)}`;
-    const reposUrl = `${CNB_BASE}/users/${encodeURIComponent(username)}/repos?page=1&page_size=20&role=Owner&status=active`;
-    
+    const username = String(input.username || '').trim().replace(/^\/+|\/+$/g, '');
+    const encodedUsername = cnbPath(username);
     const headers: Record<string, string> = {
-      'Accept': 'application/vnd.cnb.web+json',
+      'Accept': CNB_ACCEPT,
       'User-Agent': 'EdgeOne-Stats-Agent/1.0'
     };
-    const cnbToken = options.env?.CNB_API_TOKEN;
-    if (cnbToken) {
-      headers['Authorization'] = `Bearer ${cnbToken}`;
-    }
+
+    const fetchCNB = <T = any>(url: string, timeoutMs = 5_000) => fetchJsonResult<T>(url, { headers }, timeoutMs, signal);
 
     try {
-      const userResponse = await (tracer
-        ? tracer.span('cnb.fetch_profile', () => fetchWithTimeout(userUrl, { headers }, 5_000, signal), { 'cnb.username': username })
-        : fetchWithTimeout(userUrl, { headers }, 5_000, signal));
-      if (userResponse.status === 404) {
+      const userUrl = `${CNB_BASE}/users/${encodedUsername}`;
+      let profile = await (tracer
+        ? tracer.span('cnb.fetch_profile', () => fetchCNB(userUrl), { 'cnb.username': username, 'cnb.url': userUrl })
+        : fetchCNB(userUrl));
+      let isGroup = false;
+
+      if (profile.status === 404) {
+        const groupUrl = `${CNB_BASE}/${encodedUsername}`;
+        profile = await (tracer
+          ? tracer.span('cnb.fetch_group_profile', () => fetchCNB(groupUrl), { 'cnb.username': username, 'cnb.url': groupUrl })
+          : fetchCNB(groupUrl));
+        isGroup = profile.ok;
+      }
+
+      if (!profile.ok || !profile.data) {
+        if (profile.status === 404) {
+          return {
+            platform: 'cnb',
+            ok: false,
+            status: 404,
+            target: `${CNB_BASE}/u/${encodeURIComponent(username)}`,
+            error: `CNB 用户 "${username}" 不存在 (404)。请注意：CNB 的用户名是区分大小写的，例如 "Mintimate" 与 "mintimate" 是不同的，请检查输入的大写字母。`
+          };
+        }
         return {
           platform: 'cnb',
           ok: false,
-          status: 404,
-          error: `CNB 用户 "${username}" 不存在 (404)。请注意：CNB 的用户名是区分大小写的，例如 "Mintimate" 与 "mintimate" 是不同的，请检查输入的大写字母。`
+          status: profile.status,
+          target: `${CNB_BASE}/u/${encodeURIComponent(username)}`,
+          error: profile.error || `CNB public API returned ${profile.status}`,
         };
       }
-      const user = userResponse.ok ? await userResponse.json() : null;
 
-      const reposResponse = await (tracer
-        ? tracer.span('cnb.fetch_repos', () => fetchWithTimeout(reposUrl, { headers }, 5_000, signal), { 'cnb.username': username })
-        : fetchWithTimeout(reposUrl, { headers }, 5_000, signal));
-      const repos = reposResponse.ok ? await reposResponse.json() : [];
+      const reposPath = isGroup
+        ? `${CNB_BASE}/${encodedUsername}/-/repos?page=1&page_size=30&order_by=stars&desc=true`
+        : `${CNB_BASE}/users/${encodedUsername}/repos?page=1&page_size=30&order_by=stars&desc=true&role=Owner`;
+      const reposResult = await (tracer
+        ? tracer.span('cnb.fetch_repos', () => fetchCNB<any[]>(reposPath), { 'cnb.username': username, 'cnb.url': reposPath })
+        : fetchCNB<any[]>(reposPath));
+      const rawRepos = Array.isArray(reposResult.data) ? reposResult.data : [];
+      const repos: CNBRepoSummary[] = rawRepos
+        .map((repo: any) => ({
+          name: String(repo.name || '').trim(),
+          path: String(repo.path || repo.slug_path || repo.name || '').replace(/^\/+|\/+$/g, ''),
+          description: repo.description || '',
+          star_count: Number(repo.star_count ?? repo.mark_count ?? 0),
+          mark_count: Number(repo.mark_count ?? repo.star_count ?? 0),
+          fork_count: Number(repo.fork_count ?? 0),
+          language: repo.language || repo.languages?.language || '',
+          second_language: repo.second_languages?.language || '',
+          updated_at: repo.last_updated_at || repo.updated_at || repo.created_at || '',
+          is_fork: Boolean(repo.forked_from_repo),
+          forked_from: repo.forked_from_repo?.path || null,
+        }))
+        .filter((repo: CNBRepoSummary) => repo.name || repo.path);
+
+      const now = new Date();
+      const year = now.getUTCFullYear();
+      const calendarUrl = `${CNB_BASE}/users/${encodedUsername}/calendar?year=${year}`;
+      const calendarResult = isGroup
+        ? { ok: false, data: null }
+        : await (tracer
+          ? tracer.span('cnb.fetch_calendar', () => fetchCNB<Record<string, any>>(calendarUrl), { 'cnb.username': username, 'cnb.url': calendarUrl })
+          : fetchCNB<Record<string, any>>(calendarUrl));
+      const activity = summarizeCNBCalendar(calendarResult.data);
+
+      const user = profile.data as any;
+      const canonicalUsername = String(user.username || user.path || username);
+      const nickname = String(user.nickname || user.name || canonicalUsername);
+      const totalStars = repos.reduce((sum, repo) => sum + repo.star_count, 0);
+      const totalForks = repos.reduce((sum, repo) => sum + repo.fork_count, 0);
+      const languages = summarizeCNBLanguages(repos);
 
       return {
         platform: 'cnb',
-        url: `${CNB_BASE}/u/${encodeURIComponent(username)}`,
-        user: user ? {
-          username: user.username,
-          nickname: user.nickname,
-          avatar: user.avatar ? (user.avatar.startsWith('http') ? user.avatar : `${CNB_BASE}${user.avatar}`) : '',
-          follower_count: user.follower_count,
-          follow_count: user.follow_count,
-          public_repo_count: user.public_repo_count,
-          stars_count: user.stars_count,
-          created_at: user.created_at
-        } : null,
-        repos: Array.isArray(repos) ? repos.map((r: any) => ({
-          name: r.name,
-          path: r.path,
-          description: r.description,
-          star_count: r.star_count,
-          fork_count: r.fork_count,
-          language: r.language
-        })) : []
+        ok: true,
+        target: isGroup ? `${CNB_BASE}/${encodedUsername}` : `${CNB_BASE}/u/${encodeURIComponent(canonicalUsername)}`,
+        user: {
+          username: canonicalUsername,
+          nickname,
+          name: nickname,
+          bio: user.bio || user.description || '',
+          avatar: user.avatar ? (String(user.avatar).startsWith('http') ? user.avatar : `${CNB_BASE}${String(user.avatar).startsWith('/') ? '' : '/'}${user.avatar}`) : '',
+          follower_count: Number(user.follower_count ?? 0),
+          follow_count: Number(user.follow_count ?? 0),
+          public_repo_count: Number(user.public_repo_count ?? user.all_sub_repo_count ?? repos.length),
+          repo_count: Number(user.repo_count ?? user.sub_repo_count ?? repos.length),
+          stars_count: Number(user.stars_count ?? totalStars),
+          created_at: user.created_at || '',
+          is_group: isGroup,
+        },
+        totals: {
+          sampled_repos: repos.length,
+          reported_repos: Number(user.public_repo_count ?? user.all_sub_repo_count ?? user.repo_count ?? user.sub_repo_count ?? repos.length),
+          stars: totalStars,
+          forks: totalForks,
+          languages,
+          activity_year: year,
+          commits: activity.commits,
+          pull_requests: activity.pull_requests,
+          issues: activity.issues,
+          code_reviews: activity.code_reviews,
+          active_days: activity.active_days,
+        },
+        repos: repos.slice(0, 20),
+        top_repos: repos
+          .slice()
+          .sort((a, b) => (b.star_count - a.star_count) || (b.fork_count - a.fork_count))
+          .slice(0, 8),
+        next_action: 'Call the required final composition tool now. Use compose_readme_draft for README mode or compose_stats_recipe for stats mode. Do not call inspect_cnb_user again.',
       };
     } catch (e) {
-      return { platform: 'cnb', error: (e as Error).message };
+      return { platform: 'cnb', ok: false, target: `${CNB_BASE}/u/${encodeURIComponent(username)}`, error: (e as Error).message };
     }
   }
 
@@ -557,6 +639,74 @@ async function fetchJson(url: string, headers?: Record<string, string>, signal?:
   const response = await fetchWithTimeout(url, { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0', ...headers } }, 5_000, signal);
   if (!response.ok) throw new Error(`Request failed ${response.status}: ${url}`);
   return response.json();
+}
+
+async function fetchJsonResult<T>(url: string, init: RequestInit = {}, timeoutMs = 5_000, signal?: AbortSignal) {
+  try {
+    const response = await fetchWithTimeout(url, init, timeoutMs, signal);
+    const text = await response.text();
+    let data: T | null = null;
+    if (text) {
+      try {
+        data = JSON.parse(text) as T;
+      } catch {
+        return { ok: false, url, status: response.status, error: `CNB returned non-JSON response: ${text.slice(0, 160)}`, data: null };
+      }
+    }
+    if (!response.ok) {
+      const message = data && typeof data === 'object' && 'errmsg' in data
+        ? String((data as any).errmsg)
+        : `HTTP ${response.status}`;
+      return { ok: false, url, status: response.status, error: message, data };
+    }
+    if (data && typeof data === 'object' && 'errcode' in data) {
+      return { ok: false, url, status: response.status, error: String((data as any).errmsg || `CNB errcode ${(data as any).errcode}`), data };
+    }
+    return { ok: true, url, status: response.status, data };
+  } catch (error) {
+    return { ok: false, url, status: 0, error: (error as Error).message, data: null };
+  }
+}
+
+function cnbPath(value: string) {
+  return value
+    .split('/')
+    .filter(Boolean)
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+}
+
+function summarizeCNBCalendar(calendar: unknown) {
+  const total = { commits: 0, pull_requests: 0, issues: 0, code_reviews: 0, active_days: 0 };
+  if (!calendar || typeof calendar !== 'object') return total;
+  for (const day of Object.values(calendar as Record<string, any>)) {
+    if (!day || typeof day !== 'object') continue;
+    const commits = Number(day.commit_count ?? 0);
+    const pullRequests = Number(day.pr_count ?? day.pull_request_count ?? 0);
+    const issues = Number(day.issues_count ?? 0);
+    const codeReviews = Number(day.valid_cr_count ?? day.code_review_count ?? 0);
+    total.commits += commits;
+    total.pull_requests += pullRequests;
+    total.issues += issues;
+    total.code_reviews += codeReviews;
+    if (commits + pullRequests + issues + codeReviews > 0) total.active_days++;
+  }
+  return total;
+}
+
+function summarizeCNBLanguages(repos: Array<{ language: string; second_language: string }>) {
+  const counts = new Map<string, number>();
+  for (const repo of repos) {
+    for (const language of [repo.language, repo.second_language]) {
+      const name = String(language || '').trim();
+      if (!name) continue;
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([language, count]) => ({ language, count }));
 }
 
 function decodeBase64(text: string): string {

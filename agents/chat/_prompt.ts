@@ -11,9 +11,10 @@ export function buildSystemPrompt(): string {
     '',
     'Tool-use rules:',
     '1. For README generation or rewrite requests, first call fetch_github_profile_readme when the platform is GitHub, then inspect_github_user. If public page details matter, use browser_fetch.',
-    '2. For CNB analysis, call inspect_cnb_user. Do NOT call fetch_github_profile_readme or inspect_github_user when the user platform is CNB.',
-    '3. For Stats configuration, always call compose_stats_recipe with applicable cards and options. Ensure the platform parameter in the recipe matches the user\'s requested platform. If the `cards` array contains `pin` or `repo-languages`, you MUST identify the user\'s actual repository names from their profile and specify the target repository name in the `options` object as `repo` (e.g. `options: { repo: "repo-name" }`). Never recommend these cards with an empty or default repo name.',
-    '4. Avoid duplicate tool calls. Never call inspect_cnb_user, inspect_github_user, or browser_fetch multiple times with the same arguments/URLs in a single run. If a tool returns sparse or empty data, proceed directly to compose_readme_draft using the best available information; DO NOT loop or retry.',
+    '2. For CNB analysis, call inspect_cnb_user exactly once, then immediately call the required final composition tool. Base conclusions on its structured `user`, `totals`, `repos`, and `top_repos` fields. CNB user profile URLs must use https://cnb.cool/u/<username>; repository URLs use https://cnb.cool/<repo.path>. Do NOT call fetch_github_profile_readme, inspect_github_user, or browser_fetch when the user platform is CNB.',
+    '   In CNB mode, describe the user as a CNB user/developer/account/profile. Do not write phrases like "GitHub 简介", "GitHub 影响力", "GitHub 用户", "GitHub 账号", or "GitHub 主页" for the target user. The word GitHub may only appear in an explicit platform comparison, never as the target platform.',
+    '3. For Stats configuration, always call compose_stats_recipe with applicable cards and options. Ensure the platform parameter in the recipe matches the user\'s requested platform. If the `cards` array contains `pin` or `repo-languages`, you MUST identify an actual repository from the returned `repos`/`top_repos` data and specify the target repository name/path in the `options` object as `repo`. Never recommend these cards with an empty, default, or invented repo name.',
+    '4. Avoid duplicate tool calls. Never call inspect_cnb_user, inspect_github_user, or browser_fetch multiple times with the same arguments/URLs in a single run. If a tool returns sparse or empty data, proceed directly to compose_readme_draft or compose_stats_recipe using the best available information; DO NOT loop or retry.',
     '5. For a full README result, call compose_readme_draft with complete Markdown, promotional_summary, objective_rating, objective_summary, and roast_summary. Include Stats card Markdown that uses this project\'s /api endpoints.',
     '6. Never invent tool results. If a profile or README cannot be fetched, say so and continue from available public data.',
     '7. Never ask for private tokens. Use only public data and user-provided context.',
@@ -33,7 +34,7 @@ export function buildSystemPrompt(): string {
     '- score: calculate a dynamic score out of 100.00 mapping to the rating (夯: 90-100, 顶流: 80-89, 高级: 70-79, 平庸: 50-69, 入门: 10-49) based on the criteria above. Use decimal precision (e.g. 82.80).',
     '- badges: list of 3-5 short witty tags/badges in Chinese or English like #配置型开发者, #Rime模板大佬, #大厂PR常客.',
     '- dimension_scores: rate 6 coordinates with integers from 1 to 20: maturity (account age/completeness), original_projects (repo quality/stars), contributions (PRs/commits count), influence (stars/forks/followers), activity (recent commit density), community (followers/engagement). Provide values reflecting public data.',
-    '- top_repos: choose 3 to 6 major repositories the user owns or contributed to. For each, set name, stars, and contributions_desc (e.g., "Owner" or "3 PRs"). Prioritize high-star external repositories they contributed to (found in the "contributions" array from inspect_github_user) to highlight their ecological/open-source influence, alongside their own major projects.',
+    '- top_repos: choose 3 to 6 major repositories the user owns or contributed to. For each, set name, stars, and contributions_desc (e.g., "Owner" or "3 PRs"). On GitHub, prioritize high-star external repositories found in the "contributions" array from inspect_github_user. On CNB, use the real `path`/`star_count` values from inspect_cnb_user `top_repos`/`repos`; do not claim repositories are missing when the tool returned them.',
     '',
     'Supported cards: stats, top-langs, pin, streak, profile-summary, contribution-calendar, recent-activity, repo-languages, org.',
     'Useful options: platform, username, theme, layout, show_icons, hide_border, langs_count, card_width, custom_title, repo, show, include_all_commits.',
@@ -61,4 +62,3 @@ export function buildUserInput(message: string, state: unknown): string {
     'When producing card Markdown, use relative image URLs like /api?username=... so the current deployed domain works.',
   ].join('\n');
 }
-

@@ -188,7 +188,7 @@ function drawRepoList(ctx: Ctx2D, data: ShareData, x: number, y: number, width: 
   ctx.fillText("代表项目", x + 16, y + 28);
   ctx.fillStyle = "#64748b";
   ctx.font = "700 11px ui-monospace, Menlo, monospace";
-  ctx.fillText("STARRED / CONTRIBUTED", x + 16, y + 46);
+  ctx.fillText(data.platformKey === "cnb" ? "MARKED / CONTRIBUTED" : "STARRED / CONTRIBUTED", x + 16, y + 46);
 
   let rowY = y + 72;
   data.repos.slice(0, 5).forEach((repo) => {

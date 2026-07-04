@@ -91,7 +91,7 @@ export function UserPage({ platform, username }: { platform: Platform; username:
     };
   }, [platform, username]);
 
-  const profileUrl = platform === "cnb" ? `https://cnb.cool/${username}` : `https://github.com/${username}`;
+  const profileUrl = platform === "cnb" ? `https://cnb.cool/u/${encodeURIComponent(username)}` : `https://github.com/${username}`;
   const platformLabel = platform === "cnb" ? "CNB" : "GitHub";
   const cachedAtText = formatCachedAt(cachedAt);
 
