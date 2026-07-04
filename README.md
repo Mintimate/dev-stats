@@ -25,13 +25,13 @@
 
 ### 一键部署
 
-您可以通过 [腾讯云 EdgeOne Makers](https://makers.edgeone.ai/zh) 一键部署。
+您可以通过 [腾讯云 EdgeOne Makers](https://pages.edgeone.ai/zh) 一键部署。
 
 直接点击此按钮一键部署：
 
 [![使用 EdgeOne Makers 部署](https://cdnstatic.tencentcs.com/edgeone/pages/deploy.svg)](https://console.cloud.tencent.com/edgeone/pages/new?repository-url=https%3A%2F%2Fgithub.com%2FMintimate%2Fdev-stats)
 
-查看 [腾讯云 EdgeOne Makers 文档](https://makers.edgeone.ai/zh/document/product-introduction) 了解更多详情。
+查看 [腾讯云 EdgeOne Makers 文档](https://pages.edgeone.ai/zh/document/product-introduction) 了解更多详情。
 
 > **注意**：GitHub 数据源需要 `PAT_1`；CNB 公开数据源无需令牌。详见 [环境变量配置](#环境变量配置)。
 
@@ -177,7 +177,7 @@ CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/
 ## 相关链接
 
 - [原项目仓库](https://github.com/anuraghazra/github-readme-stats) - anuraghazra/github-readme-stats
-- [EdgeOne Makers 文档](https://makers.edgeone.ai/zh/document/product-introduction)
+- [EdgeOne Makers 文档](https://pages.edgeone.ai/zh/document/product-introduction)
 - [EdgeOne Makers 控制台](https://console.cloud.tencent.com/edgeone/pages)
 
 ## License

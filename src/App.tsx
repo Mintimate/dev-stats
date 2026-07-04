@@ -554,7 +554,7 @@ function ManualOptions({
         <button className="btn subtle" type="button" onClick={resetOptions}>git reset --hard</button>
       </div>
       <div className="editor-container">
-        
+
         <div className="editor-row">
           <div className="editor-row-gutter">{getLine()}</div>
           <div className="editor-row-content">
@@ -803,7 +803,7 @@ function Footer() {
     <footer className="app-footer">
       <div className="footer-container">
         <div className="footer-left">
-          <a href="https://makers.edgeone.ai/" target="_blank" className="footer-logo-link" rel="noreferrer">
+          <a href="https://pages.edgeone.ai/" target="_blank" className="footer-logo-link" rel="noreferrer">
             <span style={{ color: "#64748b", fontSize: 13, fontWeight: 500 }}>Powered by</span>
             <img src="/edgeone-logo.svg" alt="Tencent EdgeOne" className="footer-logo-img" />
           </a>

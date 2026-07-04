@@ -25,13 +25,13 @@ The original project is deployed on Vercel. This version is adapted for EdgeOne 
 
 ### One-Click Deploy
 
-You can deploy via [Tencent EdgeOne Makers](https://makers.edgeone.ai/en) with one click.
+You can deploy via [Tencent EdgeOne Makers](https://pages.edgeone.ai/en) with one click.
 
 Click the button below to deploy:
 
 [![Deploy with EdgeOne Makers](https://cdnstatic.tencentcs.com/edgeone/pages/deploy.svg)](https://console.cloud.tencent.com/edgeone/pages/new?repository-url=https%3A%2F%2Fgithub.com%2FMintimate%2Fdev-stats)
 
-See [Tencent EdgeOne Makers Documentation](https://makers.edgeone.ai/en/document/product-introduction) for more details.
+See [Tencent EdgeOne Makers Documentation](https://pages.edgeone.ai/en/document/product-introduction) for more details.
 
 > **Note**: GitHub requires `PAT_1`; public CNB data does not require a token. See [Environment Variables](#environment-variables).
 
@@ -177,7 +177,7 @@ For more styling and parameter configurations (environment variables), please re
 ## Related Links
 
 - [Original Repository](https://github.com/anuraghazra/github-readme-stats) - anuraghazra/github-readme-stats
-- [EdgeOne Makers Documentation](https://makers.edgeone.ai/en/document/product-introduction)
+- [EdgeOne Makers Documentation](https://pages.edgeone.ai/en/document/product-introduction)
 - [EdgeOne Makers Console](https://console.cloud.tencent.com/edgeone/pages)
 
 ## License
