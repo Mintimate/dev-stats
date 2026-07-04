@@ -41,21 +41,21 @@ func writeHomePage(w http.ResponseWriter, r *http.Request) {
   <main>
     <header>
       <h1>GitHub Readme Stats · EdgeOne</h1>
-      <p>EdgeOne Pages Go Cloud Functions 版本，兼容常用 github-readme-stats 图片接口。</p>
+      <p>EdgeOne Makers Go Cloud Functions 版本，兼容常用 github-readme-stats 图片接口。</p>
     </header>
     <div class="grid">
       <section>
         <h2>可用接口</h2>
         <a class="endpoint" href="%[1]s/api?username=Mintimate&show_icons=true" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api</span><span class="hint">GitHub 统计卡</span></span></a>
         <a class="endpoint" href="%[1]s/api/top-langs?username=Mintimate&layout=compact" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/top-langs</span><span class="hint">语言占比卡</span></span></a>
-        <a class="endpoint" href="%[1]s/api/pin?username=Mintimate&repo=github-readme-stats-eo" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/pin</span><span class="hint">仓库卡片</span></span></a>
+        <a class="endpoint" href="%[1]s/api/pin?username=Mintimate&repo=dev-stats" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/pin</span><span class="hint">仓库卡片</span></span></a>
         <a class="endpoint" href="%[1]s/api/gist?id=bbfce31e0217a3689c8d961a356cb10d" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/gist</span><span class="hint">Gist 卡片</span></span></a>
         <a class="endpoint" href="%[1]s/api/wakatime?username=ffflabs&layout=compact" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/wakatime</span><span class="hint">WakaTime 统计</span></span></a>
         <a class="endpoint" href="%[1]s/api/streak?username=Mintimate" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/streak</span><span class="hint">连续贡献统计</span></span></a>
         <a class="endpoint" href="%[1]s/api/profile-summary?username=Mintimate" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/profile-summary</span><span class="hint">开发者资料概览</span></span></a>
         <a class="endpoint" href="%[1]s/api/contribution-calendar?username=Mintimate" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/contribution-calendar</span><span class="hint">贡献日历</span></span></a>
         <a class="endpoint" href="%[1]s/api/recent-activity?username=Mintimate" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/recent-activity</span><span class="hint">最近公开动态</span></span></a>
-        <a class="endpoint" href="%[1]s/api/repo-languages?username=Mintimate&repo=github-readme-stats-eo" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/repo-languages</span><span class="hint">仓库语言占比</span></span></a>
+        <a class="endpoint" href="%[1]s/api/repo-languages?username=Mintimate&repo=dev-stats" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/repo-languages</span><span class="hint">仓库语言占比</span></span></a>
         <a class="endpoint" href="%[1]s/api/org?org=github" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/org</span><span class="hint">组织统计</span></span></a>
       </section>
       <aside>
@@ -65,7 +65,7 @@ func writeHomePage(w http.ResponseWriter, r *http.Request) {
         <p><code>![GitHub Stats](%[1]s/api?username=Mintimate&show_icons=true)</code></p>
       </aside>
     </div>
-    <footer>Powered by EdgeOne Pages · <a href="https://github.com/Mintimate/github-readme-stats-eo" target="_blank" rel="noreferrer">GitHub</a></footer>
+    <footer>Powered by EdgeOne Makers · <a href="https://github.com/Mintimate/dev-stats" target="_blank" rel="noreferrer">GitHub</a></footer>
   </main>
 </body>
 </html>`, html.EscapeString(baseURL))

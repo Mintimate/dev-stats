@@ -2,7 +2,7 @@ package card
 
 import (
 	"fmt"
-	"github-readme-stats-eo/cloud-functions/internal/service"
+	"dev-stats/cloud-functions/internal/service"
 	"html"
 	"strings"
 )

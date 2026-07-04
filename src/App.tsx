@@ -32,7 +32,7 @@ function TopBar({
           <img src="/favicon.svg" alt="GS Logo" />
         </div>
         <div>
-          <h1>README 统计工坊</h1>
+          <h1>DevStats</h1>
           <p className="sub">GitHub / CNB 主页 README 与统计卡片生成台</p>
         </div>
       </div>
@@ -650,12 +650,12 @@ function Footer() {
     <footer className="app-footer">
       <div className="footer-container">
         <div className="footer-left">
-          <a href="https://pages.edgeone.ai/" target="_blank" className="footer-logo-link" rel="noreferrer">
+          <a href="https://makers.edgeone.ai/" target="_blank" className="footer-logo-link" rel="noreferrer">
             <span style={{ color: "#64748b", fontSize: 13, fontWeight: 500 }}>Powered by</span>
-            <img src="https://pages.edgeone.ai/_next/static/media/BlackHeadLogo.738772d4.svg?auto=format&fit=max&w=640" alt="Tencent EdgeOne" className="footer-logo-img" />
+            <img src="https://makers.edgeone.ai/_next/static/media/BlackHeadLogo.738772d4.svg?auto=format&fit=max&w=640" alt="Tencent EdgeOne" className="footer-logo-img" />
           </a>
           <span className="footer-divider">·</span>
-          <a href="https://github.com/Mintimate/github-readme-stats-eo" target="_blank" rel="noreferrer">开源仓库</a>
+          <a href="https://github.com/Mintimate/dev-stats" target="_blank" rel="noreferrer">开源仓库</a>
         </div>
         <div className="footer-right">
           <span className="footer-text">思路来源: <a href="https://ghfind.com/" target="_blank" rel="noreferrer">ghfind</a></span>

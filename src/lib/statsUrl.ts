@@ -43,7 +43,7 @@ export function buildStatsUrl(config: ManualConfig, cardOverride?: CardType) {
   if (card === "recent-activity") url.searchParams.set("activity_count", String(config.activity_count || 5));
 
   if (card === "pin" || card === "repo-languages") {
-    url.searchParams.set("repo", config.repo || "github-readme-stats-eo");
+    url.searchParams.set("repo", config.repo || "dev-stats");
   }
 
   return `${url.pathname}${url.search}`;
@@ -90,7 +90,7 @@ export function buildUrlForRecipeCard(recipe: StatsRecipe, card: CardType) {
     platform: recipe.platform || "github",
     username: recipe.username || "Mintimate",
     card,
-    repo: "github-readme-stats-eo",
+    repo: "dev-stats",
     theme: recipe.theme || "github_dark",
     custom_title: "",
     layout: "normal",

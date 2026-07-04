@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github-readme-stats-eo/cloud-functions/internal/card"
+	"dev-stats/cloud-functions/internal/card"
 )
 
 func writeSVG(w http.ResponseWriter, cacheSeconds int, svg string) {

@@ -4,7 +4,7 @@ export const defaultConfig: ManualConfig = {
   platform: "github",
   username: "Mintimate",
   card: "stats",
-  repo: "github-readme-stats-eo",
+  repo: "dev-stats",
   theme: "github_dark",
   custom_title: "",
   layout: "normal",
