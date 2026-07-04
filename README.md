@@ -48,20 +48,16 @@ GitHub 数据源需要令牌，CNB 公开数据源无需令牌：
 
 ### 必需环境变量
 
-- **`PAT_1`**：GitHub 个人访问令牌（Personal Access Token）
+- **`GITHUB_TOKEN`**：GitHub 个人访问令牌（Personal Access Token）
   - 用于调用 GitHub API 获取用户统计数据
   - 获取方式见下方 [获取 GitHub Token](#获取-github-tokenclassic)
-  - 支持配置多个 token（`PAT_1`、`PAT_2`、`PAT_3` 等）以提高速率限制
+  - 支持配置多个 token（`GITHUB_TOKEN_1`、`GITHUB_TOKEN_2` 等）以提高速率限制
 
 ### 可选环境变量
 
 - **`CNB_API_TOKEN`**：CNB 访问令牌
   - 公开卡片通过 CNB 主站 Web JSON 接口读取，不要求令牌
   - 令牌仅作为未来受限 Open API 功能的后备，不会随主站公开请求发送
-- **`PREFERRED_ORIGIN`**：自定义域名前缀
-  - 用于首页展示的 API 示例 URL
-  - 例如：`https://github-readme-stats.mintimate.cn`
-  - 如果不设置，将自动使用当前访问域名
 - 其他原项目环境变量: [原项目文档](https://github.com/anuraghazra/github-readme-stats#customization)。
 
 > **注意**：EdgeOne Makers 在部署后加载环境变量，每次更改环境变量后需要重新触发部署使变量生效。
@@ -133,15 +129,14 @@ CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/
 3. 勾选权限：
    - `repo`
    - `read:user`
-4. 生成并复制 token（在 EdgeOne Makers 的环境变量中设置 `PAT_1` 等于这个 token 值）
+4. 生成并复制 token（在 EdgeOne Makers 的环境变量中设置 `GITHUB_TOKEN` 等于这个 token 值）
 
 ## 部署到 EdgeOne Makers
 
 1. 登录腾讯云 EdgeOne 控制台，创建新的 Pages 项目
 2. 选择 GitHub 作为代码源并关联本仓库；或直接下载仓库后在 EdgeOne Makers 手动上传（会自动触发部署）
-3. 在项目的环境变量中设置 `PAT_1` 为上一步获取的 GitHub Token
-4. （可选）设置 `PREFERRED_ORIGIN` 环境变量以自定义首页展示的 URL 前缀
-5. 由于 EdgeOne Makers 在部署后加载环境变量，设置完成后需要再次触发部署使变量生效
+3. 在项目的环境变量中设置 `GITHUB_TOKEN` 为上一步获取的 GitHub Token
+4. 由于 EdgeOne Makers 在部署后加载环境变量，设置完成后需要再次触发部署使变量生效
 
 ## 使用说明
 

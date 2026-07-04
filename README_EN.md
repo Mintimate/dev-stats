@@ -48,20 +48,16 @@ GitHub requires a token; public CNB data does not:
 
 ### Required Variables
 
-- **`PAT_1`**: GitHub Personal Access Token
+- **`GITHUB_TOKEN`**: GitHub Personal Access Token
   - Used to call GitHub API to fetch user statistics
   - See [Get GitHub Token](#get-github-token-classic) below for how to obtain
-  - Supports multiple tokens (`PAT_1`, `PAT_2`, `PAT_3`, etc.) to increase rate limits
+  - Supports multiple tokens (`GITHUB_TOKEN_1`, `GITHUB_TOKEN_2`, etc.) to increase rate limits
 
 ### Optional Variables
 
 - **`CNB_API_TOKEN`**: CNB access token
   - Public cards use CNB's web JSON endpoints and do not require a token
   - The token is only a fallback for future restricted Open API features and is never sent to public web endpoints
-- **`PREFERRED_ORIGIN`**: Custom domain prefix
-  - Used for API example URLs displayed on the homepage
-  - Example: `https://github-readme-stats.mintimate.cn`
-  - If not set, will automatically use the current access domain
 - Other environment variables from the original project: [Original Project Documentation](https://github.com/anuraghazra/github-readme-stats#customization)
 
 > **Note**: EdgeOne Makers loads environment variables after deployment. After changing environment variables, you need to trigger a new deployment for the changes to take effect.
@@ -133,15 +129,14 @@ CNB currently supports `/api`, `/api/top-langs`, `/api/pin`, `/api/streak`, `/ap
 3. Check the required permissions:
    - `repo`
    - `read:user`
-4. Generate and copy the token (set `PAT_1` equal to this token value in EdgeOne Makers environment variables)
+4. Generate and copy the token (set `GITHUB_TOKEN` equal to this token value in EdgeOne Makers environment variables)
 
 ## Deploy to EdgeOne Makers
 
 1. Log in to Tencent EdgeOne console and create a new Pages project
 2. Select GitHub as the code source and link this repository; or directly download the repository and manually upload to EdgeOne Makers (will automatically trigger deployment)
-3. Set `PAT_1` to the GitHub Token obtained in the previous step in the project's environment variables
-4. (Optional) Set `PREFERRED_ORIGIN` environment variable to customize the URL prefix displayed on the homepage
-5. Since EdgeOne Makers loads environment variables after deployment, you need to trigger another deployment after configuration for the variables to take effect
+3. Set `GITHUB_TOKEN` to the GitHub Token obtained in the previous step in the project's environment variables
+4. Since EdgeOne Makers loads environment variables after deployment, you need to trigger another deployment after configuration for the variables to take effect
 
 ## Usage
 
