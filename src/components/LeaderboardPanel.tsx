@@ -28,27 +28,34 @@ function getTagStyle(index: number) {
 }
 
 function handleAvatarError(e: React.SyntheticEvent<HTMLImageElement>) {
-  e.currentTarget.src = "favicon.svg";
+  const img = e.currentTarget;
+  // 用绝对路径 + 一次性标记兜底，避免相对路径在非根路径页面下解析出错而无限触发 onError。
+  if (img.dataset.fallback === "1") return;
+  img.dataset.fallback = "1";
+  img.src = "/favicon.svg";
 }
 
 function getHumorousTitle(rating: string) {
   const map: Record<string, string> = {
-    "夯": "🧱 搬砖巨匠",
-    "骨灰级": "💀 骨灰仙人",
-    "宗师级": "👑 宗师圣体",
-    "顶流": "🚀 顶流担当",
-    "高级": "💻 硬核干活",
-    "平庸": "☕ 摸鱼大师",
-    "入门": "🌱 潜力萌新",
-    "虚无": "👻 幽灵行者",
+    "夯": "搬砖巨匠",
+    "骨灰级": "骨灰仙人",
+    "宗师级": "宗师圣体",
+    "顶流": "顶流担当",
+    "高级": "硬核干活",
+    "平庸": "摸鱼大师",
+    "入门": "潜力萌新",
+    "虚无": "幽灵行者",
   };
   return map[rating] || rating;
 }
+
+const PAGE_SIZE = 10;
 
 function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
   const [list, setList] = useState<LeaderboardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Platform>("github");
+  const [page, setPage] = useState(1);
 
   const fetchRankings = useCallback(async (forceRebuild = false) => {
     setLoading(true);
@@ -78,7 +85,16 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
     void fetchRankings();
   }, [fetchRankings]);
 
+  // 切换榜单或刷新数据后，避免停留在一个可能已经越界的页码上。
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, list]);
+
   const filteredList = list.filter((item) => item.platform === activeTab);
+  const totalPages = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedList = filteredList.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
 
   return (
     <aside className="panel agent-right leaderboard-panel">
@@ -128,15 +144,14 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
           </div>
         ) : filteredList.length === 0 ? (
           <div className="leaderboard-empty">
-            <span className="empty-icon">🏆</span>
             <p>该平台暂无排行数据。快去分析第一个开发者，开启荣誉榜吧！</p>
           </div>
         ) : (
+          <>
           <div className="leaderboard-list">
-            {filteredList.map((item, index) => {
-              const rank = index + 1;
-              const hasMedal = rank <= 3;
-              const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉";
+            {pagedList.map((item, indexInPage) => {
+              const rank = (safePage - 1) * PAGE_SIZE + indexInPage + 1;
+              const isTopRank = rank <= 3;
               const displayNick = item.nickname || item.username;
               const displayHandle = `@${item.username}`;
               const displayTags = item.badges.slice(0, 3);
@@ -144,7 +159,7 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
 
               const avatarUrl = (item.username && item.platform)
                 ? `/api/avatar?platform=${item.platform}&username=${item.username}`
-                : "favicon.svg";
+                : "/favicon.svg";
 
               return (
                 <div
@@ -153,12 +168,8 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
                   onClick={() => onLoadUser(item)}
                   title={`点击快速载入 ${item.username} 的完整画像`}
                 >
-                  <div className={`leaderboard-rank ${hasMedal ? "has-medal" : ""}`}>
-                    {hasMedal ? (
-                      <span className="medal-icon">{medal}</span>
-                    ) : (
-                      <span className="rank-num">{rank}</span>
-                    )}
+                  <div className={`leaderboard-rank ${isTopRank ? `rank-top rank-${rank}` : ""}`}>
+                    <span className="rank-num">{rank}</span>
                   </div>
 
                   <div className="leaderboard-avatar-wrapper">
@@ -203,24 +214,44 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
 
                   <div className="leaderboard-score-box">
                     <div className="score-trend">
-                      <span className="rocket-emoji">🚀</span>
                       <span className="score-value">{item.score.toFixed(1)}</span>
                     </div>
                     <div className="score-level">
-                      <span className="trophy-emoji">🏆</span>
                       <span className="rating-label">{getHumorousTitle(item.rating)}</span>
                     </div>
                   </div>
 
                   <div className="leaderboard-action">
                     <div className="action-circle">
-                      <span className="action-emoji">⚡</span>
+                      <span className="action-arrow">→</span>
                     </div>
                   </div>
                 </div>
               );
             })}
           </div>
+          {totalPages > 1 && (
+            <div className="leaderboard-pagination">
+              <button
+                type="button"
+                className="btn subtle"
+                disabled={safePage <= 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+              >
+                上一页
+              </button>
+              <span className="pagination-info">第 {safePage} / {totalPages} 页 · 共 {filteredList.length} 人</span>
+              <button
+                type="button"
+                className="btn subtle"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              >
+                下一页
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
     </aside>
