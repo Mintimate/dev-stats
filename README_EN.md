@@ -8,13 +8,14 @@ The original project is deployed on Vercel. This version is adapted for EdgeOne 
 
 ## Features
 
+- **AI Stats Agent**: Integrates LLMs to automatically analyze your open-source contributions, generate an objective rating, and support streaming chat and smart README generation.
+- **Developer Leaderboards**: Automatically indexes evaluated developers, displaying score rankings, platform badges, and capability radars. Compete with top developers anytime.
 - **Dynamic Statistics Cards**: Display GitHub or CNB data (commits, PRs, stars, etc.)
-- **Presets Gallery**: Interactive dashboard showcase displaying multiple live cards side-by-side with one-click configuration
-- **All-New Configuration Panel**: Premium web form layout supporting input debouncing and real-time Markdown/HTML code generation
-- **Multiple Themes & Layouts**: Full support for themes, layouts (compact/normal), and custom styling parameters
-- **EdgeOne Pages Optimized**: Adapted for EdgeOne Pages Cloud Functions and platform caching
-- **Go Cloud Functions**: Uses a Go runtime backend for minimal cold starts and high performance
-- **Original API Compatible**: Maintains the same query parameters and usage as the original project
+- **Multi-Platform Data Sources**: Natively supports GitHub while seamlessly integrating CNB platform data fetching and card rendering.
+- **New React Interactive Panel**: Displays multiple cards side-by-side with one-click configuration, debouncing auto-refresh, and real-time Markdown/HTML code generation.
+- **Multiple Themes & Layouts**: Full support for original themes, layouts (compact/normal), and custom styling parameters.
+- **Go Cloud Functions Backend**: Uses a Go runtime for card rendering with minimal cold starts and high performance; Agent and leaderboard services use Node.js Cloud Functions.
+- **Original API Compatible**: Maintains the same query parameters and usage as the original project.
 
 ## Interface Preview
 
@@ -88,9 +89,14 @@ Corresponding cache rules:
 
 ![Configured origin rules](./docs/static/OriginRulesConfig.webp)
 
-## Go Cloud Functions
+## Technical Architecture
 
-The Go entrypoint lives in `cloud-functions/index.go` and uses EdgeOne Pages Cloud Functions Framework mode. Application code lives under `cloud-functions/internal`, layered into `handler` (HTTP routing and responses), `service` (GitHub/WakaTime data access), and `card` (themes, shared styles, and SVG rendering), while covering `/`, `/api`, and `/api/*`. It currently covers:
+This project is a full-stack Web application:
+- **Frontend Interface**: Built with React, offering card previews, Stats Agent chat, code generation, and global leaderboards.
+- **Agent and Business Services (TS/Node.js)**: Located in the `agents/` directory, deployed as Cloud APIs via EdgeOne Pages, handling OpenAI/LLM API calls, SSE streaming responses, and KV cache/leaderboard read/write operations. Built-in trusted avatar proxy resolves frontend cross-origin limitations.
+- **Card Rendering Engine (Go)**: Located in `cloud-functions/internal`, uses Go to implement ultra-fast SVG rendering, perfectly compatible with original project parameters, and adapted for the CNB platform.
+
+**Card endpoints currently covered by the Go rendering engine:**
 
 - `/api` - GitHub Stats Card
 - `/api/top-langs` - Top Languages Card

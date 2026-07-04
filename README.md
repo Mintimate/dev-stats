@@ -8,12 +8,13 @@
 
 ## 项目简介
 
+- **AI 智能助手 (Stats Agent)**：集成大语言模型，能自动分析你的开源贡献，生成带有客观评分的专属评价，支持流式对话与 README 智能生成
+- **开发者发现排行榜**：自动收录被评估的开发者，展示分数排名、平台标识与能力雷达，随时与其他顶级开发者对决
 - **动态统计卡片**：展示 GitHub 或 CNB 数据（如提交次数、PR、Star 等）
-- **预设卡片展厅**：支持多款卡片（综合统计、常用语言、连续贡献、WakaTime、仓库卡、组织卡）同屏展示与一键配置
-- **全新配置面板**：更美观的表单布局，支持防抖自动刷新与实时生成 Markdown/HTML 代码
+- **多平台数据源**：原生支持 GitHub，同时无缝集成 CNB 平台数据抓取与卡片渲染
+- **全新 React 交互面板**：支持多款卡片同屏展示与一键配置，防抖自动刷新并实时生成 Markdown/HTML 代码
 - **多种主题与布局**：完整适配原项目的各种卡片参数、主题与紧凑/默认布局切换
-- **EdgeOne Pages 优化**：适配 EdgeOne Pages Cloud Functions 与平台边缘缓存
-- **Go Cloud Functions**：采用 Go 运行时，提供超低冷启动与极速响应
+- **Go Cloud Functions 后端**：采用 Go 运行时处理卡片渲染，提供超低冷启动与极速响应；Agent 与排行榜业务采用 Node.js 云函数
 - **兼容原项目 API**：与原项目保持相同的查询参数和使用方式
 
 ## 界面展示
@@ -88,9 +89,14 @@ GitHub 数据源需要令牌，CNB 公开数据源无需令牌：
 
 ![配置的回源规则](./docs/static/OriginRulesConfig.webp)
 
-## Go Cloud Functions
+## 技术架构
 
-Go 版本入口位于 `cloud-functions/index.go`，采用 EdgeOne Pages Cloud Functions Framework mode。业务代码放在 `cloud-functions/internal`，按 `handler`（HTTP 路由与响应）、`service`（GitHub/WakaTime 数据访问）和 `card`（主题、统一样式与 SVG 渲染）分层，同时覆盖 `/`、`/api` 与 `/api/*`。当前已覆盖：
+本项目是一个全栈 Web 应用程序：
+- **前端界面**：采用 React 构建，提供卡片预览、Stats Agent 对话、代码生成与全局排行榜。
+- **Agent 与业务服务 (TS/Node.js)**：位于 `agents/` 目录，通过 EdgeOne Pages 部署为云端 API，处理 OpenAI / 大模型接口调用、SSE 流式响应与 KV 缓存/排行榜读写。内置受信任的头像代理，解决前端跨域限制。
+- **卡片渲染引擎 (Go)**：位于 `cloud-functions/internal`，采用 Go 语言实现极速 SVG 渲染，完美兼容原项目参数，并适配 CNB 平台。
+
+**Go 版渲染引擎当前覆盖的卡片接口：**
 
 - `/api` - GitHub 统计卡片
 - `/api/top-langs` - 语言占比卡片
