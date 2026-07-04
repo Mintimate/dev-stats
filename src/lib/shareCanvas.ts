@@ -107,20 +107,19 @@ function drawClippedImage(
 function drawPlatformBadge(ctx: CanvasRenderingContext2D, data: ShareData, x: number, y: number) {
   const isCnb = data.platformKey === "cnb";
   const label = isCnb ? "CNB" : "GitHub";
-  const fill = isCnb ? "#fff7ed" : "#f8fafc";
-  const stroke = isCnb ? "#fb923c" : "#0f172a";
-  const color = isCnb ? "#c2410c" : "#0f172a";
-  const badgeW = isCnb ? 82 : 106;
-  drawRoundRect(ctx, x, y, badgeW, 34, 17, fill, stroke);
+  const fill = isCnb ? "#f76945" : "#24292f";
+  const color = "#ffffff";
+  const badgeW = isCnb ? 72 : 96;
+  drawRoundRect(ctx, x, y, badgeW, 24, 12, fill);
   ctx.fillStyle = color;
-  ctx.font = "900 13px ui-monospace, Menlo, monospace";
+  ctx.font = "900 11px system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(label, x + badgeW / 2, y + 22);
+  ctx.fillText(label, x + badgeW / 2, y + 15);
   ctx.textAlign = "left";
 }
 
 function drawRepoList(ctx: CanvasRenderingContext2D, data: ShareData, x: number, y: number, width: number) {
-  drawRoundRect(ctx, x, y, width, 230, 14, "#f8fafc", "#e2e8f0");
+  drawRoundRect(ctx, x, y, width, 250, 14, "#f8fafc", "#e2e8f0");
   ctx.fillStyle = "#0f172a";
   ctx.font = "900 14px system-ui, sans-serif";
   ctx.fillText("代表项目", x + 16, y + 28);
@@ -143,6 +142,7 @@ function drawRepoList(ctx: CanvasRenderingContext2D, data: ShareData, x: number,
     rowY += 38;
   });
 }
+
 
 export async function createShareImage(data: ShareData) {
   const avatar = await loadImage(data.avatarUrl);
@@ -281,12 +281,12 @@ export async function createShareImage(data: ShareData) {
   context.fillRect(cardX + 24, cardY + cardH - 45, cardW - 48, 1);
   context.fillStyle = "#0f172a";
   context.font = "900 15px system-ui, sans-serif";
-  context.fillText("README 统计工坊", leftX, cardY + cardH - 20);
-  drawPlatformBadge(context, data, leftX + 150, cardY + cardH - 39);
+  context.fillText("README 统计工坊", leftX, cardY + cardH - 22);
+  drawPlatformBadge(context, data, leftX + 150, cardY + cardH - 38);
   context.textAlign = "right";
   context.fillStyle = "#059669";
   context.font = "900 13px ui-monospace, Menlo, monospace";
-  context.fillText(data.host, cardX + cardW - 40, cardY + cardH - 20);
+  context.fillText(data.host, cardX + cardW - 40, cardY + cardH - 22);
 
   return canvas.toDataURL("image/png");
 }
