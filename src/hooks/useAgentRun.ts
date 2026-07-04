@@ -253,8 +253,14 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     }
   }
 
-  async function runAgent(mode: AgentMode, forceReanalyze = false) {
-    const activeConfig = { ...config, username: agentUsername.trim() || "Mintimate", agent_mode: mode };
+  async function runAgent(
+    mode: AgentMode,
+    forceReanalyze = false,
+    overrides?: { platform?: ManualConfig["platform"]; username?: string }
+  ) {
+    const targetPlatform = overrides?.platform || config.platform;
+    const targetUsername = (overrides?.username !== undefined ? overrides.username : agentUsername).trim() || "Mintimate";
+    const activeConfig = { ...config, platform: targetPlatform, username: targetUsername, agent_mode: mode };
     syncUsername(activeConfig.username);
     setLastMode(mode);
     resetRunPanel();
@@ -349,6 +355,10 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     if (lastMode) void runAgent(lastMode, true);
   }
 
+  function resetAgent() {
+    resetRunPanel();
+  }
+
   return {
     agentUsername,
     setAgentUsername,
@@ -366,6 +376,7 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     runAgent,
     stopAgent,
     reanalyze,
+    resetAgent,
     clearCacheBadges,
   };
 }

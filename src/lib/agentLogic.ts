@@ -140,22 +140,9 @@ export function normalizeReadmeResult(
   profile: UserProfile | null,
   assistantText: string,
 ) {
-  let avatarUrl = "favicon.svg";
-  if (!event.is_ghost) {
-    if (profile?.avatar) avatarUrl = profile.avatar;
-    else if (config.platform === "cnb") avatarUrl = String((event.user as UserProfile | undefined)?.avatar || `https://cnb.cool/users/${encodeURIComponent(config.username || "youkun")}/avatar/s`);
-    else avatarUrl = `https://github.com/${encodeURIComponent(config.username || "Mintimate")}.png`;
-  }
-  if (avatarUrl && avatarUrl !== "favicon.svg" && !avatarUrl.startsWith("http") && config.platform === "cnb") {
-    avatarUrl = `https://cnb.cool${avatarUrl.startsWith("/") ? "" : "/"}${avatarUrl}`;
-  }
-  if (
-    avatarUrl.startsWith("https://cnb.cool") ||
-    avatarUrl.startsWith("https://github.com/") ||
-    avatarUrl.startsWith("https://avatars.githubusercontent.com/")
-  ) {
-    avatarUrl = `/api/avatar?url=${encodeURIComponent(avatarUrl)}`;
-  }
+  const avatarUrl = (!event.is_ghost && config.username && config.platform)
+    ? `/api/avatar?platform=${config.platform}&username=${config.username}`
+    : "favicon.svg";
 
   const user = (event.user || {}) as UserProfile;
   const markdown = String(event.markdown || "");

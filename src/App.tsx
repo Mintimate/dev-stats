@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RadarChart } from "./components/RadarChart";
 import { ShareModal } from "./components/ShareModal";
 import { useAgentRun } from "./hooks/useAgentRun";
 import { useImagePreview } from "./hooks/useImagePreview";
 import { useManualStats } from "./hooks/useManualStats";
+import { LeaderboardPanel } from "./components/LeaderboardPanel";
+import type { LeaderboardItem } from "./components/LeaderboardPanel";
 import { cardMetadata, cardOptions, themes, toolchainItems } from "./lib/constants";
 import { renderMarkdown } from "./lib/markdown";
 import { buildUrlForRecipeCard } from "./lib/statsUrl";
@@ -408,6 +410,10 @@ function AgentResultPanel({
   const title = readme?.title || (recipe ? "Stats Stack" : "分析结果");
   const summary = readme?.summary || (agent.result.kind === "stats" ? agent.result.summary : "Awaiting analysis metrics...");
 
+  const profileUrl = config.platform === "cnb"
+    ? `https://cnb.cool/${config.username}`
+    : `https://github.com/${config.username}`;
+
   if (!resultVisible) return null;
 
   async function copy(text: string, label: string) {
@@ -437,6 +443,8 @@ function AgentResultPanel({
           <span className="panel-note">{summary}</span>
         </div>
         <div className="result-actions">
+          <button className="btn" type="button" onClick={() => agent.resetAgent()}>返回主页</button>
+          <button className="btn" type="button" onClick={() => window.open(profileUrl, "_blank", "noopener,noreferrer")}>前往平台主页</button>
           <span className="result-token-chip">tokens: {agent.usage?.total || "--"}</span>
           {readme && !readme.is_ghost && (
             <>
@@ -674,10 +682,15 @@ export default function App() {
     location.hash = nextView === "manual" ? "manual" : "agent";
   }
 
-  const shellClass = useMemo(() => {
-    const hasAgentResult = agent.result.kind !== "none" || agent.running;
-    return `agent-home view ${view === "agent" ? "" : "hidden"} ${hasAgentResult ? "split-layout" : ""}`;
-  }, [agent.result.kind, agent.running, view]);
+  const shellClass = `agent-home view ${view === "agent" ? "" : "hidden"} split-layout`;
+
+  const handleLoadUser = useCallback((item: LeaderboardItem) => {
+    manual.setPlatform(item.platform);
+    agent.setAgentUsername(item.username);
+    void agent.runAgent("readme", false, { platform: item.platform, username: item.username });
+  }, [manual.setPlatform, agent.setAgentUsername, agent.runAgent]);
+
+  const showResult = agent.result.kind !== "none" || agent.running;
 
   return (
     <>
@@ -685,7 +698,11 @@ export default function App() {
         <TopBar view={view} setView={setView} config={manual.config} status={globalStatus} />
         <section className={shellClass}>
           <AgentPanel config={manual.config} agent={agent} setPlatform={manual.setPlatform} />
-          <AgentResultPanel agent={agent} config={manual.config} applyRecipe={manual.applyRecipe} setView={setView} setGlobalStatus={setGlobalStatus} />
+          {showResult ? (
+            <AgentResultPanel agent={agent} config={manual.config} applyRecipe={manual.applyRecipe} setView={setView} setGlobalStatus={setGlobalStatus} />
+          ) : (
+            <LeaderboardPanel onLoadUser={handleLoadUser} />
+          )}
         </section>
         <section className={`workspace view ${view === "manual" ? "" : "hidden"}`}>
           <ManualOptions config={manual.config} updateConfig={manual.updateConfig} setPlatform={manual.setPlatform} resetOptions={manual.resetOptions} />
