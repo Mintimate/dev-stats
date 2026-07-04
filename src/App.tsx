@@ -101,7 +101,7 @@ function AgentPanel({
   }, [agent.events]);
 
   const ledClass = agent.status === "running" ? "running" : agent.status === "done" ? "done" : agent.status === "error" || agent.status === "stopped" ? "error" : "";
-  const ledText = agent.status === "running" ? "RUNNING" : agent.status === "done" ? "DONE" : agent.status === "stopped" ? "STOPPED" : agent.status === "error" ? "ERROR" : "IDLE";
+  const ledText = agent.status === "running" ? "运行中" : agent.status === "done" ? "已完成" : agent.status === "stopped" ? "已停止" : agent.status === "error" ? "运行出错" : "未启动";
 
   return (
     <aside className="panel agent-left">
@@ -131,8 +131,8 @@ function AgentPanel({
         </div>
         <div className="task-grid">
           {[
-            { mode: "readme" as AgentMode, title: "Generate README", text: "浏览主页、读取 Profile README，并输出可复制 Markdown", cached: agent.cacheBadges.readme },
-            { mode: "stats" as AgentMode, title: "Build Stats Stack", text: "分析公开资料，生成可应用到手动面板的卡片方案", cached: agent.cacheBadges.stats },
+            { mode: "readme" as AgentMode, title: "生成主页 README", text: "浏览主页、读取 Profile README，并输出可复制 Markdown", cached: agent.cacheBadges.readme },
+            { mode: "stats" as AgentMode, title: "推荐卡片配方", text: "分析公开资料，生成可应用到手动面板的卡片方案", cached: agent.cacheBadges.stats },
           ].map((item) => (
             <button key={item.mode} className="task-btn" type="button" disabled={agent.running} onClick={() => void agent.runAgent(item.mode)}>
               <div className="task-btn-header">
@@ -146,7 +146,7 @@ function AgentPanel({
       </form>
 
       <div className={`cache-info-bar ${agent.cacheBadges.visible ? "visible" : ""}`}>
-        <span className="cache-info-icon">CACHE</span>
+        <span className="cache-info-icon">💾 缓存</span>
         <span className="cache-info-text">
           <strong>{agent.cacheBadges.username || "--"}</strong> 的分析结果已缓存，将直接展示
           {agent.cacheBadges.expiresAt ? (
@@ -173,15 +173,15 @@ function AgentPanel({
         <div className="terminal-head">
           <div className={`status-led ${ledClass}`}>{ledText}</div>
           <div className="run-meta">
-            <span className={`run-loader ${agent.running ? "" : "hidden"}`}>running</span>
-            <span>run: {agent.runId ? agent.runId.slice(0, 8) : "--"}</span>
+            <span className={`run-loader ${agent.running ? "" : "hidden"}`}>运行中</span>
+            <span>运行 ID: {agent.runId ? agent.runId.slice(0, 8) : "--"}</span>
             <span>{agent.elapsed}</span>
-            <span>tokens: {agent.usage?.total || "--"}</span>
+            <span>Tokens: {agent.usage?.total || "--"}</span>
           </div>
         </div>
-        <div className="target-line">TARGET {config.platform === "cnb" ? `https://cnb.cool/u/${config.username || "Mintimate"}` : `https://github.com/${config.username || "Mintimate"}`}</div>
+        <div className="target-line">分析目标: {config.platform === "cnb" ? `https://cnb.cool/u/${config.username || "Mintimate"}` : `https://github.com/${config.username || "Mintimate"}`}</div>
         <div className="run-article">
-          <div className="run-kicker">Run Brief</div>
+          <div className="run-kicker">分析简报</div>
           <p className="progress-copy">{agent.progress}</p>
         </div>
         <div className="event-stream" ref={eventStreamRef}>
@@ -195,7 +195,7 @@ function AgentPanel({
       </div>
       <div className="agent-actions">
         <button className="btn warn" type="button" disabled={!agent.running} onClick={() => void agent.stopAgent()}>
-          Stop
+          停止分析
         </button>
         <button className={`btn ghost ${agent.cacheBadges.visible ? "" : "hidden"}`} type="button" title="忽略缓存，重新调用 Agent 分析" disabled={agent.running} onClick={agent.reanalyze}>
           重新分析
@@ -370,7 +370,7 @@ function StatsRecipeDashboard({
           </div>
         </div>
         <div className="recipe-right">
-          <div className="card-title">卡片预览 (Live Preview)</div>
+          <div className="card-title">卡片实时预览</div>
           <div className={`recipe-preview-box image-preview-frame ${preview.loading ? "is-loading" : ""}`} aria-busy={preview.loading}>
             <img alt="Recommended stats preview" {...preview.imageProps} />
             <div className={`image-loading-overlay ${preview.loading ? "" : "hidden"}`} aria-hidden={!preview.loading}>加载预览中</div>
@@ -408,8 +408,8 @@ function AgentResultPanel({
   const resultVisible = agent.result.kind !== "none" || agent.running;
   const readme = agent.result.kind === "readme" ? agent.result.data : null;
   const recipe = agent.result.kind === "stats" ? agent.result.recipe : null;
-  const title = readme?.title || (recipe ? "Stats Stack" : "分析结果");
-  const summary = readme?.summary || (agent.result.kind === "stats" ? agent.result.summary : "Awaiting analysis metrics...");
+  const title = readme?.title || (recipe ? "卡片配方方案" : "分析结果");
+  const summary = readme?.summary || (agent.result.kind === "stats" ? agent.result.summary : "正在等待分析指标数据...");
 
   const profileUrl = config.platform === "cnb"
     ? `https://cnb.cool/${config.username}`
@@ -420,9 +420,9 @@ function AgentResultPanel({
   async function copy(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setGlobalStatus({ label: `${label} copied` });
+      setGlobalStatus({ label: `${label}已复制` });
     } catch {
-      setGlobalStatus({ label: "Copy failed", tone: "is-error" });
+      setGlobalStatus({ label: "复制失败", tone: "is-error" });
     }
   }
 
@@ -446,11 +446,11 @@ function AgentResultPanel({
         <div className="result-actions">
           <button className="btn" type="button" onClick={() => agent.resetAgent()}>返回主页</button>
           <button className="btn" type="button" onClick={() => window.open(profileUrl, "_blank", "noopener,noreferrer")}>前往平台主页</button>
-          <span className="result-token-chip">tokens: {agent.usage?.total || "--"}</span>
+          <span className="result-token-chip">Tokens: {agent.usage?.total || "--"}</span>
           {readme && !readme.is_ghost && (
             <>
-              <button className="btn primary" type="button" onClick={() => void copy(readme.markdown, "README")}>Copy README</button>
-              <button className="btn" type="button" onClick={() => downloadReadme(readme.markdown)}>Download README.md</button>
+              <button className="btn primary" type="button" onClick={() => void copy(readme.markdown, "README 代码")}>复制 README</button>
+              <button className="btn" type="button" onClick={() => downloadReadme(readme.markdown)}>下载 README.md</button>
             </>
           )}
           {(recipe || agent.lastRecipe) && (
@@ -458,7 +458,7 @@ function AgentResultPanel({
               applyRecipe(recipe || agent.lastRecipe!);
               setView("manual");
             }}>
-              Apply to Manual Stats
+              应用到手动配置
             </button>
           )}
           <ShareModal result={readme} platform={config.platform} username={config.username} />
@@ -502,15 +502,31 @@ function ManualOptions({
   resetOptions: () => void;
 }) {
   const needsRepo = config.card === "pin" || config.card === "repo-languages";
+  const needsLayout = config.card === "top-langs" || config.card === "repo-languages";
+  const needsLangsCount = config.card === "top-langs" || config.card === "repo-languages";
+  const needsActivityCount = config.card === "recent-activity";
+
+  const displayOptions = [
+    { key: "show_icons", label: "显示图标" },
+    { key: "hide_border", label: "隐藏外边框" },
+    { key: "hide_title", label: "隐藏卡片标题" },
+    { key: "hide_rank", label: "隐藏评级排名" },
+    { key: "disable_animations", label: "禁用动画效果" },
+    { key: "text_bold", label: "加粗文本" },
+    ...(config.card === "stats" ? [
+      { key: "include_all_commits", label: "包含所有提交" },
+      { key: "prs_merged", label: "统计已合并 PR" }
+    ] : [])
+  ];
 
   return (
     <section className="panel">
       <div className="panel-head">
         <div>
-          <h2 className="panel-title">Options</h2>
+          <h2 className="panel-title">卡片参数配置</h2>
           <span className="panel-note">参数变化会立即刷新预览和 Markdown</span>
         </div>
-        <button className="btn" type="button" onClick={resetOptions}>Reset</button>
+        <button className="btn" type="button" onClick={resetOptions}>重置</button>
       </div>
       <div className="controls">
         <div className="field span-3">
@@ -533,50 +549,68 @@ function ManualOptions({
             {themes.map((theme) => <option key={theme} value={theme}>{theme}</option>)}
           </select>
         </div>
-        <div className={`field span-3 repo-field ${needsRepo ? "" : "hidden"}`}>
-          <label htmlFor="repo">仓库</label>
-          <input id="repo" value={config.repo} autoComplete="off" onChange={(event) => updateConfig({ repo: event.target.value })} />
-        </div>
+        {needsRepo && (
+          <div className="field span-3 repo-field">
+            <label htmlFor="repo">仓库</label>
+            <input id="repo" value={config.repo} autoComplete="off" onChange={(event) => updateConfig({ repo: event.target.value })} />
+          </div>
+        )}
         <div className="field span-3">
           <label htmlFor="custom-title">标题</label>
           <input id="custom-title" value={config.custom_title} placeholder="留空使用默认标题" onChange={(event) => updateConfig({ custom_title: event.target.value })} />
         </div>
-        <div className="field span-2">
-          <label htmlFor="layout">布局</label>
-          <select id="layout" value={config.layout} onChange={(event) => updateConfig({ layout: event.target.value })}>
-            {["normal", "compact", "donut", "donut-vertical"].map((layout) => <option key={layout} value={layout}>{layout}</option>)}
-          </select>
-        </div>
-        {[
-          ["langs-count", "语言数", "langs_count", 1, 20],
-          ["activity-count", "动态数", "activity_count", 1, 20],
-          ["card-width", "宽度", "card_width", 0, 1200],
-        ].map(([id, label, key, min, max]) => (
-          <div className="field span-2" key={String(id)}>
-            <label htmlFor={String(id)}>{String(label)}</label>
+        {needsLayout && (
+          <div className="field span-3">
+            <label htmlFor="layout">布局</label>
+            <select id="layout" value={config.layout} onChange={(event) => updateConfig({ layout: event.target.value })}>
+              <option value="normal">默认 (normal)</option>
+              <option value="compact">紧凑 (compact)</option>
+              <option value="donut">环形 (donut)</option>
+              <option value="donut-vertical">垂直环形 (donut-vertical)</option>
+            </select>
+          </div>
+        )}
+        {needsLangsCount && (
+          <div className="field span-3">
+            <label htmlFor="langs-count">语言数</label>
             <input
-              id={String(id)}
+              id="langs-count"
               type="number"
-              min={Number(min)}
-              max={Number(max)}
-              value={Number(config[key as keyof ManualConfig])}
-              onChange={(event) => updateConfig({ [key as string]: Number(event.target.value || 0) } as Partial<ManualConfig>)}
+              min={1}
+              max={20}
+              value={config.langs_count}
+              onChange={(event) => updateConfig({ langs_count: Number(event.target.value || 0) })}
             />
           </div>
-        ))}
+        )}
+        {needsActivityCount && (
+          <div className="field span-3">
+            <label htmlFor="activity-count">动态数</label>
+            <input
+              id="activity-count"
+              type="number"
+              min={1}
+              max={20}
+              value={config.activity_count}
+              onChange={(event) => updateConfig({ activity_count: Number(event.target.value || 0) })}
+            />
+          </div>
+        )}
+        <div className="field span-3">
+          <label htmlFor="card-width">宽度</label>
+          <input
+            id="card-width"
+            type="number"
+            min={0}
+            max={1200}
+            value={config.card_width}
+            onChange={(event) => updateConfig({ card_width: Number(event.target.value || 0) })}
+          />
+        </div>
         <div className="field span-12">
           <label>显示</label>
           <div className="toggle-grid">
-            {[
-              ["show_icons", "show_icons"],
-              ["hide_border", "hide_border"],
-              ["include_all_commits", "include_all_commits"],
-              ["prs_merged", "prs_merged"],
-              ["hide_title", "hide_title"],
-              ["hide_rank", "hide_rank"],
-              ["disable_animations", "disable_animations"],
-              ["text_bold", "text_bold"],
-            ].map(([key, label]) => (
+            {displayOptions.map(({ key, label }) => (
               <label className="check" key={key}>
                 <input
                   type="checkbox"
@@ -607,9 +641,9 @@ function PreviewPanel({
   async function copy(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setGlobalStatus({ label: `${label} copied` });
+      setGlobalStatus({ label: `${label}已复制` });
     } catch {
-      setGlobalStatus({ label: "Copy failed", tone: "is-error" });
+      setGlobalStatus({ label: "复制失败", tone: "is-error" });
     }
   }
 
@@ -618,10 +652,10 @@ function PreviewPanel({
       <section className="panel">
         <div className="panel-head">
           <div>
-            <h2 className="panel-title">Preview</h2>
+            <h2 className="panel-title">实时预览</h2>
             <span className="panel-note">{previewUrl}</span>
           </div>
-          <button className="btn" type="button" onClick={() => window.open(previewUrl, "_blank", "noopener")}>Open</button>
+          <button className="btn" type="button" onClick={() => window.open(previewUrl, "_blank", "noopener")}>在新窗口打开</button>
         </div>
         <div className={`preview-stage image-preview-frame ${preview.loading ? "is-loading" : ""}`} aria-busy={preview.loading}>
           <img alt="Statistics card preview" {...preview.imageProps} />
@@ -631,15 +665,15 @@ function PreviewPanel({
       <section className="panel output">
         <div className="panel-head">
           <div>
-            <h2 className="panel-title">Markdown</h2>
+            <h2 className="panel-title">Markdown 代码</h2>
             <span className="panel-note">可直接放入 README</span>
           </div>
-          <button className="btn primary" type="button" onClick={() => void copy(markdown, "Markdown")}>Copy</button>
+          <button className="btn primary" type="button" onClick={() => void copy(markdown, "Markdown 代码")}>复制代码</button>
         </div>
         <pre className="codebox">{markdown}</pre>
         <div className="mini-list">
           <div className="url-line">{previewUrl}</div>
-          <button className="btn" type="button" onClick={() => void copy(previewUrl, "URL")}>Copy URL</button>
+          <button className="btn" type="button" onClick={() => void copy(previewUrl, "实时链接")}>复制链接</button>
         </div>
       </section>
     </section>
@@ -675,7 +709,7 @@ function Footer() {
 export default function App() {
   const manual = useManualStats();
   const [view, setViewState] = useState<ViewName>(location.hash === "#manual" ? "manual" : "agent");
-  const [globalStatus, setGlobalStatus] = useState<GlobalStatus>({ label: "Ready" });
+  const [globalStatus, setGlobalStatus] = useState<GlobalStatus>({ label: "准备就绪" });
   const agent = useAgentRun(manual.config, manual.syncUsername, setGlobalStatus);
 
   function setView(nextView: ViewName) {
