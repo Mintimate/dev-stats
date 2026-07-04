@@ -32,7 +32,7 @@ function TopBar({
           <img src="/favicon.svg" alt="GS Logo" />
         </div>
         <div>
-          <h1>DevStats</h1>
+          <h1>DevStats 统计工坊</h1>
           <p className="sub">GitHub / CNB 主页 README 与统计卡片生成台</p>
         </div>
       </div>
@@ -652,7 +652,7 @@ function Footer() {
         <div className="footer-left">
           <a href="https://makers.edgeone.ai/" target="_blank" className="footer-logo-link" rel="noreferrer">
             <span style={{ color: "#64748b", fontSize: 13, fontWeight: 500 }}>Powered by</span>
-            <img src="https://makers.edgeone.ai/_next/static/media/BlackHeadLogo.738772d4.svg?auto=format&fit=max&w=640" alt="Tencent EdgeOne" className="footer-logo-img" />
+            <img src="/edgeone-logo.svg" alt="Tencent EdgeOne" className="footer-logo-img" />
           </a>
           <span className="footer-divider">·</span>
           <a href="https://github.com/Mintimate/dev-stats" target="_blank" rel="noreferrer">开源仓库</a>

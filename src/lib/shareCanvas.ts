@@ -306,7 +306,7 @@ export async function createShareImage(data: ShareData) {
   context.fillRect(cardX + 24, cardY + cardH - 45, cardW - 48, 1);
   context.fillStyle = "#0f172a";
   context.font = "900 15px system-ui, sans-serif";
-  context.fillText("DevStats", leftX, cardY + cardH - 22);
+  context.fillText("DevStats 统计工坊", leftX, cardY + cardH - 22);
   drawPlatformBadge(context, data, leftX + 150, cardY + cardH - 38);
   context.textAlign = "right";
   context.fillStyle = "#059669";
