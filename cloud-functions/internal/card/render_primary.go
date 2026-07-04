@@ -19,7 +19,7 @@ func RenderStatsCard(data service.StatsData, opts Options) string {
 	width := opts.CardWidth
 	if width < 287 {
 		if opts.HideRank {
-			width = 287
+			width = 340
 		} else {
 			width = 450
 		}

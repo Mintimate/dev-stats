@@ -51,6 +51,10 @@
     {
       "source": "/api/org",
       "cacheTtl": 86400
+    },
+    {
+      "source": "/api/avatar",
+      "cacheTtl": 604800
     }
   ],
   "cloudFunctions": {

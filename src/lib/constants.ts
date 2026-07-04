@@ -23,15 +23,15 @@ export const defaultConfig: ManualConfig = {
 };
 
 export const cardOptions: Array<{ value: CardType; label: string }> = [
-  { value: "stats", label: "Stats Card" },
-  { value: "top-langs", label: "Top Languages" },
-  { value: "streak", label: "Streak" },
-  { value: "profile-summary", label: "Profile Summary" },
-  { value: "contribution-calendar", label: "Contribution Calendar" },
-  { value: "recent-activity", label: "Recent Activity" },
-  { value: "pin", label: "Pinned Repo" },
-  { value: "repo-languages", label: "Repo Languages" },
-  { value: "org", label: "Organization" },
+  { value: "stats", label: "统计数据卡片 (Stats)" },
+  { value: "top-langs", label: "最常使用语言 (Top Languages)" },
+  { value: "streak", label: "连续贡献天数 (Streak)" },
+  { value: "profile-summary", label: "个人主页概览 (Profile Summary)" },
+  { value: "contribution-calendar", label: "贡献日历 (Contribution Calendar)" },
+  { value: "recent-activity", label: "最近动态 (Recent Activity)" },
+  { value: "pin", label: "置顶仓库卡片 (Pinned Repo)" },
+  { value: "repo-languages", label: "单仓语言分布 (Repo Languages)" },
+  { value: "org", label: "组织机构卡片 (Organization)" },
 ];
 
 export const themes = [

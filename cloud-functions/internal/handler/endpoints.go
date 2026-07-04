@@ -351,7 +351,7 @@ func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/png")
 	}
 
-	w.Header().Set("Cache-Control", "public, max-age=7200")
+	w.Header().Set("Cache-Control", "public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400")
 
 	_, _ = io.Copy(w, resp.Body)
 }
