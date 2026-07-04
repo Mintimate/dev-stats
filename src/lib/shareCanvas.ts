@@ -70,7 +70,7 @@ function dataUrlToBlob(dataUrl: string) {
 }
 
 async function loadImage(url: string) {
-  if (!url || url.endsWith("favicon.svg")) return null;
+  if (!url) return null;
   try {
     const image = new Image();
     image.crossOrigin = "anonymous";
@@ -83,16 +83,24 @@ async function loadImage(url: string) {
   }
 }
 
-async function loadLogoImage() {
-  try {
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.src = "/favicon.svg";
-    await image.decode();
-    return image;
-  } catch {
-    return null;
+let _logoPromise: Promise<HTMLImageElement | null> | null = null;
+
+function loadLogoImage(): Promise<HTMLImageElement | null> {
+  if (!_logoPromise) {
+    _logoPromise = (async () => {
+      try {
+        const image = new Image();
+        image.crossOrigin = "anonymous";
+        image.src = "/favicon.svg";
+        await image.decode();
+        return image;
+      } catch {
+        _logoPromise = null; // 允许下次重试
+        return null;
+      }
+    })();
   }
+  return _logoPromise;
 }
 
 function drawClippedImage(
@@ -190,7 +198,7 @@ export async function createShareImage(data: ShareData) {
   context.fillStyle = "#e2e8f0";
   context.fillRect(cardX + 24, cardY + 130 - 1, cardW - 48, 1);
   if (logo) {
-    drawClippedImage(context, logo, cardX + 40, cardY + 38, 54, 12);
+    drawClippedImage(context, logo, cardX + 40, cardY + 38, 54, 14);
   } else {
     drawRoundRect(context, cardX + 40, cardY + 38, 54, 54, 14, "#ecfdf5", "#059669");
     context.fillStyle = "#059669";

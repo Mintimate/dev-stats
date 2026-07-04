@@ -96,7 +96,7 @@
       .mark svg {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain;
         display: block;
       }
 
@@ -2265,4 +2265,325 @@
           gap: 10px;
         }
       }
+
+      /* ==========================================
+         Leaderboard Panel & Rankings Styles
+         ========================================== */
+      .leaderboard-panel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        max-height: 800px;
+      }
+
+      .leaderboard-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 14px;
+        background: var(--surface-2);
+        border-bottom-left-radius: 8px;
+        border-bottom-right-radius: 8px;
+      }
+
+      .leaderboard-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .leaderboard-row {
+        display: flex;
+        align-items: center;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .leaderboard-row:hover {
+        transform: translateY(-2px);
+        border-color: var(--line-strong);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        background: #f8fafc;
+      }
+
+      .leaderboard-row:active {
+        transform: translateY(0);
+      }
+
+      /* Rank Indicator */
+      .leaderboard-rank {
+        width: 32px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        font-weight: 800;
+        font-size: 14px;
+        color: var(--muted);
+        flex-shrink: 0;
+      }
+
+      .leaderboard-rank.has-medal {
+        font-size: 20px;
+      }
+
+      /* Avatar Wrapper & Platform Badge */
+      .leaderboard-avatar-wrapper {
+        position: relative;
+        width: 42px;
+        height: 42px;
+        margin-right: 12px;
+        flex-shrink: 0;
+      }
+
+      .leaderboard-avatar {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 1.5px solid var(--line-strong);
+        background: var(--surface-2);
+      }
+
+      .platform-badge {
+        position: absolute;
+        bottom: -2px;
+        right: -2px;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        font-size: 9px;
+        font-weight: 900;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        border: 1px solid var(--surface);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+
+      .platform-badge.github {
+        background: #24292f;
+      }
+
+      .platform-badge.cnb {
+        background: #0052d9;
+      }
+
+      /* User Info */
+      .leaderboard-info {
+        flex: 1;
+        min-width: 0;
+        margin-right: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .leaderboard-name-box {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .leaderboard-username {
+        font-weight: 750;
+        color: var(--ink);
+        font-size: 14px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      }
+
+      .leaderboard-nickname {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 550;
+      }
+
+      /* Tag List */
+      .leaderboard-tags {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+
+      .leaderboard-tag {
+        font-size: 9px;
+        font-weight: 700;
+        padding: 1.5px 6px;
+        border-radius: 100px;
+        line-height: 1.2;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+      }
+
+      .leaderboard-tag.plus-tag {
+        background: #f1f5f9;
+        color: #64748b;
+        border: 1px solid rgba(100, 116, 139, 0.12);
+      }
+
+      /* Score & Level Display */
+      .leaderboard-score-box {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: center;
+        margin-right: 12px;
+        flex-shrink: 0;
+        text-align: right;
+        min-width: 75px;
+      }
+
+      .score-trend {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+
+      .score-value {
+        font-size: 16px;
+        font-weight: 900;
+        color: #ea580c;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      }
+
+      .score-level {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        margin-top: 2px;
+      }
+
+      .rating-label {
+        font-size: 10px;
+        font-weight: 750;
+        color: var(--muted);
+      }
+
+      /* Action Icon */
+      .leaderboard-action {
+        flex-shrink: 0;
+      }
+
+      .action-circle {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.25s ease;
+      }
+
+      .leaderboard-row:hover .action-circle {
+        border-color: #fde047;
+        background: #fef9c3;
+        transform: scale(1.1) rotate(15deg);
+      }
+
+      .action-emoji {
+        font-size: 14px;
+      }
+
+      /* Skeletons & Loading States */
+      .leaderboard-loading {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .leaderboard-skeleton-row {
+        display: flex;
+        align-items: center;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+      }
+
+      .skeleton {
+        background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 37%, #f1f5f9 63%);
+        background-size: 400% 100%;
+        animation: skeleton-loading 1.4s ease infinite;
+        border-radius: 4px;
+      }
+
+      @keyframes skeleton-loading {
+        0% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+
+      .skeleton-rank {
+        width: 24px;
+        height: 16px;
+        margin-right: 8px;
+      }
+
+      .skeleton-avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        margin-right: 12px;
+      }
+
+      .skeleton-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .skeleton-name {
+        width: 40%;
+        height: 14px;
+      }
+
+      .skeleton-tags {
+        width: 70%;
+        height: 10px;
+      }
+
+      .skeleton-score {
+        width: 60px;
+        height: 24px;
+      }
+
+      /* Empty State */
+      .leaderboard-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        text-align: center;
+        color: var(--muted);
+      }
+
+      .empty-icon {
+        font-size: 48px;
+        margin-bottom: 14px;
+      }
+
+      .leaderboard-empty p {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0;
+        max-width: 240px;
+        line-height: 1.5;
+      }
+
     
