@@ -17,19 +17,23 @@ import (
 )
 
 func NewClient() *Client {
+	tokens := make([]string, 0)
+	if tok := os.Getenv("GITHUB_TOKEN"); tok != "" {
+		tokens = append(tokens, tok)
+	}
+
 	keys := make([]string, 0)
 	for _, env := range os.Environ() {
 		key, value, ok := strings.Cut(env, "=")
 		if !ok || value == "" {
 			continue
 		}
-		if regexp.MustCompile(`^PAT_\d+$`).MatchString(key) {
+		if regexp.MustCompile(`^GITHUB_TOKEN_\d+$`).MatchString(key) {
 			keys = append(keys, key)
 		}
 	}
-	sort.Slice(keys, func(i, j int) bool { return naturalPATLess(keys[i], keys[j]) })
+	sort.Slice(keys, func(i, j int) bool { return naturalTokenLess(keys[i], keys[j]) })
 
-	tokens := make([]string, 0, len(keys))
 	for _, key := range keys {
 		tokens = append(tokens, os.Getenv(key))
 	}
@@ -40,9 +44,9 @@ func NewClient() *Client {
 	}
 }
 
-func naturalPATLess(a, b string) bool {
-	an, _ := strconv.Atoi(strings.TrimPrefix(a, "PAT_"))
-	bn, _ := strconv.Atoi(strings.TrimPrefix(b, "PAT_"))
+func naturalTokenLess(a, b string) bool {
+	an, _ := strconv.Atoi(strings.TrimPrefix(a, "GITHUB_TOKEN_"))
+	bn, _ := strconv.Atoi(strings.TrimPrefix(b, "GITHUB_TOKEN_"))
 	return an < bn
 }
 
@@ -177,13 +181,19 @@ func (c *Client) PATInfo(ctx context.Context) map[string]any {
 	}
 
 	keys := make([]string, 0)
+	if tok := os.Getenv("GITHUB_TOKEN"); tok != "" {
+		keys = append(keys, "GITHUB_TOKEN")
+	}
+
+	subKeys := make([]string, 0)
 	for _, env := range os.Environ() {
 		key, _, ok := strings.Cut(env, "=")
-		if ok && regexp.MustCompile(`^PAT_\d+$`).MatchString(key) {
-			keys = append(keys, key)
+		if ok && regexp.MustCompile(`^GITHUB_TOKEN_\d+$`).MatchString(key) {
+			subKeys = append(subKeys, key)
 		}
 	}
-	sort.Slice(keys, func(i, j int) bool { return naturalPATLess(keys[i], keys[j]) })
+	sort.Slice(subKeys, func(i, j int) bool { return naturalTokenLess(subKeys[i], subKeys[j]) })
+	keys = append(keys, subKeys...)
 
 	details := map[string]any{}
 	for _, key := range keys {
