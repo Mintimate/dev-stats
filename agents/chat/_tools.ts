@@ -1,8 +1,61 @@
-import { sseEvent } from '../_shared';
+import { getGitHubToken, sseEvent } from '../_shared';
 import { tool } from '@openai/agents';
 
 const GITHUB_API = 'https://api.github.com';
 const CNB_BASE = 'https://cnb.cool';
+
+/** Max raw HTML size (in bytes) that cleanHtml will process to avoid ReDoS on malicious pages. */
+const MAX_HTML_CLEAN_BYTES = 200_000;
+
+/** Allowlisted hostnames for the browser_fetch tool (SSRF prevention). */
+const BROWSER_FETCH_ALLOWED_HOSTS = new Set([
+  'github.com',
+  'api.github.com',
+  'raw.githubusercontent.com',
+  'cnb.cool',
+  'gitee.com',
+  'gitlab.com',
+  'bitbucket.org',
+  'stackoverflow.com',
+  'dev.to',
+  'medium.com',
+  'npmjs.com',
+  'www.npmjs.com',
+  'crates.io',
+  'pypi.org',
+]);
+
+/**
+ * Validate that a URL is safe for server-side fetching (SSRF prevention).
+ * Rejects private IPs, non-HTTP(S) protocols, and cloud metadata endpoints.
+ */
+function isAllowedBrowserFetchUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    // Only allow http(s)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    const hostname = parsed.hostname.toLowerCase();
+    // Block private / loopback / link-local / metadata IPs
+    if (
+      /^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|0\.|169\.254\.|\[?::1|\[?fe80|\[?fc00|\[?fd00)/i.test(hostname) ||
+      hostname === 'localhost' ||
+      hostname === 'metadata.google.internal'
+    ) {
+      return false;
+    }
+    // If an allowlist is maintained, check it; otherwise allow any public host
+    if (BROWSER_FETCH_ALLOWED_HOSTS.size > 0) {
+      // Check exact match or parent domain match (e.g. "docs.github.com" matches "github.com")
+      for (const allowed of BROWSER_FETCH_ALLOWED_HOSTS) {
+        if (hostname === allowed || hostname.endsWith('.' + allowed)) return true;
+      }
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export const STATS_TOOL_NAMES = [
   'inspect_github_user',
@@ -13,7 +66,7 @@ export const STATS_TOOL_NAMES = [
   'compose_readme_draft',
 ] as const;
 
-export function createOpenAIAgentTools(options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any }) {
+export function createOpenAIAgentTools(options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any; tracer?: any; prefetchedProfile?: Record<string, unknown>; env?: Record<string, string | undefined> }) {
   return getToolSchemas().map((schema) => tool({
     name: schema.name,
     description: schema.description,
@@ -182,22 +235,33 @@ function cloneSchema(schema: unknown) {
 export async function executeStatsTool(
   name: string,
   input: Record<string, unknown>,
-  options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any },
+  options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any; tracer?: any; prefetchedProfile?: Record<string, unknown>; env?: Record<string, string | undefined> },
 ) {
   const sseQueue = options.sseQueue ?? [];
   const signal = options.signal;
+  const tracer = options.tracer;
+
+  const gitHubToken = getGitHubToken(options.env);
+  const gitHubHeaders: Record<string, string> = {};
+  if (gitHubToken) {
+    gitHubHeaders['Authorization'] = `token ${gitHubToken}`;
+  }
 
   if (name === 'inspect_github_user') {
     const username = String(input.username || '');
-    const user = await fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}`, signal);
-    const repos = await fetchJson(
-      `${GITHUB_API}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=12`,
-      signal,
-    );
+    // Re-use profile data fetched during the validation phase to save GitHub API quota (60 req/h anonymous).
+    const user = options.prefetchedProfile ?? await (tracer
+      ? tracer.span('github.fetch_profile', () => fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}`, gitHubHeaders, signal), { 'github.username': username })
+      : fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}`, gitHubHeaders, signal));
+    const repos = await (tracer
+      ? tracer.span('github.fetch_repos', () => fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=12`, gitHubHeaders, signal), { 'github.username': username })
+      : fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=12`, gitHubHeaders, signal));
 
     let contributions: any[] = [];
     try {
-      const prs = await fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr&per_page=60`, signal);
+      const prs = await (tracer
+        ? tracer.span('github.search_prs', () => fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr&per_page=60`, gitHubHeaders, signal), { 'github.username': username })
+        : fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr&per_page=60`, gitHubHeaders, signal));
       if (prs && Array.isArray(prs.items)) {
         const repoMap = new Map<string, { prCount: number }>();
         for (const item of prs.items) {
@@ -217,24 +281,30 @@ export async function executeStatsTool(
           .sort((a, b) => b[1].prCount - a[1].prCount)
           .slice(0, 6);
 
-        await Promise.all(
-          topContributed.map(async ([repoName, stats]) => {
-            try {
-              const detail = await fetchJson(`${GITHUB_API}/repos/${repoName}`, signal);
-              contributions.push({
-                name: repoName,
-                description: detail.description,
-                stargazers_count: detail.stargazers_count,
-                forks_count: detail.forks_count,
-                language: detail.language,
-                html_url: detail.html_url,
-                pr_count: stats.prCount,
-              });
-            } catch {
-              // Ignore failure for individual repos
-            }
-          })
-        );
+        // Wrap all contributed-repo fetches in a single span to reduce trace noise
+        const fetchContribRepos = async () => {
+          await Promise.all(
+            topContributed.map(async ([repoName, stats]) => {
+              try {
+                const detail = await fetchJson(`${GITHUB_API}/repos/${repoName}`, gitHubHeaders, signal);
+                contributions.push({
+                  name: repoName,
+                  description: detail.description,
+                  stargazers_count: detail.stargazers_count,
+                  forks_count: detail.forks_count,
+                  language: detail.language,
+                  html_url: detail.html_url,
+                  pr_count: stats.prCount,
+                });
+              } catch {
+                // Ignore failure for individual repos
+              }
+            })
+          );
+        };
+        await (tracer
+          ? tracer.span('github.fetch_contributed_repos', fetchContribRepos, { 'github.username': username, 'github.contrib_count': topContributed.length })
+          : fetchContribRepos());
       }
     } catch {
       // Ignore errors for search queries (e.g. rate limits)
@@ -261,13 +331,29 @@ export async function executeStatsTool(
     // the whole 20s tool budget.
     const username = String(input.username || '');
     const url = `${GITHUB_API}/repos/${encodeURIComponent(username)}/${encodeURIComponent(username)}/readme`;
+    const headers: Record<string, string> = { 'User-Agent': 'EdgeOne-Stats-Agent/1.0', Accept: 'application/vnd.github+json' };
+    if (gitHubToken) {
+      headers['Authorization'] = `token ${gitHubToken}`;
+    }
     try {
-      const response = await fetchWithTimeout(
-        url,
-        { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0', Accept: 'application/vnd.github+json' } },
-        5_000,
-        signal,
-      );
+      const response = await (tracer
+        ? tracer.span(
+            'github.fetch_readme_api',
+            () =>
+              fetchWithTimeout(
+                url,
+                { headers },
+                5_000,
+                signal,
+              ),
+            { 'github.username': username, 'github.url': url },
+          )
+        : fetchWithTimeout(
+            url,
+            { headers },
+            5_000,
+            signal,
+          ));
       if (response.status === 404) {
         return {
           ok: false,
@@ -312,13 +398,19 @@ export async function executeStatsTool(
     const userUrl = `${CNB_BASE}/users/${encodeURIComponent(username)}`;
     const reposUrl = `${CNB_BASE}/users/${encodeURIComponent(username)}/repos?page=1&page_size=20&role=Owner&status=active`;
     
-    const headers = {
+    const headers: Record<string, string> = {
       'Accept': 'application/vnd.cnb.web+json',
       'User-Agent': 'EdgeOne-Stats-Agent/1.0'
     };
+    const cnbToken = options.env?.CNB_API_TOKEN;
+    if (cnbToken) {
+      headers['Authorization'] = `Bearer ${cnbToken}`;
+    }
 
     try {
-      const userResponse = await fetch(userUrl, { signal, headers });
+      const userResponse = await (tracer
+        ? tracer.span('cnb.fetch_profile', () => fetchWithTimeout(userUrl, { headers }, 5_000, signal), { 'cnb.username': username })
+        : fetchWithTimeout(userUrl, { headers }, 5_000, signal));
       if (userResponse.status === 404) {
         return {
           platform: 'cnb',
@@ -329,7 +421,9 @@ export async function executeStatsTool(
       }
       const user = userResponse.ok ? await userResponse.json() : null;
 
-      const reposResponse = await fetch(reposUrl, { signal, headers });
+      const reposResponse = await (tracer
+        ? tracer.span('cnb.fetch_repos', () => fetchWithTimeout(reposUrl, { headers }, 5_000, signal), { 'cnb.username': username })
+        : fetchWithTimeout(reposUrl, { headers }, 5_000, signal));
       const repos = reposResponse.ok ? await reposResponse.json() : [];
 
       return {
@@ -361,10 +455,18 @@ export async function executeStatsTool(
 
   if (name === 'browser_fetch') {
     const url = String(input.url || '');
-    const sandboxResult = await fetchWithSandboxBrowser(url, options.sandbox, signal);
+    // SSRF prevention: validate URL before fetching
+    if (!isAllowedBrowserFetchUrl(url)) {
+      return { ok: false, url, error: 'URL is not allowed: must be a public HTTP(S) URL on a permitted host.' };
+    }
+    const sandboxResult = await (tracer
+      ? tracer.span('sandbox.browser_goto', () => fetchWithSandboxBrowser(url, options.sandbox, signal), { 'browser.url': url })
+      : fetchWithSandboxBrowser(url, options.sandbox, signal));
     if (sandboxResult) return sandboxResult;
 
-    const response = await fetch(url, { signal, headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' } });
+    const response = await (tracer
+      ? tracer.span('browser_fetch.http_fallback', () => fetchWithTimeout(url, { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' } }, 5_000, signal), { 'browser.url': url })
+      : fetchWithTimeout(url, { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' } }, 5_000, signal));
     const text = await response.text();
     return { url, status: response.status, text: cleanHtml(text).slice(0, 8000) };
   }
@@ -451,8 +553,8 @@ async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs =
   }
 }
 
-async function fetchJson(url: string, signal?: AbortSignal) {
-  const response = await fetchWithTimeout(url, { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' } }, 5_000, signal);
+async function fetchJson(url: string, headers?: Record<string, string>, signal?: AbortSignal) {
+  const response = await fetchWithTimeout(url, { headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0', ...headers } }, 5_000, signal);
   if (!response.ok) throw new Error(`Request failed ${response.status}: ${url}`);
   return response.json();
 }
@@ -484,7 +586,9 @@ function decodeBase64(text: string): string {
 }
 
 function cleanHtml(value: string): string {
-  return value
+  // Truncate before regex processing to prevent ReDoS on malicious pages
+  const truncated = value.length > MAX_HTML_CLEAN_BYTES ? value.slice(0, MAX_HTML_CLEAN_BYTES) : value;
+  return truncated
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')

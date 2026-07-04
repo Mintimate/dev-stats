@@ -9,7 +9,7 @@ import {
 } from '@openai/agents';
 import { getStore } from '@edgeone/pages-blob';
 import { resolveModelName } from '../_model';
-import { createLogger, createSSEResponse, jsonResponse, sseEvent, truncateText } from '../_shared';
+import { createLogger, createSSEResponse, getGitHubToken, jsonResponse, sseEvent, truncateText } from '../_shared';
 import { buildSystemPrompt, buildUserInput } from './_prompt';
 import { createOpenAIAgentTools } from './_tools';
 
@@ -30,7 +30,7 @@ const QWEN_THINKING_MODEL_SETTINGS: ModelSettings = {
   },
 };
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DEFAULT_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const CACHE_STORE_NAME = 'stats-agent-analysis-cache';
 
 interface CacheEntry {
@@ -49,12 +49,12 @@ function buildCacheKey(platform: string, username: string, mode: string): string
   return `analysis/${safePlatform}/${safeUsername}/${safeMode}.json`;
 }
 
-async function readCache(key: string): Promise<CacheEntry | null> {
+async function readCache(key: string, cacheTtlMs: number): Promise<CacheEntry | null> {
   try {
     const store = getStore(CACHE_STORE_NAME);
     const entry = await store.get(key, { type: 'json' }) as CacheEntry | null;
     if (!entry || typeof entry.cachedAt !== 'number') return null;
-    if (Date.now() - entry.cachedAt > CACHE_TTL_MS) return null;
+    if (Date.now() - entry.cachedAt > cacheTtlMs) return null;
     return entry;
   } catch {
     return null;
@@ -211,7 +211,28 @@ async function removeFromLeaderboard(platform: string, username: string): Promis
   }
 }
 
-export async function onRequest(context: any) {
+/** Minimal type definition for the EdgeOne Makers agent request context. */
+interface AgentContext {
+  request?: {
+    body?: Record<string, unknown>;
+    signal?: AbortSignal;
+    headers?: Record<string, string>;
+  };
+  env?: Record<string, string | undefined>;
+  tracer?: {
+    span: (name: string, fn: (...args: any[]) => any, attrs?: Record<string, unknown>) => any;
+    startSpan: (name: string, attrs?: Record<string, unknown>) => any;
+    setAttributes: (attrs: Record<string, unknown>) => void;
+  };
+  sandbox?: { browser?: any };
+  store?: { openaiSession: (id: string) => any };
+  conversation_id?: string;
+  run_id?: string;
+  waitUntil?: (promise: Promise<unknown>) => void;
+  utils?: { abortActiveRun?: (id: string) => any };
+}
+
+export async function onRequest(context: AgentContext) {
   const body = context.request?.body ?? {};
   const message = typeof body.message === 'string' ? body.message.trim() : '';
   const state = body.state ?? {};
@@ -224,6 +245,15 @@ export async function onRequest(context: any) {
     headers['Makers-Conversation-Id'] ||
     headers['MAKERS-CONVERSATION-ID'];
   const runId = String(context.run_id || body.run_id || conversationId || '');
+
+  // Attach general trace attributes so the console can filter/aggregate spans
+  // by session. Without these, auto-collected OpenInference spans are orphaned
+  // from the Traces panel's run_id / conversation_id filter dimensions.
+  context.tracer?.setAttributes({
+    'agent.run_id': runId || conversationId || 'unknown',
+    'agent.conversation_id': conversationId || 'unknown',
+    'agent.route_path': '/chat',
+  });
 
   if (!message) return jsonResponse({ error: "'message' is required" }, 400);
   if (!conversationId) return jsonResponse({ error: "Missing required 'makers-conversation-id' header" }, 400);
@@ -238,11 +268,40 @@ export async function onRequest(context: any) {
   const platform = frontendState.platform || 'github';
   const username = frontendState.username || '';
   const cacheKey = buildCacheKey(platform, username, agentMode);
+  const cacheTtlMs = Number(env.CACHE_TTL_MS) || DEFAULT_CACHE_TTL_MS;
+
+  // Enrich the root span with business context now that platform/username/mode are known.
+  // These attrs allow filtering Traces by user or mode in the console panel.
+  // We initialize cache.hit to false and execution_type to full_run by default.
+  context.tracer?.setAttributes({
+    'user.platform': platform,
+    'user.username': username,
+    'agent.mode': agentMode,
+    'agent.force_reanalyze': forceReanalyze,
+    'cache.key': cacheKey,
+    'cache.hit': false,
+    'agent.execution_type': 'full_run',
+  });
 
   // --- Cache read: skip if force_reanalyze ---
   if (!forceReanalyze) {
-    const cached = await readCache(cacheKey);
+    const cached = await (context.tracer
+      ? context.tracer.span(
+        'cache.lookup',
+        async (span: any) => {
+          const res = await readCache(cacheKey, cacheTtlMs);
+          span.setAttributes({ 'cache.hit': !!res });
+          return res;
+        },
+        { 'cache.key': cacheKey, 'agent.mode': agentMode },
+      )
+      : readCache(cacheKey, cacheTtlMs));
     if (cached) {
+      // Mark root span as cache hit
+      context.tracer?.setAttributes({
+        'cache.hit': true,
+        'agent.execution_type': 'cache_hit',
+      });
       logger.log({
         event: 'agent.cache.hit',
         route: '/chat',
@@ -272,6 +331,9 @@ export async function onRequest(context: any) {
     }
   }
 
+  // Capture tracer for use inside the SSE generator closure.
+  const tracer = context.tracer;
+
   return createSSEResponse(async function* () {
     const sseQueue: string[] = [];
     const collectedEvents: string[] = []; // for writing to cache
@@ -280,15 +342,18 @@ export async function onRequest(context: any) {
     let assistantText = '';
     let emittedReadmeDraft = false;
     let emittedStatsRecipe = false;
+    let agentRunSpan: any = null;
+    let agentRunSpanEnded = false;
+    let prefetchedProfile: Record<string, unknown> | undefined;
 
     logger.log({
       event: 'agent.run.start',
       route: '/chat',
       conversation_id: conversationId,
       run_id: runId,
-      platform: state?.platform,
-      username: state?.username,
-      agent_mode: state?.agent_mode,
+      platform: frontendState.platform,
+      username: frontendState.username,
+      agent_mode: frontendState.agent_mode,
       framework: 'openai-agents-sdk',
       model: modelName,
       tools_enabled: true,
@@ -308,7 +373,7 @@ export async function onRequest(context: any) {
       const statusChunk = sseEvent({
         type: 'agent_status',
         status: 'model_ready',
-        model: modelName,
+        model: '腾讯云 TDP 社区模型',
         protocol: 'openai_agents_sdk',
         tools_enabled: true,
         thinking_enabled: false,
@@ -323,17 +388,39 @@ export async function onRequest(context: any) {
       const checkThinkingChunk = sseEvent({ type: 'thinking', content: `正在验证 ${platform === 'github' ? 'GitHub' : 'CNB'} 用户 "${username}" 是否存在...` });
       yield* yieldAndCollect(checkThinkingChunk);
 
+      // Span: user existence validation — records timing, outcome, and whether the user exists.
+      const validateSpan = tracer?.startSpan('user.validate', {
+        'user.platform': platform,
+        'user.username': username,
+      });
+      const gitHubToken = getGitHubToken(env);
+      const cnbToken = env.CNB_API_TOKEN;
+
       try {
         if (platform === 'github') {
+          const headers: Record<string, string> = { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' };
+          if (gitHubToken) {
+            headers['Authorization'] = `token ${gitHubToken}`;
+          }
           const checkResponse = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
             signal,
-            headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' }
+            headers
           });
           if (checkResponse.status === 404) {
+            validateSpan?.setAttributes({ 'user.exists': false, 'http.status_code': 404 });
             throw new Error(`GitHub 用户 "${username}" 不存在 (404)，请检查拼写是否正确。`);
           }
           if (checkResponse.ok) {
             const profile = await checkResponse.json();
+            validateSpan?.setAttributes({
+              'user.exists': true,
+              'user.display_name': String(profile.name || profile.login || username),
+              'user.followers': Number(profile.followers ?? 0),
+              'user.public_repos': Number(profile.public_repos ?? 0),
+              'http.status_code': checkResponse.status,
+            });
+            // Store prefetched profile to avoid duplicate API call in inspect_github_user tool
+            prefetchedProfile = profile;
             const profileChunk = sseEvent({
               type: 'user_profile',
               content: JSON.stringify({
@@ -345,18 +432,30 @@ export async function onRequest(context: any) {
             yield* yieldAndCollect(profileChunk);
           }
         } else if (platform === 'cnb') {
+          const headers: Record<string, string> = {
+            'Accept': 'application/vnd.cnb.web+json',
+            'User-Agent': 'EdgeOne-Stats-Agent/1.0'
+          };
+          if (cnbToken) {
+            headers['Authorization'] = `Bearer ${cnbToken}`;
+          }
           const checkResponse = await fetch(`https://cnb.cool/users/${encodeURIComponent(username)}`, {
             signal,
-            headers: {
-              'Accept': 'application/vnd.cnb.web+json',
-              'User-Agent': 'EdgeOne-Stats-Agent/1.0'
-            }
+            headers
           });
           if (checkResponse.status === 404) {
+            validateSpan?.setAttributes({ 'user.exists': false, 'http.status_code': 404 });
             throw new Error(`CNB 用户 "${username}" 不存在 (404)。请注意：CNB 用户名区分大小写，请检查输入。`);
           }
           if (checkResponse.ok) {
             const profile = await checkResponse.json();
+            validateSpan?.setAttributes({
+              'user.exists': true,
+              'user.display_name': String(profile.nickname || profile.username || username),
+              'user.followers': Number(profile.follower_count ?? 0),
+              'user.public_repos': Number(profile.public_repo_count ?? 0),
+              'http.status_code': checkResponse.status,
+            });
             const profileChunk = sseEvent({
               type: 'user_profile',
               content: JSON.stringify({
@@ -370,13 +469,17 @@ export async function onRequest(context: any) {
         }
       } catch (err: any) {
         if (err.message && err.message.includes('不存在 (404)')) {
+          validateSpan?.end();
           throw err;
         }
+        validateSpan?.setAttributes({ 'user.validate_bypassed': true, 'error.message': err.message || String(err) });
         logger.log({
           event: 'agent.run.validation_bypass',
           message: 'User validation bypassed due to network or rate limit',
           error: err.message || String(err)
         });
+      } finally {
+        validateSpan?.end();
       }
 
       const llmClient = new OpenAI({
@@ -388,6 +491,9 @@ export async function onRequest(context: any) {
         sseQueue,
         signal,
         sandbox: context.sandbox,
+        tracer,
+        prefetchedProfile,
+        env,
       });
 
       const agent = new Agent({
@@ -403,6 +509,19 @@ export async function onRequest(context: any) {
         context.store && conversationId
           ? context.store.openaiSession(conversationId)
           : undefined;
+
+      // Span: agent run — covers the full LLM inference + tool-call loop.
+      // OpenInference auto-generates nested LLM + tool child spans inside this span.
+      // We add business attrs so each turn is linkable to user/mode/model in the Traces panel.
+      agentRunSpan = tracer?.startSpan('agent.run', {
+        'agent.framework': 'openai-agents-sdk',
+        'agent.model': modelName,
+        'agent.mode': agentMode,
+        'agent.max_turns': 8,
+        'user.platform': platform,
+        'user.username': username,
+      });
+      let agentTurns = 0;
 
       const result = await run(agent, buildUserInput(message, state), {
         stream: true,
@@ -422,6 +541,8 @@ export async function onRequest(context: any) {
         const mapped = mapAgentEvent(event);
         for (const item of mapped) {
           if (item.type === 'ai_response') assistantText += String(item.content || '');
+          // Count agent turns for the run span summary attribute
+          if (item.type === 'agent_status' && item.status === 'agent_updated') agentTurns++;
           const chunk = sseEvent(item);
           yield* yieldAndCollect(chunk);
         }
@@ -438,6 +559,14 @@ export async function onRequest(context: any) {
           yield* yieldAndCollect(usageChunk);
         }
       }
+
+      agentRunSpan?.setAttributes({
+        'agent.turns': agentTurns,
+        'agent.emitted_readme': emittedReadmeDraft,
+        'agent.emitted_stats': emittedStatsRecipe,
+        'llm.token.total': collectUsage(result.rawResponses).total_tokens,
+      });
+      if (!agentRunSpanEnded) { agentRunSpan?.end(); agentRunSpanEnded = true; }
 
       for (const sideEffect of drainSseQueue(sseQueue)) {
         if (sideEffect.includes('"type":"readme_draft"')) emittedReadmeDraft = true;
@@ -477,10 +606,33 @@ export async function onRequest(context: any) {
 
       // Write to cache only on successful completion (has useful result)
       if (emittedReadmeDraft || emittedStatsRecipe) {
-        await writeCache(cacheKey, collectedEvents);
-        logger.log({ event: 'agent.cache.write', cache_key: cacheKey, events_count: collectedEvents.length });
+        // Span: cache write — shows serialization + Blob persistence latency
+        await (tracer
+          ? tracer.span(
+            'cache.write',
+            async (span: any) => {
+              await writeCache(cacheKey, collectedEvents);
+              span.setAttributes({
+                'cache.key': cacheKey,
+                'cache.events_count': collectedEvents.length,
+                'cache.mode': agentMode,
+              });
+              logger.log({ event: 'agent.cache.write', cache_key: cacheKey, events_count: collectedEvents.length });
+            },
+            { 'cache.key': cacheKey },
+          )
+          : writeCache(cacheKey, collectedEvents).then(() =>
+            logger.log({ event: 'agent.cache.write', cache_key: cacheKey, events_count: collectedEvents.length }),
+          ));
         if (emittedReadmeDraft) {
-          await updateLeaderboard(platform, username, collectedEvents);
+          // Span: leaderboard update — shows scoring + Blob write latency
+          await (tracer
+            ? tracer.span(
+              'leaderboard.update',
+              () => updateLeaderboard(platform, username, collectedEvents),
+              { 'user.platform': platform, 'user.username': username },
+            )
+            : updateLeaderboard(platform, username, collectedEvents));
         }
       }
     } catch (error) {
@@ -496,6 +648,9 @@ export async function onRequest(context: any) {
         error_name: err.name,
         error_message: err.message,
       });
+      // Ensure the run span is closed on error path (guard against double-close)
+      agentRunSpan?.setAttributes({ 'agent.error': true, 'agent.error_message': err.message });
+      if (!agentRunSpanEnded) { agentRunSpan?.end(); agentRunSpanEnded = true; }
       // Clean up cache and rankings if the user is verified to be non-existent
       if (err.message && err.message.includes('不存在 (404)')) {
         await deleteCache(cacheKey);
@@ -527,9 +682,9 @@ function mapAgentEvent(event: RunStreamEvent): Array<Record<string, unknown>> {
     const name = item.name || item.toolName || raw.name;
     return name
       ? [
-          { type: 'tool_called', name, input: parseMaybeJson(raw.arguments) },
-          { type: 'tool_call', name, arguments: truncateText(raw.arguments ?? {}, 700) },
-        ]
+        { type: 'tool_called', name, input: parseMaybeJson(raw.arguments) },
+        { type: 'tool_call', name, arguments: truncateText(raw.arguments ?? {}, 700) },
+      ]
       : [];
   }
 

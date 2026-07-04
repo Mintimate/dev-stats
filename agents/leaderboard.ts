@@ -41,8 +41,10 @@ export async function onRequest(context: any) {
     logger.error({ event: 'leaderboard.list_keys.error', error: String(err) });
   }
 
-  // 3. Rebuild if forced, or index does not exist, or index count is different from actual cache count
-  const needsRebuild = forceRebuild || !indexExists || leaderboard.length === 0 || leaderboard.length !== cacheKeysCount;
+  // 3. Rebuild only if forced, or index does not exist / is empty.
+  // Count mismatch is not a trigger because updateLeaderboard() handles incremental updates;
+  // rebuilding on every count difference caused redundant full scans.
+  const needsRebuild = forceRebuild || !indexExists || leaderboard.length === 0;
 
   if (!needsRebuild) {
     return jsonResponse({ leaderboard });
@@ -58,16 +60,31 @@ export async function onRequest(context: any) {
     });
 
     const rebuiltList: any[] = [];
+    const cacheKeys = blobsList.filter(b => {
+      const parts = b.key.split('/');
+      return parts.length === 4 && parts[0] === 'analysis' && parts[3] === 'readme.json';
+    });
 
-    for (const blob of blobsList) {
-      const parts = blob.key.split('/');
-      // key structure: analysis/${platform}/${username}/readme.json
-      if (parts.length === 4 && parts[0] === 'analysis' && parts[3] === 'readme.json') {
-        const platform = parts[1];
-        const username = parts[2];
-        try {
+    // Process blobs in parallel batches of 5 for performance
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < cacheKeys.length; i += BATCH_SIZE) {
+      const batch = cacheKeys.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(async (blob: any) => {
+          const parts = blob.key.split('/');
+          const platform = parts[1];
+          const username = parts[2];
           const cacheEntry: any = await store.get(blob.key, { type: 'json' });
-          if (cacheEntry && Array.isArray(cacheEntry.events)) {
+          return { platform, username, cacheEntry };
+        })
+      );
+
+      for (const result of results) {
+        if (result.status !== 'fulfilled') continue;
+        const { platform, username, cacheEntry } = result.value;
+        try {
+          if (!cacheEntry || !Array.isArray(cacheEntry.events)) continue;
+
             let readmeDraft: any = null;
             let userProfile: any = null;
             for (const raw of cacheEntry.events) {
@@ -146,9 +163,8 @@ export async function onRequest(context: any) {
                 updatedAt: cacheEntry.cachedAt || Date.now(),
               });
             }
-          }
         } catch (err) {
-          logger.error({ event: 'leaderboard.rebuild.item_error', key: blob.key, error: String(err) });
+          logger.error({ event: 'leaderboard.rebuild.item_error', platform, username, error: String(err) });
         }
       }
     }

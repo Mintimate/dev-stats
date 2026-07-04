@@ -82,3 +82,21 @@ export function truncateText(value: unknown, maxLength: number): string {
   if (!text) return '';
   return text.length <= maxLength ? text : `${text.slice(0, maxLength)}...`;
 }
+
+export function getGitHubToken(env?: Record<string, string | undefined>): string | undefined {
+  if (!env) return undefined;
+  if (env.GITHUB_TOKEN) return env.GITHUB_TOKEN;
+  const tokenKeys = Object.keys(env)
+    .filter((key) => /^GITHUB_TOKEN_\d+$/.test(key))
+    .sort((a, b) => {
+      const an = parseInt(a.replace('GITHUB_TOKEN_', ''), 10);
+      const bn = parseInt(b.replace('GITHUB_TOKEN_', ''), 10);
+      return an - bn;
+    });
+  if (tokenKeys.length > 0) {
+    return env[tokenKeys[0]];
+  }
+  return undefined;
+}
+
+
