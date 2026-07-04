@@ -1,4 +1,5 @@
 {
+  "name": "dev-stats",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github-readme-stats-eo/cloud-functions/internal/handler"
+	"dev-stats/cloud-functions/internal/handler"
 	"github.com/gin-gonic/gin"
 )
 

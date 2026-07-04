@@ -143,7 +143,7 @@ func (c *CNBClient) getWebJSON(ctx context.Context, path string, target any) err
 		return err
 	}
 	req.Header.Set("Accept", "application/vnd.cnb.web+json")
-	req.Header.Set("User-Agent", "github-readme-stats-eo/1.0")
+	req.Header.Set("User-Agent", "dev-stats/1.0")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
@@ -517,7 +517,7 @@ func (c *CNBClient) HasUsableToken(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
-	req.Header.Set("User-Agent", "github-readme-stats-eo/1.0")
+	req.Header.Set("User-Agent", "dev-stats/1.0")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return false

@@ -1,4 +1,4 @@
-module github-readme-stats-eo/cloud-functions
+module dev-stats/cloud-functions
 
 go 1.25.0
 

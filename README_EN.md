@@ -28,7 +28,7 @@ You can deploy via [Tencent EdgeOne Pages](https://pages.edgeone.ai/en) with one
 
 Click the button below to deploy:
 
-[![Deploy with EdgeOne Pages](https://cdnstatic.tencentcs.com/edgeone/pages/deploy.svg)](https://console.cloud.tencent.com/edgeone/pages/new?repository-url=https%3A%2F%2Fgithub.com%2FMintimate%2Fgithub-readme-stats-eo)
+[![Deploy with EdgeOne Pages](https://cdnstatic.tencentcs.com/edgeone/pages/deploy.svg)](https://console.cloud.tencent.com/edgeone/pages/new?repository-url=https%3A%2F%2Fgithub.com%2FMintimate%2Fdev-stats)
 
 See [Tencent EdgeOne Pages Documentation](https://pages.edgeone.ai/en/document/product-introduction) for more details.
 

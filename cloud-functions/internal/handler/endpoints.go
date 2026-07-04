@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github-readme-stats-eo/cloud-functions/internal/card"
-	"github-readme-stats-eo/cloud-functions/internal/service"
+	"dev-stats/cloud-functions/internal/card"
+	"dev-stats/cloud-functions/internal/service"
 )
 
 func handleStats(w http.ResponseWriter, r *http.Request) {

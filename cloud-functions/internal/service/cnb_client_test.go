@@ -118,8 +118,8 @@ func TestCNBLivePublicSource(t *testing.T) {
 	if err != nil || len(languages) == 0 {
 		t.Fatalf("live languages failed: data=%#v err=%v", languages, err)
 	}
-	repo, err := client.FetchRepo(ctx, "Mintimate", "github-readme-stats-eo")
-	if err != nil || !strings.Contains(repo.NameWithOwner, "/github-readme-stats-eo") {
+	repo, err := client.FetchRepo(ctx, "Mintimate", "dev-stats")
+	if err != nil || !strings.Contains(repo.NameWithOwner, "/dev-stats") {
 		t.Fatalf("live nested repo resolution failed: data=%#v err=%v", repo, err)
 	}
 	_, days, err := client.FetchContributionCalendar(ctx, "Mintimate")
