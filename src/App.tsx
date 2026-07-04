@@ -26,7 +26,9 @@ function TopBar({
   return (
     <header className="topbar">
       <div className="brand">
-        <div className="mark">GS</div>
+        <div className="mark">
+          <img src="/favicon.svg" alt="GS Logo" />
+        </div>
         <div>
           <h1>README 统计工坊</h1>
           <p className="sub">GitHub / CNB 主页 README 与统计卡片生成台</p>

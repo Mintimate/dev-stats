@@ -83,6 +83,18 @@ async function loadImage(url: string) {
   }
 }
 
+async function loadLogoImage() {
+  try {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.src = "/favicon.svg";
+    await image.decode();
+    return image;
+  } catch {
+    return null;
+  }
+}
+
 function drawClippedImage(
   ctx: CanvasRenderingContext2D,
   image: HTMLImageElement,
@@ -146,6 +158,7 @@ function drawRepoList(ctx: CanvasRenderingContext2D, data: ShareData, x: number,
 
 export async function createShareImage(data: ShareData) {
   const avatar = await loadImage(data.avatarUrl);
+  const logo = await loadLogoImage();
   const scale = 2;
   const width = 1600;
   const height = 1120;
@@ -176,12 +189,16 @@ export async function createShareImage(data: ShareData) {
 
   context.fillStyle = "#e2e8f0";
   context.fillRect(cardX + 24, cardY + 130 - 1, cardW - 48, 1);
-  drawRoundRect(context, cardX + 40, cardY + 38, 54, 54, 14, "#ecfdf5", "#059669");
-  context.fillStyle = "#059669";
-  context.font = "900 16px ui-monospace, Menlo, monospace";
-  context.textAlign = "center";
-  context.fillText("GS", cardX + 67, cardY + 73);
-  context.textAlign = "left";
+  if (logo) {
+    drawClippedImage(context, logo, cardX + 40, cardY + 38, 54, 12);
+  } else {
+    drawRoundRect(context, cardX + 40, cardY + 38, 54, 54, 14, "#ecfdf5", "#059669");
+    context.fillStyle = "#059669";
+    context.font = "900 16px ui-monospace, Menlo, monospace";
+    context.textAlign = "center";
+    context.fillText("GS", cardX + 67, cardY + 73);
+    context.textAlign = "left";
+  }
 
   context.fillStyle = "#0f172a";
   context.font = "900 30px system-ui, sans-serif";
