@@ -41,7 +41,7 @@ func writeHomePage(w http.ResponseWriter, r *http.Request) {
   <main>
     <header>
       <h1>GitHub Readme Stats · EdgeOne</h1>
-      <p>EdgeOne Pages Go Cloud Functions 版本，兼容常用 github-readme-stats 图片接口。</p>
+      <p>EdgeOne Makers Go Cloud Functions 版本，兼容常用 github-readme-stats 图片接口。</p>
     </header>
     <div class="grid">
       <section>
@@ -65,7 +65,7 @@ func writeHomePage(w http.ResponseWriter, r *http.Request) {
         <p><code>![GitHub Stats](%[1]s/api?username=Mintimate&show_icons=true)</code></p>
       </aside>
     </div>
-    <footer>Powered by EdgeOne Pages · <a href="https://github.com/Mintimate/dev-stats" target="_blank" rel="noreferrer">GitHub</a></footer>
+    <footer>Powered by EdgeOne Makers · <a href="https://github.com/Mintimate/dev-stats" target="_blank" rel="noreferrer">GitHub</a></footer>
   </main>
 </body>
 </html>`, html.EscapeString(baseURL))
