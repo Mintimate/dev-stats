@@ -2586,4 +2586,194 @@
         line-height: 1.5;
       }
 
+      /* ==========================================
+         Geeky Terminal & Code Editor Style Overrides
+         ========================================== */
+
+      .panel-title-group {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .panel-window-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
+      .panel-window-controls .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .panel-window-controls .dot-close {
+        background-color: #ff5f56;
+        border: 1px solid #e0443e;
+      }
+
+      .panel-window-controls .dot-minimize {
+        background-color: #ffbd2e;
+        border: 1px solid #dea123;
+      }
+
+      .panel-window-controls .dot-expand {
+        background-color: #27c93f;
+        border: 1px solid #1aab29;
+      }
+
+      .editor-container {
+        display: flex;
+        flex-direction: column;
+        background: var(--surface);
+        position: relative;
+        border-top: 1px solid var(--line);
+      }
+
+      .editor-row {
+        display: flex;
+        align-items: center;
+        min-height: 46px;
+        border-bottom: 1px solid rgba(226, 232, 240, 0.3);
+      }
+
+      .editor-row:hover {
+        background: rgba(226, 232, 240, 0.15);
+      }
+
+      .editor-row-gutter {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        width: 48px;
+        height: 100%;
+        padding-right: 12px;
+        border-right: 1px solid var(--line);
+        background: var(--surface-2);
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 11px;
+        font-weight: 700;
+        user-select: none;
+        opacity: 0.55;
+      }
+
+      .editor-row-content {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 4px 16px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 13px;
+        color: var(--ink);
+      }
+
+      .editor-row-content.indent-1 {
+        padding-left: 48px;
+      }
+
+      /* Syntax Highlighting Colors */
+      .code-keyword {
+        color: #d73a49; /* Red keyword */
+        font-weight: 800;
+      }
+
+      .code-var {
+        color: #e36209; /* Orange variable */
+        font-weight: 700;
+      }
+
+      .code-operator {
+        color: #d73a49;
+        font-weight: 800;
+      }
+
+      .code-string {
+        color: #032f62; /* Blue string */
+        font-weight: 700;
+      }
+
+      .code-type {
+        color: #6f42c1; /* Purple type */
+        font-weight: 750;
+      }
+
+      .code-number {
+        color: #005cc5; /* Dark blue number */
+        font-weight: 700;
+      }
+
+      .code-comment {
+        color: #6a737d; /* Gray comment */
+        font-style: italic;
+        font-weight: 500;
+      }
+
+      .code-key {
+        color: #22863a; /* Green object key */
+        font-weight: 700;
+      }
+
+      /* Inline Inputs and Selects inside Editor */
+      .editor-row-content input,
+      .editor-row-content select {
+        width: auto;
+        min-width: 140px;
+        max-width: 280px;
+        height: 28px;
+        min-height: 28px;
+        padding: 0 8px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--surface-2);
+        color: var(--ink);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 12px;
+        font-weight: 700;
+        outline: none;
+      }
+
+      .editor-row-content input[type="number"] {
+        min-width: 60px;
+        max-width: 100px;
+      }
+
+      .editor-row-content input[type="checkbox"] {
+        min-width: 16px;
+        width: 16px;
+        height: 16px;
+        min-height: 16px;
+        accent-color: var(--green);
+        cursor: pointer;
+      }
+
+      .editor-row-content .segmented {
+        min-height: 28px;
+        height: 28px;
+        padding: 2px;
+        border-radius: 4px;
+      }
+
+      .editor-row-content .segmented button {
+        padding: 0 10px;
+        font-size: 11px;
+        height: 22px;
+      }
+
+      /* Glow borders for active/focus items */
+      input:focus, select:focus {
+        border-color: var(--green) !important;
+        box-shadow: 0 0 8px rgba(34, 197, 94, 0.15) !important;
+      }
+
+      .btn:hover {
+        transform: translateY(-1px);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+
     

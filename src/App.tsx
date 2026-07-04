@@ -506,6 +506,21 @@ function ManualOptions({
   const needsLangsCount = config.card === "top-langs" || config.card === "repo-languages";
   const needsActivityCount = config.card === "recent-activity";
 
+  const themeDescriptions: Record<string, string> = {
+    github_dark: "GitHub 经典暗色",
+    default: "默认经典浅色",
+    transparent: "透明背景无边框",
+    tokyonight: "东京之夜 (暗色)",
+    dracula: "经典德拉科拉 (暗色)",
+    catppuccin_mocha: "摩卡猫 (猫咪暗色)",
+    rose_pine: "蔷薇松木 (微红暗色)",
+    vue: "Vue 官方经典浅色",
+    "vue-dark": "Vue 官方经典暗色",
+    radical: "激进炫红 (暗色)",
+    graywhite: "极简灰白双色",
+    ambient_gradient: "炫彩弥散渐变 (霓虹)",
+  };
+
   const displayOptions = [
     { key: "show_icons", label: "显示图标" },
     { key: "hide_border", label: "隐藏外边框" },
@@ -519,109 +534,198 @@ function ManualOptions({
     ] : [])
   ];
 
+  let row = 1;
+  const getLine = () => String(row++).padStart(2, "0");
+
   return (
     <section className="panel">
       <div className="panel-head">
-        <div>
-          <h2 className="panel-title">卡片参数配置</h2>
-          <span className="panel-note">参数变化会立即刷新预览和 Markdown</span>
+        <div className="panel-title-group">
+          <div className="panel-window-controls">
+            <span className="dot dot-close" />
+            <span className="dot dot-minimize" />
+            <span className="dot dot-expand" />
+          </div>
+          <div>
+            <h2 className="panel-title">Config Compiler (参数配置编译器)</h2>
+            <span className="panel-note">// 参数变化将即时触发实时渲染管线，更新编译预览与 Markdown</span>
+          </div>
         </div>
-        <button className="btn" type="button" onClick={resetOptions}>重置</button>
+        <button className="btn subtle" type="button" onClick={resetOptions}>git reset --hard</button>
       </div>
-      <div className="controls">
-        <div className="field span-3">
-          <label>平台</label>
-          <PlatformSegment platform={config.platform} onChange={setPlatform} />
-        </div>
-        <div className="field span-3">
-          <label htmlFor="username">用户名 / 组织</label>
-          <input id="username" value={config.username} autoComplete="off" onChange={(event) => updateConfig({ username: event.target.value })} />
-        </div>
-        <div className="field span-3">
-          <label htmlFor="card-type">卡片</label>
-          <select id="card-type" value={config.card} onChange={(event) => updateConfig({ card: event.target.value as CardType })}>
-            {cardOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </div>
-        <div className="field span-3">
-          <label htmlFor="theme">主题</label>
-          <select id="theme" value={config.theme} onChange={(event) => updateConfig({ theme: event.target.value })}>
-            {themes.map((theme) => <option key={theme} value={theme}>{theme}</option>)}
-          </select>
-        </div>
-        {needsRepo && (
-          <div className="field span-3 repo-field">
-            <label htmlFor="repo">仓库</label>
-            <input id="repo" value={config.repo} autoComplete="off" onChange={(event) => updateConfig({ repo: event.target.value })} />
+      <div className="editor-container">
+        
+        <div className="editor-row">
+          <div className="editor-row-gutter">{getLine()}</div>
+          <div className="editor-row-content">
+            <span className="code-keyword">const</span> <span className="code-var">TARGET_PLATFORM</span> = <PlatformSegment platform={config.platform} onChange={setPlatform} /><span className="code-operator">;</span> <span className="code-comment">// 目标托管平台</span>
           </div>
-        )}
-        <div className="field span-3">
-          <label htmlFor="custom-title">标题</label>
-          <input id="custom-title" value={config.custom_title} placeholder="留空使用默认标题" onChange={(event) => updateConfig({ custom_title: event.target.value })} />
         </div>
-        {needsLayout && (
-          <div className="field span-3">
-            <label htmlFor="layout">布局</label>
-            <select id="layout" value={config.layout} onChange={(event) => updateConfig({ layout: event.target.value })}>
-              <option value="normal">默认 (normal)</option>
-              <option value="compact">紧凑 (compact)</option>
-              <option value="donut">环形 (donut)</option>
-              <option value="donut-vertical">垂直环形 (donut-vertical)</option>
+
+        <div className="editor-row">
+          <div className="editor-row-gutter">{getLine()}</div>
+          <div className="editor-row-content">
+            <span className="code-keyword">const</span> <span className="code-var">DEVELOPER_ID</span> = <span className="code-string">"</span>
+            <input id="username" value={config.username} placeholder="e.g. Mintimate" autoComplete="off" onChange={(event) => updateConfig({ username: event.target.value })} />
+            <span className="code-string">"</span><span className="code-operator">;</span> <span className="code-comment">// 开发者/组织用户名</span>
+          </div>
+        </div>
+
+        <div className="editor-row">
+          <div className="editor-row-gutter">{getLine()}</div>
+          <div className="editor-row-content">
+            <span className="code-keyword">const</span> <span className="code-var">WIDGET_MODULE</span> = <span className="code-type">Widget</span><span className="code-operator">.</span>
+            <select id="card-type" value={config.card} onChange={(event) => updateConfig({ card: event.target.value as CardType })}>
+              {cardOptions.map((option) => {
+                const chineseLabel = option.label.split(" (")[0];
+                const codeVal = option.value.toUpperCase().replace(/-/g, "_");
+                return (
+                  <option key={option.value} value={option.value}>
+                    {codeVal} // {chineseLabel}
+                  </option>
+                );
+              })}
             </select>
+            <span className="code-operator">;</span> <span className="code-comment">// 统计卡片类型 (当前: {cardOptions.find(c => c.value === config.card)?.label})</span>
+          </div>
+        </div>
+
+        <div className="editor-row">
+          <div className="editor-row-gutter">{getLine()}</div>
+          <div className="editor-row-content">
+            <span className="code-keyword">const</span> <span className="code-var">THEME_SCHEME</span> = <span className="code-type">Theme</span><span className="code-operator">.</span>
+            <select id="theme" value={config.theme} onChange={(event) => updateConfig({ theme: event.target.value })}>
+              {themes.map((theme) => {
+                const label = themeDescriptions[theme] || theme;
+                const codeVal = theme.toUpperCase().replace(/-/g, "_");
+                return (
+                  <option key={theme} value={theme}>
+                    {codeVal} // {label}
+                  </option>
+                );
+              })}
+            </select>
+            <span className="code-operator">;</span> <span className="code-comment">// 视觉卡片配色主题</span>
+          </div>
+        </div>
+
+        {needsRepo && (
+          <div className="editor-row">
+            <div className="editor-row-gutter">{getLine()}</div>
+            <div className="editor-row-content">
+              <span className="code-keyword">const</span> <span className="code-var">TARGET_REPOSITORY</span> = <span className="code-string">"</span>
+              <input id="repo" value={config.repo} placeholder="e.g. dev-stats" autoComplete="off" onChange={(event) => updateConfig({ repo: event.target.value })} />
+              <span className="code-string">"</span><span className="code-operator">;</span> <span className="code-comment">// 关联的具体项目仓库名</span>
+            </div>
           </div>
         )}
+
+        <div className="editor-row">
+          <div className="editor-row-gutter">{getLine()}</div>
+          <div className="editor-row-content">
+            <span className="code-keyword">let</span> <span className="code-var">CUSTOM_HEADER</span> = <span className="code-string">"</span>
+            <input id="custom-title" value={config.custom_title} placeholder="// 留空则使用默认配置" onChange={(event) => updateConfig({ custom_title: event.target.value })} />
+            <span className="code-string">"</span><span className="code-operator">;</span> <span className="code-comment">// 自定义标题头名称</span>
+          </div>
+        </div>
+
+        {needsLayout && (
+          <div className="editor-row">
+            <div className="editor-row-gutter">{getLine()}</div>
+            <div className="editor-row-content">
+              <span className="code-keyword">let</span> <span className="code-var">GRID_LAYOUT</span> = <span className="code-type">Layout</span><span className="code-operator">.</span>
+              <select id="layout" value={config.layout} onChange={(event) => updateConfig({ layout: event.target.value })}>
+                <option value="normal">NORMAL // 默认布局</option>
+                <option value="compact">COMPACT // 紧凑布局</option>
+                <option value="donut">DONUT // 环形图布局</option>
+                <option value="donut-vertical">DONUT_VERTICAL // 垂直环形图布局</option>
+              </select>
+              <span className="code-operator">;</span> <span className="code-comment">// 布局排列排版方式</span>
+            </div>
+          </div>
+        )}
+
         {needsLangsCount && (
-          <div className="field span-3">
-            <label htmlFor="langs-count">语言数</label>
-            <input
-              id="langs-count"
-              type="number"
-              min={1}
-              max={20}
-              value={config.langs_count}
-              onChange={(event) => updateConfig({ langs_count: Number(event.target.value || 0) })}
-            />
+          <div className="editor-row">
+            <div className="editor-row-gutter">{getLine()}</div>
+            <div className="editor-row-content">
+              <span className="code-keyword">let</span> <span className="code-var">LANG_LIMIT</span> = <span className="code-number"></span>
+              <input
+                id="langs-count"
+                type="number"
+                min={1}
+                max={20}
+                value={config.langs_count}
+                onChange={(event) => updateConfig({ langs_count: Number(event.target.value || 0) })}
+              />
+              <span className="code-operator">;</span> <span className="code-comment">// 限制展示的编程语言总数</span>
+            </div>
           </div>
         )}
+
         {needsActivityCount && (
-          <div className="field span-3">
-            <label htmlFor="activity-count">动态数</label>
-            <input
-              id="activity-count"
-              type="number"
-              min={1}
-              max={20}
-              value={config.activity_count}
-              onChange={(event) => updateConfig({ activity_count: Number(event.target.value || 0) })}
-            />
+          <div className="editor-row">
+            <div className="editor-row-gutter">{getLine()}</div>
+            <div className="editor-row-content">
+              <span className="code-keyword">let</span> <span className="code-var">ACT_LIMIT</span> = <span className="code-number"></span>
+              <input
+                id="activity-count"
+                type="number"
+                min={1}
+                max={20}
+                value={config.activity_count}
+                onChange={(event) => updateConfig({ activity_count: Number(event.target.value || 0) })}
+              />
+              <span className="code-operator">;</span> <span className="code-comment">// 限制展示的动态日志总条数</span>
+            </div>
           </div>
         )}
-        <div className="field span-3">
-          <label htmlFor="card-width">宽度</label>
-          <input
-            id="card-width"
-            type="number"
-            min={0}
-            max={1200}
-            value={config.card_width}
-            onChange={(event) => updateConfig({ card_width: Number(event.target.value || 0) })}
-          />
-        </div>
-        <div className="field span-12">
-          <label>显示</label>
-          <div className="toggle-grid">
-            {displayOptions.map(({ key, label }) => (
-              <label className="check" key={key}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(config[key as keyof ManualConfig])}
-                  onChange={(event) => updateConfig({ [key]: event.target.checked } as Partial<ManualConfig>)}
-                />
-                {label}
-              </label>
-            ))}
+
+        <div className="editor-row">
+          <div className="editor-row-gutter">{getLine()}</div>
+          <div className="editor-row-content">
+            <span className="code-keyword">let</span> <span className="code-var">CANVAS_WIDTH</span> = <span className="code-number"></span>
+            <input
+              id="card-width"
+              type="number"
+              min={0}
+              max={1200}
+              value={config.card_width}
+              onChange={(event) => updateConfig({ card_width: Number(event.target.value || 0) })}
+            />
+            <span className="code-operator">;</span> <span className="code-comment">// 自定义画布宽度限制 (0为自适应)</span>
           </div>
         </div>
+
+        <div className="editor-row">
+          <div className="editor-row-gutter">{getLine()}</div>
+          <div className="editor-row-content">
+            <span className="code-keyword">const</span> <span className="code-var">FEATURE_FLAGS</span> = <span className="code-operator">{'{'}</span>
+          </div>
+        </div>
+
+        {displayOptions.map(({ key, label }) => (
+          <div className="editor-row" key={key}>
+            <div className="editor-row-gutter">{getLine()}</div>
+            <div className="editor-row-content indent-1">
+              <span className="code-key">"{key}"</span><span className="code-operator">:</span>
+              <input
+                type="checkbox"
+                checked={Boolean(config[key as keyof ManualConfig])}
+                onChange={(event) => updateConfig({ [key]: event.target.checked } as Partial<ManualConfig>)}
+              />
+              <span className="code-operator">,</span> <span className="code-comment">// {label}</span>
+            </div>
+          </div>
+        ))}
+
+        <div className="editor-row">
+          <div className="editor-row-gutter">{getLine()}</div>
+          <div className="editor-row-content">
+            <span className="code-operator">{'};'}</span>
+          </div>
+        </div>
+
       </div>
     </section>
   );
@@ -641,9 +745,9 @@ function PreviewPanel({
   async function copy(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setGlobalStatus({ label: `${label}已复制` });
+      setGlobalStatus({ label: `[Debugger] ${label}已拷贝至剪贴板` });
     } catch {
-      setGlobalStatus({ label: "复制失败", tone: "is-error" });
+      setGlobalStatus({ label: `[Error] 复制 ${label} 失败，请检查 clipboard 权限`, tone: "is-error" });
     }
   }
 
@@ -651,11 +755,18 @@ function PreviewPanel({
     <section className="preview-grid">
       <section className="panel">
         <div className="panel-head">
-          <div>
-            <h2 className="panel-title">实时预览</h2>
-            <span className="panel-note">{previewUrl}</span>
+          <div className="panel-title-group">
+            <div className="panel-window-controls">
+              <span className="dot dot-close" />
+              <span className="dot dot-minimize" />
+              <span className="dot dot-expand" />
+            </div>
+            <div>
+              <h2 className="panel-title">// Stage.output - 渲染管线输出</h2>
+              <span className="panel-note">{previewUrl}</span>
+            </div>
           </div>
-          <button className="btn" type="button" onClick={() => window.open(previewUrl, "_blank", "noopener")}>在新窗口打开</button>
+          <button className="btn subtle" type="button" onClick={() => window.open(previewUrl, "_blank", "noopener")}>curl --open</button>
         </div>
         <div className={`preview-stage image-preview-frame ${preview.loading ? "is-loading" : ""}`} aria-busy={preview.loading}>
           <img alt="Statistics card preview" {...preview.imageProps} />
@@ -664,16 +775,23 @@ function PreviewPanel({
       </section>
       <section className="panel output">
         <div className="panel-head">
-          <div>
-            <h2 className="panel-title">Markdown 代码</h2>
-            <span className="panel-note">可直接放入 README</span>
+          <div className="panel-title-group">
+            <div className="panel-window-controls">
+              <span className="dot dot-close" />
+              <span className="dot dot-minimize" />
+              <span className="dot dot-expand" />
+            </div>
+            <div>
+              <h2 className="panel-title">// Clipboard.copypasta - 终极大招</h2>
+              <span className="panel-note">可直接粘贴至 README.md 中</span>
+            </div>
           </div>
-          <button className="btn primary" type="button" onClick={() => void copy(markdown, "Markdown 代码")}>复制代码</button>
+          <button className="btn primary" type="button" onClick={() => void copy(markdown, "Markdown 碎片")}>pbcopy</button>
         </div>
         <pre className="codebox">{markdown}</pre>
         <div className="mini-list">
           <div className="url-line">{previewUrl}</div>
-          <button className="btn" type="button" onClick={() => void copy(previewUrl, "实时链接")}>复制链接</button>
+          <button className="btn subtle" type="button" onClick={() => void copy(previewUrl, "API 终点")}>Copy Endpoint (复制请求路径)</button>
         </div>
       </section>
     </section>
