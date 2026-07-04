@@ -256,3 +256,15 @@ func (c *Client) singlePATStatus(ctx context.Context, token string) map[string]a
 	}
 	return map[string]any{"status": "valid", "remaining": parsed.Data.RateLimit.Remaining}
 }
+
+func (c *Client) FetchAvatarURL(ctx context.Context, username string) (string, error) {
+	var u struct {
+		AvatarURL string `json:"avatar_url"`
+	}
+	err := c.restJSON(ctx, "/users/"+username, &u)
+	if err != nil {
+		return "", err
+	}
+	return u.AvatarURL, nil
+}
+

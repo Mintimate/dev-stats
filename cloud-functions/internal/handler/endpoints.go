@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -292,6 +295,10 @@ func handlePATInfo(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(info)
 }
 
+// maxAvatarSize is the upper bound for avatar images (2 MB).
+// Any response larger than this is rejected to avoid OOM.
+const maxAvatarSize = 2 << 20
+
 func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 	username := r.URL.Query().Get("username")
 	platform := r.URL.Query().Get("platform")
@@ -315,11 +322,28 @@ func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var fallbackURL string
+	if platform == "github" {
+		fallbackURL = "https://github.com/" + username + ".png"
+	} else {
+		fallbackURL = "https://cnb.cool/users/" + username + "/avatar/s"
+	}
+
 	var avatarURL string
 	if platform == "github" {
-		avatarURL = "https://github.com/" + username + ".png"
+		// Use API with a short 2-second timeout to avoid holding up the request
+		apiCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		ghClient := service.NewClient()
+		apiAvatarURL, err := ghClient.FetchAvatarURL(apiCtx, username)
+		cancel()
+
+		if err == nil && apiAvatarURL != "" {
+			avatarURL = apiAvatarURL
+		} else {
+			avatarURL = fallbackURL
+		}
 	} else {
-		avatarURL = "https://cnb.cool/users/" + username + "/avatar/s"
+		avatarURL = fallbackURL
 	}
 
 	req, err := http.NewRequestWithContext(r.Context(), "GET", avatarURL, nil)
@@ -329,25 +353,59 @@ func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Header.Set("User-Agent", "EdgeOne-Stats-Agent/1.0")
 
-	// Use a dedicated client with a 5-second timeout to prevent 504 Gateway Timeouts on cold starts
+	// Use a 5-second timeout for downloading the image, fallback to 302 on fail
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
 	resp, err := client.Do(req)
 	if err != nil {
 		// If back-to-source fails or times out, redirect the client to the direct avatar URL as fallback
-		http.Redirect(w, r, avatarURL, http.StatusFound)
+		http.Redirect(w, r, fallbackURL, http.StatusFound)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		// Fallback to 302 redirect if the source returns a non-OK status code
-		http.Redirect(w, r, avatarURL, http.StatusFound)
+		http.Redirect(w, r, fallbackURL, http.StatusFound)
 		return
 	}
 
-	// Set CORS headers so frontend canvas and img elements can retrieve the resource freely
+	// --- Buffer-then-write: read the ENTIRE body before sending any bytes ---
+	// This prevents the CDN from caching a truncated image when the upstream
+	// transfer is interrupted mid-stream.
+	expectedLen := int64(0)
+	if cl := resp.Header.Get("Content-Length"); cl != "" {
+		expectedLen, _ = strconv.ParseInt(cl, 10, 64)
+	}
+
+	// Guard against absurdly large payloads
+	if expectedLen > maxAvatarSize {
+		http.Redirect(w, r, fallbackURL, http.StatusFound)
+		return
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxAvatarSize+1))
+	if err != nil {
+		// Read failed (timeout, connection reset, etc.) → redirect as fallback
+		http.Redirect(w, r, fallbackURL, http.StatusFound)
+		return
+	}
+
+	// Reject over-sized responses that exceeded the limit reader
+	if int64(len(body)) > maxAvatarSize {
+		http.Redirect(w, r, fallbackURL, http.StatusFound)
+		return
+	}
+
+	// If the upstream declared a Content-Length, verify we received exactly that many bytes.
+	// A mismatch means the transfer was truncated.
+	if expectedLen > 0 && int64(len(body)) != expectedLen {
+		http.Redirect(w, r, fallbackURL, http.StatusFound)
+		return
+	}
+
+	// --- All data received and validated. Now write the response atomically. ---
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 
@@ -358,7 +416,8 @@ func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/png")
 	}
 
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
 	w.Header().Set("Cache-Control", "public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400")
 
-	_, _ = io.Copy(w, resp.Body)
+	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(body))
 }
