@@ -110,10 +110,12 @@ export async function onRequest(context: any) {
             if (readmeDraft) {
               const nickname = userProfile?.nickname || readmeDraft.user?.nickname || readmeDraft.user?.name || username;
               let avatar = userProfile?.avatar || readmeDraft.user?.avatar || '';
-              let displayUsername = username;
 
-              // Local extraction from title first (case-sensitive)
-              if (readmeDraft.title && readmeDraft.title.toLowerCase().startsWith(username.toLowerCase())) {
+              // 优先使用分析时持久化下来的权威大小写用户名（user_profile.username，来自平台 API）。
+              // 缓存 key 里的 username 段对 GitHub 是强制小写的，不能作为大小写来源。
+              // 只有老缓存缺失该字段时，才退回到从 AI 生成的标题里尝试猜大小写这个不太可靠的办法。
+              let displayUsername = userProfile?.username || username;
+              if (!userProfile?.username && readmeDraft.title && readmeDraft.title.toLowerCase().startsWith(username.toLowerCase())) {
                 displayUsername = readmeDraft.title.slice(0, username.length);
               }
 

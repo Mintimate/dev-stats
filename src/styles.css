@@ -2333,6 +2333,22 @@
         font-size: 20px;
       }
 
+      /* Top-3 rank coloring (no emoji, just tinted numerals) */
+      .leaderboard-rank.rank-1 .rank-num {
+        color: #b45309;
+        font-size: 16px;
+      }
+
+      .leaderboard-rank.rank-2 .rank-num {
+        color: #64748b;
+        font-size: 16px;
+      }
+
+      .leaderboard-rank.rank-3 .rank-num {
+        color: #c2703d;
+        font-size: 16px;
+      }
+
       /* Avatar Wrapper & Platform Badge */
       .leaderboard-avatar-wrapper {
         position: relative;
@@ -2493,6 +2509,33 @@
 
       .action-emoji {
         font-size: 14px;
+      }
+
+      .action-arrow {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--muted);
+      }
+
+      .leaderboard-row:hover .action-arrow {
+        color: #b45309;
+      }
+
+      /* Pagination */
+      .leaderboard-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 14px 0 4px;
+      }
+
+      .pagination-info {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        white-space: nowrap;
       }
 
       /* Skeletons & Loading States */

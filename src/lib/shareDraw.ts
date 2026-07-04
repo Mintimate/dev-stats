@@ -448,6 +448,9 @@ export function drawScene(
     context.drawImage(qr, qrX, qrY, qrSize, qrSize);
     drawQrFrame(context, qrX - qrPad, qrY - qrPad, qrSize + qrPad * 2, qrSize + qrPad * 2, accent);
 
+    // drawRoundRect 会把 fillStyle 改成白色画背景框，这里必须重新设置颜色，否则网址文字会被画成白色而“隐形”。
+    context.fillStyle = "#059669";
+    context.font = "900 13px ui-monospace, Menlo, monospace";
     context.fillText(data.host, qrX - qrPad - 12, cardY + cardH - 46);
 
     const slogans = [

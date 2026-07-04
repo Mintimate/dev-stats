@@ -136,13 +136,13 @@ export function captureRecipe(event: { name?: string; content?: string }) {
 
 export function normalizeReadmeResult(
   event: Record<string, unknown>,
-  config: ManualConfig,
+  config: Pick<ManualConfig, "platform" | "username">,
   profile: UserProfile | null,
   assistantText: string,
 ) {
   const avatarUrl = (!event.is_ghost && config.username && config.platform)
     ? `/api/avatar?platform=${config.platform}&username=${config.username}`
-    : "favicon.svg";
+    : "/favicon.svg";
 
   const user = (event.user || {}) as UserProfile;
   const markdown = String(event.markdown || "");
