@@ -112,17 +112,21 @@ async function updateLeaderboard(platform: string, username: string, events: str
     }
 
     const nickname = userProfile?.nickname || readmeDraft.user?.nickname || readmeDraft.user?.name || username;
+    // 优先使用平台 API 校验时捕获的“权威大小写”用户名（写入 user_profile.username），
+    // 而不是访客提交表单时的原始大小写，避免同一账号在榜单里因为大小写不同被当成两条记录、
+    // 或者展示出和平台真实用户名不一致的大小写。旧缓存没有该字段时回退到原始 username。
+    const canonicalUsername = userProfile?.username || username;
     let avatar = userProfile?.avatar || readmeDraft.user?.avatar || '';
     if (avatar && !avatar.startsWith('http') && platform === 'cnb') {
       avatar = `https://cnb.cool${avatar.startsWith('/') ? '' : '/'}${avatar}`;
     }
     if (!avatar) {
       avatar = platform === 'cnb'
-        ? `https://cnb.cool/users/${encodeURIComponent(username)}/avatar/s`
-        : `https://github.com/${encodeURIComponent(username)}.png`;
+        ? `https://cnb.cool/users/${encodeURIComponent(canonicalUsername)}/avatar/s`
+        : `https://github.com/${encodeURIComponent(canonicalUsername)}.png`;
     }
 
-    let displayUsername = username;
+    let displayUsername = canonicalUsername;
     if (platform === 'cnb' && avatar) {
       const match = avatar.match(/\/users\/([^/]+)/);
       if (match) displayUsername = match[1];
@@ -148,7 +152,7 @@ async function updateLeaderboard(platform: string, username: string, events: str
     // with the same name differing only in case, and this also cleans up any legacy
     // lowercase entries written by an older version of the code.
     leaderboard = leaderboard.filter(
-      (item) => !(item.platform === platform && item.username.toLowerCase() === username.toLowerCase())
+      (item) => !(item.platform === platform && item.username.toLowerCase() === canonicalUsername.toLowerCase())
     );
 
     // Add new entry
@@ -168,7 +172,7 @@ async function updateLeaderboard(platform: string, username: string, events: str
     }
 
     await store.setJSON(leaderboardKey, leaderboard);
-    logger.log({ event: 'leaderboard.update.success', platform, username, score });
+    logger.log({ event: 'leaderboard.update.success', platform, username: canonicalUsername, score });
   } catch (err) {
     logger.error({ event: 'leaderboard.update.error', platform, username, error: String(err) });
   }
@@ -424,6 +428,9 @@ export async function onRequest(context: AgentContext) {
             const profileChunk = sseEvent({
               type: 'user_profile',
               content: JSON.stringify({
+                // profile.login 是 GitHub API 返回的权威大小写，不同于访客表单里随意输入的大小写，
+                // 持久化后供排行榜、独立用户页等场景统一使用，避免同一账号因大小写不一致而展示不一致。
+                username: profile.login || username,
                 nickname: profile.name || profile.login || username,
                 bio: profile.bio || '这位开发者很低调，什么都没有留下。',
                 avatar: profile.avatar_url || ''
@@ -459,6 +466,8 @@ export async function onRequest(context: AgentContext) {
             const profileChunk = sseEvent({
               type: 'user_profile',
               content: JSON.stringify({
+                // profile.username 是 CNB API 返回的权威大小写（CNB 用户名区分大小写）。
+                username: profile.username || username,
                 nickname: profile.nickname || profile.username || username,
                 bio: profile.bio || '这位开发者很低调，什么都没有留下。',
                 avatar: profile.avatar || ''
