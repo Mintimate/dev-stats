@@ -40,7 +40,11 @@ interface CacheEntry {
 
 function buildCacheKey(platform: string, username: string, mode: string): string {
   const safePlatform = (platform || 'github').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const safeUsername = (username || '').toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+  // CNB usernames are case-sensitive; GitHub is case-insensitive — normalize only for GitHub
+  const rawUsername = username || '';
+  const safeUsername = safePlatform === 'cnb'
+    ? rawUsername.replace(/[^a-zA-Z0-9_.-]/g, '')
+    : rawUsername.toLowerCase().replace(/[^a-z0-9_.-]/g, '');
   const safeMode = (mode || 'readme').toLowerCase().replace(/[^a-z0-9]/g, '');
   return `analysis/${safePlatform}/${safeUsername}/${safeMode}.json`;
 }
@@ -64,6 +68,146 @@ async function writeCache(key: string, events: string[]): Promise<void> {
     await store.setJSON(key, entry);
   } catch {
     // Cache write failures are non-fatal
+  }
+}
+
+async function updateLeaderboard(platform: string, username: string, events: string[]): Promise<void> {
+  try {
+    let readmeDraft: any = null;
+    let userProfile: any = null;
+
+    for (const raw of events) {
+      if (raw.startsWith('data: ')) {
+        const jsonStr = raw.slice(6).trim();
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed.type === 'readme_draft') {
+            readmeDraft = parsed;
+          } else if (parsed.type === 'user_profile') {
+            try {
+              userProfile = typeof parsed.content === 'string' ? JSON.parse(parsed.content) : parsed.content;
+            } catch {
+              userProfile = parsed;
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    if (!readmeDraft) return;
+
+    const store = getStore(CACHE_STORE_NAME);
+    const leaderboardKey = 'leaderboard/readme_rankings.json';
+    let leaderboard: any[] = [];
+
+    try {
+      const entry = await store.get(leaderboardKey, { type: 'json' });
+      if (Array.isArray(entry)) {
+        leaderboard = entry;
+      }
+    } catch {
+      // ignore
+    }
+
+    const nickname = userProfile?.nickname || readmeDraft.user?.nickname || readmeDraft.user?.name || username;
+    let avatar = userProfile?.avatar || readmeDraft.user?.avatar || '';
+    if (avatar && !avatar.startsWith('http') && platform === 'cnb') {
+      avatar = `https://cnb.cool${avatar.startsWith('/') ? '' : '/'}${avatar}`;
+    }
+    if (!avatar) {
+      avatar = platform === 'cnb'
+        ? `https://cnb.cool/users/${encodeURIComponent(username)}/avatar/s`
+        : `https://github.com/${encodeURIComponent(username)}.png`;
+    }
+
+    let displayUsername = username;
+    if (platform === 'cnb' && avatar) {
+      const match = avatar.match(/\/users\/([^/]+)/);
+      if (match) displayUsername = match[1];
+    }
+
+    const score = typeof readmeDraft.score === 'number' ? readmeDraft.score : 60;
+    const rating = readmeDraft.objective_rating || '入门';
+    const badges = Array.isArray(readmeDraft.badges) ? readmeDraft.badges : [];
+
+    const rankItem = {
+      username: displayUsername,
+      platform,
+      nickname,
+      avatar,
+      score,
+      rating,
+      badges,
+      updatedAt: Date.now(),
+    };
+
+    // Remove existing entry for same user and platform.
+    // Use case-insensitive match for both platforms: CNB doesn't allow two accounts
+    // with the same name differing only in case, and this also cleans up any legacy
+    // lowercase entries written by an older version of the code.
+    leaderboard = leaderboard.filter(
+      (item) => !(item.platform === platform && item.username.toLowerCase() === username.toLowerCase())
+    );
+
+    // Add new entry
+    leaderboard.push(rankItem);
+
+    // Sort by score desc, then by updatedAt desc
+    leaderboard.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return b.updatedAt - a.updatedAt;
+    });
+
+    // Keep top 100
+    if (leaderboard.length > 100) {
+      leaderboard = leaderboard.slice(0, 100);
+    }
+
+    await store.setJSON(leaderboardKey, leaderboard);
+    logger.log({ event: 'leaderboard.update.success', platform, username, score });
+  } catch (err) {
+    logger.error({ event: 'leaderboard.update.error', platform, username, error: String(err) });
+  }
+}
+
+async function deleteCache(key: string): Promise<void> {
+  try {
+    const store = getStore(CACHE_STORE_NAME);
+    await store.delete(key);
+  } catch {
+    // ignore
+  }
+}
+
+async function removeFromLeaderboard(platform: string, username: string): Promise<void> {
+  try {
+    const store = getStore(CACHE_STORE_NAME);
+    const leaderboardKey = 'leaderboard/readme_rankings.json';
+    let leaderboard: any[] = [];
+    try {
+      const entry = await store.get(leaderboardKey, { type: 'json' });
+      if (Array.isArray(entry)) {
+        leaderboard = entry;
+      }
+    } catch {
+      return;
+    }
+
+    // Case-insensitive match for both platforms (see updateLeaderboard for rationale)
+    const filtered = leaderboard.filter(
+      (item) => !(item.platform === platform && item.username.toLowerCase() === username.toLowerCase())
+    );
+
+    if (filtered.length !== leaderboard.length) {
+      await store.setJSON(leaderboardKey, filtered);
+      logger.log({ event: 'leaderboard.remove.success', platform, username });
+    }
+  } catch (err) {
+    logger.error({ event: 'leaderboard.remove.error', platform, username, error: String(err) });
   }
 }
 
@@ -105,6 +249,13 @@ export async function onRequest(context: any) {
         cache_key: cacheKey,
         cached_at: new Date(cached.cachedAt).toISOString(),
       });
+      // Sync casing updates on cache hit; use waitUntil if available to avoid blocking SSE first frame
+      const leaderboardUpdate = updateLeaderboard(platform, username, cached.events);
+      if (typeof context.waitUntil === 'function') {
+        context.waitUntil(leaderboardUpdate);
+      } else {
+        await leaderboardUpdate;
+      }
       return createSSEResponse(async function* () {
         // Emit a cache-hit marker so the frontend knows it came from cache
         yield sseEvent({
@@ -328,6 +479,9 @@ export async function onRequest(context: any) {
       if (emittedReadmeDraft || emittedStatsRecipe) {
         await writeCache(cacheKey, collectedEvents);
         logger.log({ event: 'agent.cache.write', cache_key: cacheKey, events_count: collectedEvents.length });
+        if (emittedReadmeDraft) {
+          await updateLeaderboard(platform, username, collectedEvents);
+        }
       }
     } catch (error) {
       const err = error as Error;
@@ -342,6 +496,11 @@ export async function onRequest(context: any) {
         error_name: err.name,
         error_message: err.message,
       });
+      // Clean up cache and rankings if the user is verified to be non-existent
+      if (err.message && err.message.includes('不存在 (404)')) {
+        await deleteCache(cacheKey);
+        await removeFromLeaderboard(platform, username);
+      }
       yield sseEvent({ type: 'error_message', content: err.message });
     }
   }, signal);

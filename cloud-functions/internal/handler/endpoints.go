@@ -292,28 +292,33 @@ func handlePATInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
-	avatarURL := r.URL.Query().Get("url")
-	if avatarURL == "" {
-		http.Error(w, "Missing url parameter", http.StatusBadRequest)
+	username := r.URL.Query().Get("username")
+	platform := r.URL.Query().Get("platform")
+
+	if username == "" || platform == "" {
+		http.Error(w, "Missing username or platform parameter", http.StatusBadRequest)
 		return
 	}
 
-	// Safety restriction: only allow trusted domains to prevent SSRF attacks
-	allowed := false
-	trustedPrefixes := []string{
-		"https://cnb.cool/",
-		"https://github.com/",
-		"https://avatars.githubusercontent.com/",
+	// Validate inputs to prevent path traversal or abuse
+	if platform != "github" && platform != "cnb" {
+		http.Error(w, "Invalid platform parameter", http.StatusBadRequest)
+		return
 	}
-	for _, prefix := range trustedPrefixes {
-		if strings.HasPrefix(avatarURL, prefix) {
-			allowed = true
-			break
+
+	// Sanitize username (alphanumeric, dash, underscore, dot, plus, etc.)
+	for _, ch := range username {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '.' || ch == '+') {
+			http.Error(w, "Invalid characters in username", http.StatusBadRequest)
+			return
 		}
 	}
-	if !allowed {
-		http.Error(w, "Forbidden URL source", http.StatusForbidden)
-		return
+
+	var avatarURL string
+	if platform == "github" {
+		avatarURL = "https://github.com/" + username + ".png"
+	} else {
+		avatarURL = "https://cnb.cool/users/" + username + "/avatar/s"
 	}
 
 	req, err := http.NewRequestWithContext(r.Context(), "GET", avatarURL, nil)
@@ -346,7 +351,7 @@ func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/png")
 	}
 
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("Cache-Control", "public, max-age=7200")
 
 	_, _ = io.Copy(w, resp.Body)
 }
