@@ -14,9 +14,41 @@ async function loadBitmap(url: string): Promise<ImageBitmap | null> {
   }
 }
 
+/**
+ * favicon.svg 的根节点用的是 width="100%" height="100%"（仅百分比，无绝对像素尺寸）。
+ * 直接 fetch 成 Blob 交给 createImageBitmap 解码时，浏览器缺少可解析百分比的视口上下文，
+ * 常会解码失败或得到空白位图（因此卡片左上角一直是兜底的 "GS" 方块）。
+ * 这里改用主线程的 <img> + Canvas 方式渲染：<img> 天然能按内置的替代元素尺寸/显式 width/height
+ * 正确栅格化 SVG 矢量内容，再画进固定尺寸的 canvas 得到可靠的 ImageBitmap。
+ */
+async function loadLogoBitmap(url: string): Promise<ImageBitmap | null> {
+  if (!url) return null;
+  try {
+    const size = 128;
+    const image = new Image();
+    image.decoding = "async";
+    image.width = size;
+    image.height = size;
+    image.src = url;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(image, 0, 0, size, size);
+    return await createImageBitmap(canvas);
+  } catch (err) {
+    console.error("Failed to load logo", err);
+    return null;
+  }
+}
+
 async function loadQrBitmap(data: ShareData): Promise<ImageBitmap | null> {
   try {
-    const qrUrl = window.location.origin || `https://${data.host}`;
+    const origin = window.location.origin || `https://${data.host}`;
+    // 指向该用户的独立画像主页（/u/:platform/:username），扫码后直接看到本人报告，而不是落地到裸首页。
+    const qrUrl = `${origin}/u/${data.platformKey}/${encodeURIComponent(data.username)}`;
     const canvas = await toCanvas(qrUrl, {
       margin: 1,
       width: 128,
@@ -59,7 +91,7 @@ export async function createShareImage(data: ShareData): Promise<string> {
   // 主线程并发加载三个资源为 ImageBitmap，再整体转移进 Worker。
   const [avatar, logo, qr] = await Promise.all([
     loadBitmap(data.avatarUrl),
-    loadBitmap("/favicon.svg"),
+    loadLogoBitmap("/favicon.svg"),
     loadQrBitmap(data),
   ]);
 
