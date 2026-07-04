@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createShareImage, shareObjectUrl } from "../lib/shareCanvas";
+import { createShareImage } from "../lib/shareCanvas";
 import type { ReadmeResult, ShareData } from "../lib/types";
 
 function cleanText(value: string) {
@@ -38,6 +38,7 @@ function buildShareData(result: ReadmeResult, platform: string, username: string
 
 export function ShareModal({ result, platform, username }: { result: ReadmeResult | null; platform: string; username: string }) {
   const [open, setOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [dataUrl, setDataUrl] = useState("");
   const [objectUrl, setObjectUrl] = useState("");
   const generationRef = useRef(0);
@@ -57,30 +58,37 @@ export function ShareModal({ result, platform, username }: { result: ReadmeResul
 
   async function prepare() {
     if (!shareData) return;
-    const generation = generationRef.current;
-    const nextDataUrl = await createShareImage(shareData);
-    const nextObjectUrl = shareObjectUrl(nextDataUrl);
-    if (generation !== generationRef.current) {
-      URL.revokeObjectURL(nextObjectUrl);
-      return;
+    setGenerating(true);
+    try {
+      const generation = generationRef.current;
+      const nextUrl = await createShareImage(shareData);
+      if (generation !== generationRef.current) {
+        URL.revokeObjectURL(nextUrl);
+        return;
+      }
+      setDataUrl(nextUrl);
+      setObjectUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return nextUrl;
+      });
+    } finally {
+      setGenerating(false);
     }
-    setDataUrl(nextDataUrl);
-    setObjectUrl((current) => {
-      if (current) URL.revokeObjectURL(current);
-      return nextObjectUrl;
-    });
   }
 
   function showModal(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
-    void (async () => {
-      try {
-        if (!dataUrl || !objectUrl) await prepare();
-        setOpen(true);
-      } catch {
-        alert("图片生成失败，请稍后重试。");
-      }
-    })();
+    setOpen(true);
+    if (!dataUrl || !objectUrl) {
+      void (async () => {
+        try {
+          await prepare();
+        } catch {
+          alert("图片生成失败，请稍后重试。");
+          setOpen(false);
+        }
+      })();
+    }
   }
 
   function warmup() {
@@ -115,14 +123,29 @@ export function ShareModal({ result, platform, username }: { result: ReadmeResul
             </button>
           </div>
           <div className="share-modal-body">
-            <p className="share-modal-tip">画像已生成，可右键复制图片，或点击下方按钮下载。</p>
-            <div className="share-image-container">
-              <img src={dataUrl} alt="Share Preview" />
+            <p className="share-modal-tip">
+              {generating ? "正在绘制画像报告，请稍候..." : "画像已生成，可右键复制图片，或点击下方按钮下载。"}
+            </p>
+            <div className="share-image-container" style={{ position: "relative", minHeight: 240 }}>
+              {generating && (
+                <div className="image-loading-overlay" style={{ opacity: 1, pointerEvents: "auto" }}>
+                  正在生成分享图片...
+                </div>
+              )}
+              {dataUrl && <img src={dataUrl} alt="Share Preview" style={{ opacity: generating ? 0.3 : 1 }} />}
             </div>
           </div>
           <div className="share-modal-footer">
-            <a className="btn" href={objectUrl || dataUrl || "#"} download={`${username || "developer"}-readme-stats-share.png`}>
-              保存到本地
+            <a
+              className="btn"
+              style={generating ? { cursor: "not-allowed", opacity: 0.55, pointerEvents: "none" } : undefined}
+              href={generating ? "#" : (objectUrl || dataUrl || "#")}
+              download={`${username || "developer"}-readme-stats-share.png`}
+              onClick={(event) => {
+                if (generating) event.preventDefault();
+              }}
+            >
+              {generating ? "正在生成中..." : "保存到本地"}
             </a>
           </div>
         </div>
