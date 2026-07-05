@@ -135,18 +135,25 @@ function AgentPanel({
             { mode: "stats" as AgentMode, title: "推荐卡片配方", text: "分析公开资料，生成可应用到手动面板的卡片方案", cached: agent.cacheBadges.stats },
           ].map((item) => (
             <button key={item.mode} className="task-btn" type="button" disabled={agent.running} onClick={() => void agent.runAgent(item.mode)}>
-              <div className="task-btn-header">
-                <strong>{item.title}</strong>
-                <span className={`cache-badge ${item.cached ? "" : "hidden"}`}>已缓存</span>
+              <div className="task-btn-content">
+                <div className="task-btn-header">
+                  <strong>{item.title}</strong>
+                  <span className={`cache-badge ${item.cached ? "" : "hidden"}`}>已缓存</span>
+                </div>
+                <span>{item.text}</span>
               </div>
-              <span>{item.text}</span>
+              <div className="task-btn-action">
+                <div className="action-circle">
+                  <span className="action-arrow">→</span>
+                </div>
+              </div>
             </button>
           ))}
         </div>
       </form>
 
       <div className={`cache-info-bar ${agent.cacheBadges.visible ? "visible" : ""}`}>
-        <span className="cache-info-icon">💾 缓存</span>
+        <span className="cache-badge">缓存</span>
         <span className="cache-info-text">
           <strong>{agent.cacheBadges.username || "--"}</strong> 的分析结果已缓存，将直接展示
           {agent.cacheBadges.expiresAt ? (
