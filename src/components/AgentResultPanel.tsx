@@ -202,7 +202,7 @@ export function AgentResultPanel({
           <ShareModal result={readme} platform={config.platform} username={config.username} />
         </div>
       </div>
-      <div className="result-body">
+      <div className={`result-body ${agent.running ? "is-loading" : ""}`}>
         <LoadingOverlay running={agent.running} />
         {readme && (
           <>
@@ -212,121 +212,124 @@ export function AgentResultPanel({
                 <button type="button" className={tab === "readme" ? "active" : ""} onClick={() => setTab("readme")}>README 草稿</button>
               </div>
             </div>
-            {tab === "report" ? (
-              <ReadmeReport result={readme} config={config} />
-            ) : (
-              <div className="mock-editor-window">
-                <div className="editor-header">
-                  <div className="editor-window-controls">
-                    <span className="dot dot-close" />
-                    <span className="dot dot-minimize" />
-                    <span className="dot dot-expand" />
-                  </div>
-                  <div className="editor-tabs">
-                    <button
-                      type="button"
-                      className={`editor-tab ${editorTab === "preview" ? "active" : ""}`}
-                      onClick={() => setEditorTab("preview")}
-                    >
-                      <span className="tab-icon">📄</span> README.md
-                    </button>
-                    <button
-                      type="button"
-                      className={`editor-tab ${editorTab === "source" ? "active" : ""}`}
-                      onClick={() => setEditorTab("source")}
-                    >
-                      <span className="tab-icon">💻</span> source.md
-                    </button>
-                    <button
-                      type="button"
-                      className={`editor-tab ${editorTab === "html" ? "active" : ""}`}
-                      onClick={() => setEditorTab("html")}
-                    >
-                      <span className="tab-icon">🌐</span> dist/index.html
-                    </button>
-                  </div>
-                  <div className="editor-git-status">
-                    <span className="git-branch-icon">⌥</span> git: <strong>main*</strong>
-                  </div>
-                </div>
-
-                <div className="editor-workspace">
-                  {editorTab === "preview" && (
-                    <div className="readme-preview-body">
-                      <div className="readme-render" dangerouslySetInnerHTML={{ __html: renderMarkdown(readme.markdown, config.platform, config.username) }} />
+            <div className="result-tab-panel">
+              <div className={`result-tab-content ${tab === "report" ? "active" : ""}`}>
+                <ReadmeReport result={readme} config={config} />
+              </div>
+              <div className={`result-tab-content ${tab === "readme" ? "active" : ""}`}>
+                <div className="mock-editor-window">
+                  <div className="editor-header">
+                    <div className="editor-window-controls">
+                      <span className="dot dot-close" />
+                      <span className="dot dot-minimize" />
+                      <span className="dot dot-expand" />
                     </div>
-                  )}
-
-                  {editorTab === "source" && (
-                    <div className="editor-code-container">
+                    <div className="editor-tabs">
                       <button
-                        className="btn subtle editor-copy-btn"
                         type="button"
-                        onClick={() => void copy(readme.markdown, "Markdown 源码")}
+                        className={`editor-tab ${editorTab === "preview" ? "active" : ""}`}
+                        onClick={() => setEditorTab("preview")}
                       >
-                        复制代码
+                        <span className="tab-icon">📄</span> README.md
                       </button>
-                      <div className="code-editor-pre">
-                        {readme.markdown.split(/\r?\n/).map((line, idx) => (
-                          <div key={idx} className="code-line">
-                            <span className="line-number">{idx + 1}</span>
-                            <span className="line-content">{line || " "}</span>
-                          </div>
-                        ))}
+                      <button
+                        type="button"
+                        className={`editor-tab ${editorTab === "source" ? "active" : ""}`}
+                        onClick={() => setEditorTab("source")}
+                      >
+                        <span className="tab-icon">💻</span> source.md
+                      </button>
+                      <button
+                        type="button"
+                        className={`editor-tab ${editorTab === "html" ? "active" : ""}`}
+                        onClick={() => setEditorTab("html")}
+                      >
+                        <span className="tab-icon">🌐</span> dist/index.html
+                      </button>
+                    </div>
+                    <div className="editor-git-status">
+                      <span className="git-branch-icon">⌥</span> git: <strong>main*</strong>
+                    </div>
+                  </div>
+
+                  <div className="editor-workspace">
+                    {editorTab === "preview" && (
+                      <div className="readme-preview-body">
+                        <div className="readme-render" dangerouslySetInnerHTML={{ __html: renderMarkdown(readme.markdown, config.platform, config.username) }} />
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {editorTab === "html" && (
-                    <div className="editor-code-container">
-                      {(() => {
-                        const rawHtml = renderMarkdown(readme.markdown, config.platform, config.username);
-                        const formattedHtml = rawHtml
-                          .replace(/(<\/?(?:div|p|ul|ol|li|h[1-6]|table|thead|tbody|tr|th|td|pre|code)[^>]*>)/gi, "\n$1\n")
-                          .split("\n")
-                          .map((line) => line.trim())
-                          .filter(Boolean)
-                          .join("\n");
-                        return (
-                          <>
-                            <button
-                              className="btn subtle editor-copy-btn"
-                              type="button"
-                              onClick={() => void copy(formattedHtml, "HTML 源码")}
-                            >
-                              复制 HTML
-                            </button>
-                            <div className="code-editor-pre">
-                              {formattedHtml.split("\n").map((line, idx) => (
-                                <div key={idx} className="code-line">
-                                  <span className="line-number">{idx + 1}</span>
-                                  <span className="line-content">{line || " "}</span>
-                                </div>
-                              ))}
+                    {editorTab === "source" && (
+                      <div className="editor-code-container">
+                        <button
+                          className="btn subtle editor-copy-btn"
+                          type="button"
+                          onClick={() => void copy(readme.markdown, "Markdown 源码")}
+                        >
+                          复制代码
+                        </button>
+                        <div className="code-editor-pre">
+                          {readme.markdown.split(/\r?\n/).map((line, idx) => (
+                            <div key={idx} className="code-line">
+                              <span className="line-number">{idx + 1}</span>
+                              <span className="line-content">{line || " "}</span>
                             </div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                <div className="editor-status-bar">
-                  <div className="status-left">
-                    <span className="status-item status-branch">🟢 UTF-8</span>
-                    <span className="status-item">Spaces: 2</span>
-                    <span className="status-item status-lang">Markdown</span>
+                    {editorTab === "html" && (
+                      <div className="editor-code-container">
+                        {(() => {
+                          const rawHtml = renderMarkdown(readme.markdown, config.platform, config.username);
+                          const formattedHtml = rawHtml
+                            .replace(/(<\/?(?:div|p|ul|ol|li|h[1-6]|table|thead|tbody|tr|th|td|pre|code)[^>]*>)/gi, "\n$1\n")
+                            .split("\n")
+                            .map((line) => line.trim())
+                            .filter(Boolean)
+                            .join("\n");
+                          return (
+                            <>
+                              <button
+                                className="btn subtle editor-copy-btn"
+                                type="button"
+                                onClick={() => void copy(formattedHtml, "HTML 源码")}
+                              >
+                                复制 HTML
+                              </button>
+                              <div className="code-editor-pre">
+                                {formattedHtml.split("\n").map((line, idx) => (
+                                  <div key={idx} className="code-line">
+                                    <span className="line-number">{idx + 1}</span>
+                                    <span className="line-content">{line || " "}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
-                  <div className="status-humor-bar">
-                    {humorQuote}
-                  </div>
-                  <div className="status-right">
-                    <span className="status-item">Line {readme.markdown.split(/\r?\n/).length}, Col 1</span>
-                    <span className="status-item">100% Bug-Free*</span>
+
+                  <div className="editor-status-bar">
+                    <div className="status-left">
+                      <span className="status-item status-branch">🟢 UTF-8</span>
+                      <span className="status-item">Spaces: 2</span>
+                      <span className="status-item status-lang">Markdown</span>
+                    </div>
+                    <div className="status-humor-bar">
+                      {humorQuote}
+                    </div>
+                    <div className="status-right">
+                      <span className="status-item">Line {readme.markdown.split(/\r?\n/).length}, Col 1</span>
+                      <span className="status-item">100% Bug-Free*</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
           </>
         )}
         {recipe && <StatsRecipeDashboard recipe={recipe} summary={agent.result.kind === "stats" ? agent.result.summary : ""} />}

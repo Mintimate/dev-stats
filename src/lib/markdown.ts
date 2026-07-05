@@ -25,15 +25,15 @@ const BLOCK_DEPTH_CLOSE_RE = new RegExp(`</(${BLOCK_DEPTH_TAGS})>`, "gi");
 
 function isSafeUrl(url: string) {
   const trimmed = String(url || "").trim();
-  // 只允许 http(s) / 相对路径 / 锚点，阻止 javascript: / data: 等危险协议。
-  return /^(https?:\/\/|\/|#|\.\/|\.\.\/)/i.test(trimmed);
+  // 只允许 http(s) / mailto / 相对路径 / 锚点，阻止 javascript: / data: 等危险协议。
+  return /^(https?:\/\/|mailto:|\/|#|\.\/|\.\.\/)/i.test(trimmed);
 }
 
 function resolveRelativeUrl(url: string, platform?: string, username?: string): string {
   const trimmed = String(url || "").trim();
   if (!platform || !username) return trimmed;
   // 仅放行 http(s) 与锚点；data:/javascript: 等危险协议交给 isSafeUrl 统一把关。
-  if (/^(https?:\/\/|#)/i.test(trimmed)) {
+  if (/^(https?:\/\/|mailto:|#)/i.test(trimmed)) {
     return trimmed;
   }
   if (/^\/?api(\/|\?|$)/i.test(trimmed)) {
@@ -54,6 +54,8 @@ function resolveRelativeUrl(url: string, platform?: string, username?: string): 
 const SAFE_ATTRS_BY_TAG: Record<string, string[]> = {
   a: ["href", "target", "rel", "title"],
   img: ["src", "alt", "title"],
+  div: ["align", "class"],
+  p: ["align", "class"],
 };
 const DEFAULT_SAFE_ATTRS = ["alt", "colspan", "rowspan", "class"];
 
@@ -138,7 +140,8 @@ function inlineMarkdown(value: string, platform?: string, username?: string) {
           return isSafeUrl(resolvedUrl) ? `<a href="${resolvedUrl}" target="_blank" rel="noopener">${text}</a>` : m;
         })
         .replace(/`([^`]+)`/g, "<code>$1</code>")
-        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/(^|[\s([{"'“])\*([^*\n]+?)\*(?=$|[\s)\]}.,!?:;"'”])/g, "$1<em>$2</em>");
     }
   }).join("");
 }
@@ -159,6 +162,35 @@ function getBlockTagChange(line: string): number {
     if (!o.endsWith("/>")) change += 1;
   }
   return change - closes.length;
+}
+
+function stripHtmlCommentsFromLine(line: string, inComment: boolean) {
+  let remaining = line;
+  let output = "";
+
+  while (remaining) {
+    if (inComment) {
+      const endIndex = remaining.indexOf("-->");
+      if (endIndex === -1) {
+        return { line: output, inComment: true };
+      }
+      remaining = remaining.slice(endIndex + 3);
+      inComment = false;
+      continue;
+    }
+
+    const startIndex = remaining.indexOf("<!--");
+    if (startIndex === -1) {
+      output += remaining;
+      break;
+    }
+
+    output += remaining.slice(0, startIndex);
+    remaining = remaining.slice(startIndex + 4);
+    inComment = true;
+  }
+
+  return { line: output, inComment };
 }
 
 
@@ -211,9 +243,10 @@ export function renderMarkdown(markdown: string, platform?: string, username?: s
   let inCode = false;
   let listOpen = false;
   let htmlBlockDepth = 0;
+  let inHtmlComment = false;
 
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
+    let line = lines[index];
     if (line.startsWith("```")) {
       if (listOpen) {
         html.push("</ul>");
@@ -227,6 +260,11 @@ export function renderMarkdown(markdown: string, platform?: string, username?: s
       html.push(`${escapeHtml(line)}\n`);
       continue;
     }
+
+    const uncommented = stripHtmlCommentsFromLine(line, inHtmlComment);
+    line = uncommented.line;
+    inHtmlComment = uncommented.inComment;
+    if (!line.trim()) continue;
 
     const lineTagChange = getBlockTagChange(line);
     const isBlock = isBlockLine(line) || htmlBlockDepth > 0;
@@ -253,6 +291,24 @@ export function renderMarkdown(markdown: string, platform?: string, username?: s
         tableLines.push(lines[index]);
       }
       html.push(renderMarkdownTable(tableLines, platform, username));
+      continue;
+    }
+    const quote = line.match(/^\s*>\s?(.*)$/);
+    if (quote) {
+      if (listOpen) {
+        html.push("</ul>");
+        listOpen = false;
+      }
+      html.push(`<blockquote>${quote[1].trim() ? `<p>${inlineMarkdown(quote[1], platform, username)}</p>` : ""}</blockquote>`);
+      continue;
+    }
+    const horizontalRule = line.match(/^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/);
+    if (horizontalRule) {
+      if (listOpen) {
+        html.push("</ul>");
+        listOpen = false;
+      }
+      html.push("<hr />");
       continue;
     }
     const heading = line.match(/^(#{1,6})\s+(.+)$/);
