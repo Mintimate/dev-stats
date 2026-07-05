@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useState } from "react";
 import type { Platform } from "../lib/types";
+import { getTagColor } from "../lib/constants";
 
 export interface LeaderboardItem {
   username: string;
@@ -16,17 +17,6 @@ interface LeaderboardPanelProps {
   onLoadUser: (item: LeaderboardItem) => void;
 }
 
-function getTagStyle(index: number) {
-  const colors = [
-    { background: "#fff7ed", color: "#ea580c", border: "1px solid rgba(234, 88, 12, 0.15)" }, // Orange
-    { background: "#f0fdf4", color: "#16a34a", border: "1px solid rgba(22, 163, 74, 0.15)" }, // Green
-    { background: "#eff6ff", color: "#2563eb", border: "1px solid rgba(37, 99, 235, 0.15)" }, // Blue
-    { background: "#faf5ff", color: "#7c3aed", border: "1px solid rgba(124, 58, 237, 0.15)" }, // Purple
-    { background: "#fdf2f8", color: "#db2777", border: "1px solid rgba(219, 39, 119, 0.15)" }, // Pink
-  ];
-  return colors[index % colors.length];
-}
-
 function handleAvatarError(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget;
   // 用绝对路径 + 一次性标记兜底，避免相对路径在非根路径页面下解析出错而无限触发 onError。
@@ -35,7 +25,7 @@ function handleAvatarError(e: React.SyntheticEvent<HTMLImageElement>) {
   img.src = "/favicon.svg";
 }
 
-function getHumorousTitle(rating: string) {
+export function getHumorousTitle(rating: string) {
   const map: Record<string, string> = {
     "夯": "搬砖巨匠",
     "骨灰级": "骨灰仙人",
@@ -48,6 +38,7 @@ function getHumorousTitle(rating: string) {
   };
   return map[rating] || rating;
 }
+
 
 const PAGE_SIZE = 10;
 
@@ -207,7 +198,7 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
                         <span
                           key={tag}
                           className="leaderboard-tag"
-                          style={getTagStyle(tagIndex)}
+                          style={getTagColor(tagIndex)}
                         >
                           {tag}
                         </span>

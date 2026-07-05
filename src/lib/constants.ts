@@ -73,3 +73,19 @@ export const cardMetadata: Record<string, { name: string; desc: string }> = {
   "repo-languages": { name: "Repo Languages", desc: "单仓语言分布：细致分析单个仓库的各种语言占比。" },
   "contribution-calendar": { name: "Contribution Calendar", desc: "贡献日历：展示近期公开贡献热力分布。" },
 };
+
+/**
+ * 徽章/标签的循环配色表。Leaderboard 榜单行与 README 报告卡片（AgentResultPanel / UserPage）
+ * 共用同一套配色规则，保证同一个用户的 badge 在不同页面视觉上一致。
+ */
+const TAG_COLOR_CYCLE = [
+  { background: "#fff7ed", color: "#ea580c", border: "1px solid rgba(234, 88, 12, 0.15)" }, // Orange
+  { background: "#f0fdf4", color: "#16a34a", border: "1px solid rgba(22, 163, 74, 0.15)" }, // Green
+  { background: "#eff6ff", color: "#2563eb", border: "1px solid rgba(37, 99, 235, 0.15)" }, // Blue
+  { background: "#faf5ff", color: "#7c3aed", border: "1px solid rgba(124, 58, 237, 0.15)" }, // Purple
+  { background: "#fdf2f8", color: "#db2777", border: "1px solid rgba(219, 39, 119, 0.15)" }, // Pink
+];
+
+export function getTagColor(index: number) {
+  return TAG_COLOR_CYCLE[index % TAG_COLOR_CYCLE.length];
+}
