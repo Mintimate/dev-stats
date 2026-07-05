@@ -1,4 +1,5 @@
 import type { ShareData } from "./types";
+import { getTagColor } from "./constants";
 
 type Ctx2D = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
 
@@ -340,15 +341,16 @@ export function drawScene(
 
   context.font = "900 12px system-ui, sans-serif";
   let badgeX = leftX;
-  data.badges.slice(0, 5).forEach((badge) => {
+  data.badges.slice(0, 5).forEach((badge, badgeIndex) => {
     const label = String(badge).slice(0, 18);
     const pillW = Math.min(140, context.measureText(label).width + 22);
     if (badgeX + pillW > leftX + leftW) {
       badgeX = leftX;
       y += 32;
     }
-    drawRoundRect(context, badgeX, y, pillW, 28, 14, "#f1f5f9", "#e2e8f0");
-    context.fillStyle = "#0f172a";
+    const tagColor = getTagColor(badgeIndex);
+    drawRoundRect(context, badgeX, y, pillW, 28, 14, tagColor.background, tagColor.color);
+    context.fillStyle = tagColor.color;
     context.fillText(label, badgeX + 11, y + 18);
     badgeX += pillW + 8;
   });

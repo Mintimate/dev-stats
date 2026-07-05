@@ -2,13 +2,13 @@
 
 [English](README_EN.md) | 简体中文
 
-本项目基于 [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats) 核心代码进行扩展，新增了 CNB 平台支持、AI 智能评估助手、开发者排行榜等功能，适配 [腾讯云 EdgeOne Makers](https://makers.edgeone.ai) 平台部署。
+本项目基于 [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats) 核心代码进行扩展，新增了 CNB 平台支持、**AI Stats Agent 智能评估助手**、开发者排行榜等功能，适配 [腾讯云 EdgeOne Makers](https://makers.edgeone.ai) 平台部署。
 
-原项目采用 Vercel 平台部署，本版本适配 EdgeOne Makers Cloud Functions，采用 Go 运行时实现后端，提供丰富的 Web 前端交互以及更低的响应延迟。
+原项目采用 Vercel 平台部署，本版本适配 EdgeOne Makers Cloud Functions，采用 Go 运行时实现后端，同时提供基于 Node.js 的 AI Agent 云函数层，兼具丰富的 Web 前端交互与极低的响应延迟。AI Stats Agent 的开发者画像分析灵感同样来自 [hikariming/ghfind](https://github.com/hikariming/ghfind)。
 
 ## 项目简介
 
-- **AI 智能助手 (Stats Agent)**：集成大语言模型，能自动分析你的开源贡献，生成带有客观评分的专属评价，支持流式对话与 README 智能生成
+- **AI Stats Agent**：集成大语言模型，能自动分析你的开源贡献，生成带有客观评分的专属评价，支持流式对话与 README 智能生成
 - **开发者发现排行榜**：自动收录被评估的开发者，展示分数排名、平台标识与能力雷达，随时与其他顶级开发者对决
 - **动态统计卡片**：展示 GitHub 或 CNB 数据（如提交次数、PR、Star 等）
 - **多平台数据源**：原生支持 GitHub，同时无缝集成 CNB 平台数据抓取与卡片渲染
@@ -19,7 +19,105 @@
 
 ## 界面展示
 
-![EdgeOne Makers Dashboard](./docs/static/dashboard.webp)
+![Dev Stats 网站](./docs/static/websiteIndex.webp)
+
+分享卡片
+
+![Dev Stats 分享卡片](./docs/static/cardShare.webp)
+
+手动渲染 Stats 卡片:
+
+![Dev Stats 手动渲染 Stats 卡片](./docs/static/makeStatsCardManually.webp)
+
+## AI Stats Agent
+
+AI Stats Agent 是本项目的核心亮点功能，基于大语言模型（LLM）构建，通过 EdgeOne Makers Node.js 云函数部署，提供开发者画像分析、README 自动生成和 Stats 卡片推荐等完整 AI 能力。
+
+### 主要功能
+
+#### 🤖 预设任务按钮驱动
+
+Agent 面板采用**预设按钮**驱动，无需自由输入提示词。只需填入用户名并点击对应按钮，Agent 即会自动完成完整的分析链路，并通过 SSE（Server-Sent Events）实时流式展示运行纪要。
+
+当前提供两个预设任务：
+
+| 按钮 | 说明 |
+|------|------|
+| **生成主页 README** | 浏览主页、读取 Profile README，输出可直接复制的 Markdown 草稿 |
+| **推荐卡片配方** | 分析公开资料，生成可应用到手动面板的 Stats 卡片方案 |
+
+Agent 在执行过程中会依次调用以下工具：
+
+| 工具 | 说明 |
+|------|------|
+| `browser_fetch` | 浏览用户主页，获取公开信号 |
+| `inspect_github_user` | 拷打 GitHub 用户资料：仓库、语言、活跃度 |
+| `inspect_cnb_user` | 拷打 CNB 用户资料：项目、组织、公开履历 |
+| `fetch_github_profile_readme` | 读取 Profile README，参考用户自我介绍 |
+| `compose_stats_recipe` | 生成个性化 Stats 卡片配方 |
+| `compose_readme_draft` | 输出完整的 README Markdown 草稿 |
+
+#### 📊 开发者评分体系
+
+Agent 会基于公开数据对开发者进行多维度打分（每维度 1–20 分）：
+
+| 维度 | 说明 |
+|------|------|
+| `maturity` | 账号成熟度与完整度 |
+| `original_projects` | 原创项目质量与 Star 数 |
+| `contributions` | PR、提交量与贡献深度 |
+| `influence` | Star、Fork、Follower 影响力 |
+| `activity` | 近期提交密度与活跃度 |
+| `community` | 粉丝量与社区参与度 |
+
+综合评分对应五档能力评级：
+
+| 评级 | 分数范围 | 说明 |
+|------|----------|------|
+| 🔥 **夯** | 90–100 | 行业顶级影响力，核心技术突破 |
+| ⭐ **顶流** | 80–89 | 明星开源项目领导者 |
+| 💪 **高级** | 70–79 | 工程深度扎实，中等影响力 |
+| 😐 **平庸** | 50–69 | 日常提交，缺乏旗舰作品 |
+| 🌱 **入门** | 10–49 | 新手账号，多为 Fork 或 Demo |
+
+#### 📝 README 智能生成
+
+在"README 模式"下，Agent 会：
+
+1. 获取现有 Profile README（GitHub 模式）
+2. 分析仓库列表、语言分布、贡献历史
+3. 撰写完整的个人介绍 Markdown（促销文案 + 客观评价 + 毒舌吐槽三段）
+4. 推荐适合的 Stats 卡片组合并嵌入 README 中
+5. 生成 `score`、`badges`、`dimension_scores` 等结构化画像数据
+
+#### 🏆 开发者排行榜
+
+每次 Agent 完成分析后，结果会自动写入 KV Blob 存储，并更新全局排行榜：
+
+- 收录所有被评估的开发者（GitHub / CNB 双平台）
+- 按综合得分降序排列，最多展示 Top 100
+- 显示昵称、头像、分数、评级、标签
+- 排行榜数据通过 `/agents/leaderboard` 接口提供，前端实时渲染
+
+### Agent API 接口
+
+| 接口 | 说明 |
+|------|------|
+| `POST /agents/chat` | 流式 SSE 对话，传入 `{ message, state, history }` |
+| `GET /agents/chat?id=...` | 轮询会话结果（供非流式场景使用） |
+| `POST /agents/stop` | 中断当前 Agent 运行 |
+| `GET /agents/leaderboard` | 获取开发者排行榜 |
+| `GET /agents/profile` | 获取指定用户的缓存分析结果 |
+
+### 环境变量（Agent 功能）
+
+Agent 功能需要额外配置大模型访问令牌：
+
+| 变量名 | 说明 | 是否必须 |
+|--------|------|----------|
+| `OPENAI_API_KEY` | 大模型 API Key（支持 OpenAI 兼容接口） | ✅ Agent 功能必需 |
+| `OPENAI_BASE_URL` | 自定义模型 API 地址（可接入国产模型） | 可选 |
+| `OPENAI_MODEL` | 指定使用的模型名称 | 可选 |
 
 ## 快速开始
 
@@ -59,6 +157,14 @@ GitHub 数据源需要令牌，CNB 公开数据源无需令牌：
   - 公开卡片通过 CNB 主站 Web JSON 接口读取，不要求令牌
   - 令牌仅作为未来受限 Open API 功能的后备，不会随主站公开请求发送
 - 其他原项目环境变量: [原项目文档](https://github.com/anuraghazra/github-readme-stats#customization)。
+
+### Agent 相关环境变量
+
+使用 **AI Stats Agent** 功能时，还需配置大模型访问凭据：
+
+- **`OPENAI_API_KEY`**：大模型 API Key（支持 OpenAI 兼容接口）✅ **Agent 功能必需**
+- **`OPENAI_BASE_URL`**：自定义模型 API 地址，可接入国产模型或其他兼容服务（可选）
+- **`OPENAI_MODEL`**：指定使用的模型名称（可选）
 
 > **注意**：EdgeOne Makers 在部署后加载环境变量，每次更改环境变量后需要重新触发部署使变量生效。
 
@@ -172,6 +278,7 @@ CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/
 ## 相关链接
 
 - [原项目仓库](https://github.com/anuraghazra/github-readme-stats) - anuraghazra/github-readme-stats
+- [ghfind](https://github.com/hikariming/ghfind) - AI Stats Agent 开发者画像分析灵感来源
 - [EdgeOne Makers 文档](https://pages.edgeone.ai/zh/document/product-introduction)
 - [EdgeOne Makers 控制台](https://console.cloud.tencent.com/edgeone/pages)
 

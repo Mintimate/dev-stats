@@ -8,7 +8,7 @@ import (
 
 // Provider is the data-source contract shared by GitHub and CNB cards.
 type Provider interface {
-	FetchStats(context.Context, string, bool, []string, bool, bool, bool, string) (StatsData, error)
+	FetchStats(ctx context.Context, q StatsQuery) (StatsData, error)
 	FetchTopLanguages(context.Context, string, []string, float64, float64) ([]LanguageStat, error)
 	FetchRepo(context.Context, string, string) (RepoData, error)
 	FetchContributionCalendar(context.Context, string) (string, []ContributionDay, error)

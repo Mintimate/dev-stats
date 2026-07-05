@@ -2,9 +2,9 @@
 
 English | [简体中文](README.md)
 
-This project is an extended version of [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats), adding support for the CNB platform, AI evaluation agent, and developer leaderboards, fully adapted for deployment on [Tencent EdgeOne Makers](https://makers.edgeone.ai).
+This project is an extended version of [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats), adding support for the CNB platform, **AI Stats Agent**, and developer leaderboards, fully adapted for deployment on [Tencent EdgeOne Makers](https://makers.edgeone.ai).
 
-The original project is deployed on Vercel. This version is adapted for EdgeOne Makers Cloud Functions and now includes a Go runtime implementation, keeping the same API interfaces and features, alongside a rich interactive Web frontend.
+The original project is deployed on Vercel. This version is adapted for EdgeOne Makers Cloud Functions, using a Go runtime for card rendering and a Node.js AI Agent layer, combining a rich interactive Web frontend with ultra-low response latency. The developer profile analysis in AI Stats Agent was also inspired by [hikariming/ghfind](https://github.com/hikariming/ghfind).
 
 ## Features
 
@@ -19,7 +19,105 @@ The original project is deployed on Vercel. This version is adapted for EdgeOne 
 
 ## Interface Preview
 
-![EdgeOne Makers Dashboard](./docs/static/dashboard.webp)
+![Dev Stats Website](./docs/static/websiteIndex.webp)
+
+Share Card
+
+![Dev Stats Share Card](./docs/static/cardShare.webp)
+
+Manual Stats Card Rendering:
+
+![Dev Stats Manual Stats Card](./docs/static/makeStatsCardManually.webp)
+
+## AI Stats Agent
+
+AI Stats Agent is the flagship feature of this project, built on top of large language models (LLMs) and deployed as EdgeOne Makers Node.js Cloud Functions. It provides complete AI capabilities for developer profile analysis, smart README generation, and Stats card recommendations.
+
+### Key Capabilities
+
+#### 🤖 Preset Task Buttons
+
+The Agent panel is driven by **preset buttons** — no free-form prompt input required. Simply enter a username and click the corresponding button; the Agent will automatically run the full analysis pipeline and stream live progress via SSE (Server-Sent Events).
+
+Two preset tasks are available:
+
+| Button | Description |
+|--------|-------------|
+| **Generate Profile README** | Browse the profile page, read the existing Profile README, and output a ready-to-copy Markdown draft |
+| **Recommend Card Recipe** | Analyze public data and generate a Stats card configuration applicable to the manual panel |
+
+During execution, the Agent calls the following tools in sequence:
+
+| Tool | Description |
+|------|-------------|
+| `browser_fetch` | Browse the user's profile page to gather public signals |
+| `inspect_github_user` | Fetch GitHub user data: repositories, languages, activity |
+| `inspect_cnb_user` | Fetch CNB user data: projects, organizations, public history |
+| `fetch_github_profile_readme` | Read the Profile README as self-introduction context |
+| `compose_stats_recipe` | Generate a personalized Stats card recipe |
+| `compose_readme_draft` | Output a complete README Markdown draft |
+
+#### 📊 Developer Scoring System
+
+The Agent scores developers across 6 dimensions based on public data (each dimension: 1–20 points):
+
+| Dimension | Description |
+|-----------|-------------|
+| `maturity` | Account age and profile completeness |
+| `original_projects` | Original project quality and star counts |
+| `contributions` | PRs, commit volume, and contribution depth |
+| `influence` | Stars, forks, and followers |
+| `activity` | Recent commit density and engagement |
+| `community` | Follower count and community involvement |
+
+The composite score maps to five rating tiers:
+
+| Rating | Score Range | Description |
+|--------|-------------|-------------|
+| 🔥 **夯** | 90–100 | Industry-leading influence, core technical breakthroughs |
+| ⭐ **顶流** | 80–89 | Leading prominent open-source flagship projects |
+| 💪 **高级** | 70–79 | Solid engineering depth with moderate influence |
+| 😐 **平庸** | 50–69 | Regular commits, lacks high-impact flagship work |
+| 🌱 **入门** | 10–49 | New profile, mostly forks or basic demos |
+
+#### 📝 Smart README Generation
+
+In "README mode", the Agent will:
+
+1. Fetch the existing Profile README (GitHub mode)
+2. Analyze repository list, language distribution, and contribution history
+3. Write a complete personal introduction Markdown (promotional summary + objective evaluation + witty roast)
+4. Recommend fitting Stats card combinations and embed them in the README
+5. Generate structured profile data: `score`, `badges`, `dimension_scores`, and `top_repos`
+
+#### 🏆 Developer Leaderboard
+
+After each analysis, results are automatically written to KV Blob storage and the global leaderboard is updated:
+
+- Indexes all evaluated developers (GitHub & CNB dual-platform)
+- Ranked by composite score descending, showing Top 100
+- Displays nickname, avatar, score, rating tier, and tags
+- Leaderboard data served via `/agents/leaderboard`, rendered in real-time on the frontend
+
+### Agent API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /agents/chat` | Streaming SSE conversation, accepts `{ message, state, history }` |
+| `GET /agents/chat?id=...` | Poll session results (for non-streaming use cases) |
+| `POST /agents/stop` | Interrupt the current Agent run |
+| `GET /agents/leaderboard` | Retrieve the developer leaderboard |
+| `GET /agents/profile` | Get cached analysis result for a specific user |
+
+### Environment Variables (Agent)
+
+The Agent feature requires additional LLM access credentials:
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `OPENAI_API_KEY` | LLM API key (supports any OpenAI-compatible API) | ✅ Required for Agent |
+| `OPENAI_BASE_URL` | Custom model API base URL (for third-party or domestic models) | Optional |
+| `OPENAI_MODEL` | Model name to use | Optional |
 
 ## Quick Start
 
@@ -59,6 +157,14 @@ GitHub requires a token; public CNB data does not:
   - Public cards use CNB's web JSON endpoints and do not require a token
   - The token is only a fallback for future restricted Open API features and is never sent to public web endpoints
 - Other environment variables from the original project: [Original Project Documentation](https://github.com/anuraghazra/github-readme-stats#customization)
+
+### Agent Environment Variables
+
+To use the **AI Stats Agent** feature, you also need to configure LLM credentials:
+
+- **`OPENAI_API_KEY`**: LLM API key (supports any OpenAI-compatible API) ✅ **Required for Agent**
+- **`OPENAI_BASE_URL`**: Custom model API base URL, supports third-party or domestic model providers (optional)
+- **`OPENAI_MODEL`**: Specifies the model name to use (optional)
 
 > **Note**: EdgeOne Makers loads environment variables after deployment. After changing environment variables, you need to trigger a new deployment for the changes to take effect.
 
@@ -172,6 +278,7 @@ For more styling and parameter configurations (environment variables), please re
 ## Related Links
 
 - [Original Repository](https://github.com/anuraghazra/github-readme-stats) - anuraghazra/github-readme-stats
+- [ghfind](https://github.com/hikariming/ghfind) - Inspiration for AI Stats Agent developer profile analysis
 - [EdgeOne Makers Documentation](https://pages.edgeone.ai/en/document/product-introduction)
 - [EdgeOne Makers Console](https://console.cloud.tencent.com/edgeone/pages)
 

@@ -1,9 +1,14 @@
 import { getStore } from '@edgeone/pages-blob';
 import { createLogger, jsonResponse } from './_shared';
+import {
+  CACHE_STORE_NAME,
+  extractReadmeFromEvents,
+  LEADERBOARD_KEY,
+  parseAnalysisCacheKey,
+  resolveGitHubLogin,
+} from './_cache';
 
 const logger = createLogger('leaderboard-agent');
-const CACHE_STORE_NAME = 'stats-agent-analysis-cache';
-const leaderboardKey = 'leaderboard/readme_rankings.json';
 
 export async function onRequest(context: any) {
   const store = getStore(CACHE_STORE_NAME);
@@ -16,7 +21,7 @@ export async function onRequest(context: any) {
   // 1. Try reading the compiled index if not forcing a rebuild
   if (!forceRebuild) {
     try {
-      const entry = await store.get(leaderboardKey, { type: 'json', consistency: 'strong' });
+      const entry = await store.get(LEADERBOARD_KEY, { type: 'json', consistency: 'strong' });
       if (Array.isArray(entry)) {
         leaderboard = entry;
         indexExists = true;
@@ -80,27 +85,7 @@ export async function onRequest(context: any) {
         try {
           if (!cacheEntry || !Array.isArray(cacheEntry.events)) continue;
 
-            let readmeDraft: any = null;
-            let userProfile: any = null;
-            for (const raw of cacheEntry.events) {
-              if (raw.startsWith('data: ')) {
-                const jsonStr = raw.slice(6).trim();
-                try {
-                  const parsed = JSON.parse(jsonStr);
-                  if (parsed.type === 'readme_draft') {
-                    readmeDraft = parsed;
-                  } else if (parsed.type === 'user_profile') {
-                    try {
-                      userProfile = typeof parsed.content === 'string' ? JSON.parse(parsed.content) : parsed.content;
-                    } catch {
-                      userProfile = parsed;
-                    }
-                  }
-                } catch {
-                  // ignore
-                }
-              }
-            }
+            const { readmeDraft, userProfile } = extractReadmeFromEvents(cacheEntry.events);
 
             if (readmeDraft) {
               const nickname = userProfile?.nickname || readmeDraft.user?.nickname || readmeDraft.user?.name || username;
@@ -181,7 +166,7 @@ export async function onRequest(context: any) {
 
     // Save index
     try {
-      await store.setJSON(leaderboardKey, sliced);
+      await store.setJSON(LEADERBOARD_KEY, sliced);
       logger.log({ event: 'leaderboard.rebuild.success', count: sliced.length });
     } catch (err) {
       logger.error({ event: 'leaderboard.save_index.error', error: String(err) });
@@ -192,30 +177,4 @@ export async function onRequest(context: any) {
     logger.error({ event: 'leaderboard.rebuild.failed', error: String(error) });
     return jsonResponse({ error: error.message || String(error) }, 500);
   }
-}
-
-function parseAnalysisCacheKey(key: string): { platform: string; username: string; mode: string } | null {
-  const parts = key.split('/');
-  if (parts.length === 4 && parts[0] === 'analysis') {
-    return { platform: parts[1], username: parts[2], mode: parts[3].replace(/\.json$/, '') };
-  }
-  if (parts.length === 5 && parts[0] === 'analysis' && /^v\d+$/.test(parts[1])) {
-    return { platform: parts[2], username: parts[3], mode: parts[4].replace(/\.json$/, '') };
-  }
-  return null;
-}
-
-async function resolveGitHubLogin(username: string): Promise<string> {
-  try {
-    const response = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
-      headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' },
-    });
-    if (response.ok) {
-      const profile = await response.json();
-      return profile.login || username;
-    }
-  } catch {
-    // ignore
-  }
-  return username;
 }

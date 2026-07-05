@@ -1,4 +1,5 @@
 import { RadarChart } from "./RadarChart";
+import { getTagColor } from "../lib/constants";
 import type { ManualConfig, ReadmeResult } from "../lib/types";
 
 /**
@@ -9,53 +10,59 @@ import type { ManualConfig, ReadmeResult } from "../lib/types";
 export function ReadmeReport({
   result,
   config,
+  children,
 }: {
   result: ReadmeResult;
   config: Pick<ManualConfig, "platform" | "username">;
+  children?: React.ReactNode;
 }) {
   return (
     <div className="dashboard-grid">
-      <div className="db-profile-card">
-        <div className="user-header">
-          <img
-            className="user-avatar"
-            src={result.avatarUrl}
-            alt="User avatar"
-            crossOrigin="anonymous"
-            decoding="async"
-            onError={(event) => {
-              const img = event.currentTarget;
-              // 用绝对路径 + 一次性标记兜底，避免在 /u/:platform/:username 这类子路径下
-              // 相对路径 "favicon.svg" 被解析成 "/u/:platform/favicon.svg" 而 404，
-              // 导致 onError 无限重复触发、无限请求同一张图。
-              if (img.dataset.fallback === "1") return;
-              img.dataset.fallback = "1";
-              img.src = "/favicon.svg";
-            }}
-          />
-          <div className="user-info">
-            <h3 className="user-name">{result.user?.nickname || result.user?.name || config.username || "--"}</h3>
-            <span className="user-handle">@{config.username || "--"}</span>
+      <div className="db-left-column">
+        <div className="db-profile-card">
+          <div className="user-header">
+            <img
+              className="user-avatar"
+              src={result.avatarUrl}
+              alt="User avatar"
+              crossOrigin="anonymous"
+              decoding="async"
+              onError={(event) => {
+                const img = event.currentTarget;
+                // 用绝对路径 + 一次性标记兜底，避免在 /u/:platform/:username 这类子路径下
+                // 相对路径 "favicon.svg" 被解析成 "/u/:platform/favicon.svg" 而 404，
+                // 导致 onError 无限重复触发、无限请求同一张图。
+                if (img.dataset.fallback === "1") return;
+                img.dataset.fallback = "1";
+                img.src = "/favicon.svg";
+              }}
+            />
+            <div className="user-info">
+              <h3 className="user-name">{result.user?.nickname || result.user?.name || config.username || "--"}</h3>
+              <span className="user-handle">@{config.username || "--"}</span>
+            </div>
+          </div>
+          <p className="user-bio">{result.user?.bio || "--"}</p>
+          <div className="score-card">
+            <div className="score-main">
+              <span className="score-value">{result.score.toFixed(2)}</span>
+              <span className="score-total">/ 100</span>
+            </div>
+            <div className="score-level-badge">
+              <span className="level-label">LEVEL</span>
+              <span>{result.objective_rating}</span>
+            </div>
+          </div>
+          <div className="badges-container">
+            {result.badges.map((badge, badgeIndex) => (
+              <span className="db-tag" key={badge} style={getTagColor(badgeIndex)}>{badge}</span>
+            ))}
           </div>
         </div>
-        <p className="user-bio">{result.user?.bio || "--"}</p>
-        <div className="score-card">
-          <div className="score-main">
-            <span className="score-value">{result.score.toFixed(2)}</span>
-            <span className="score-total">/ 100</span>
-          </div>
-          <div className="score-level-badge">
-            <span className="level-label">LEVEL</span>
-            <span>{result.objective_rating}</span>
-          </div>
-        </div>
-        <div className="badges-container">
-          {result.badges.map((badge) => (
-            <span className="db-tag" key={badge}>{badge}</span>
-          ))}
-        </div>
+        {children}
       </div>
       <div className="db-details-card">
+
         <div className="chart-section">
           <div className="card-title">维度评分</div>
           <div className="radar-container">

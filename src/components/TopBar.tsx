@@ -1,0 +1,54 @@
+import type { GlobalStatus, ManualConfig, ViewName } from "../lib/types";
+import { cardOptions } from "../lib/constants";
+
+export function TopBar({
+  view,
+  setView,
+  config,
+  status,
+}: {
+  view: ViewName;
+  setView: (view: ViewName) => void;
+  config: ManualConfig;
+  status: GlobalStatus;
+}) {
+  const selectedCard = cardOptions.find((item) => item.value === config.card)?.label || config.card;
+
+  return (
+    <header className="topbar">
+      <div className="brand">
+        <div className="mark">
+          <img src="/favicon.svg" alt="GS Logo" />
+        </div>
+        <div>
+          <h1>DevStats 统计工坊</h1>
+          <p className="sub">GitHub / CNB 主页 README 与统计卡片生成台</p>
+        </div>
+      </div>
+      <div className="topbar-tools">
+        <nav className="primary-nav" aria-label="主视图">
+          <button className={`nav-btn ${view === "agent" ? "active" : ""}`} type="button" onClick={() => setView("agent")}>
+            AI 分析
+          </button>
+          <button className={`nav-btn ${view === "manual" ? "active" : ""}`} type="button" onClick={() => setView("manual")}>
+            手动配置
+          </button>
+        </nav>
+        <div className="context-strip" aria-label="当前上下文">
+          <span className="context-chip">
+            <span className="context-label">平台</span>
+            <span className="context-value">{config.platform === "github" ? "GitHub" : "CNB"}</span>
+          </span>
+          <span className="context-chip">
+            <span className="context-label">卡片</span>
+            <span className="context-value">{selectedCard}</span>
+          </span>
+          <span className={`context-chip status ${status.tone || ""}`}>
+            <span className="context-label">状态</span>
+            <span className="context-value">{status.label}</span>
+          </span>
+        </div>
+      </div>
+    </header>
+  );
+}

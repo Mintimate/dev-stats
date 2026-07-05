@@ -119,6 +119,7 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     setUsage(null);
     setResult({ kind: "none" });
     setToolchain(emptyToolchain);
+    clearCacheBadges();
   }
 
   function startTimer() {

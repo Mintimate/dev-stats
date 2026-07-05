@@ -10,6 +10,15 @@ import {
 import { getStore } from '@edgeone/pages-blob';
 import { resolveModelName } from '../_model';
 import { createLogger, createSSEResponse, getGitHubToken, jsonResponse, sseEvent, truncateText } from '../_shared';
+import {
+  buildCacheKey as buildCacheKeyShared,
+  CACHE_STORE_NAME,
+  type CacheEntry,
+  extractReadmeFromEvents,
+  LEADERBOARD_KEY,
+  parseAnalysisCacheKey,
+  resolveGitHubLogin,
+} from '../_cache';
 import { buildSystemPrompt, buildUserInput } from './_prompt';
 import { createOpenAIAgentTools } from './_tools';
 
@@ -31,25 +40,7 @@ const QWEN_THINKING_MODEL_SETTINGS: ModelSettings = {
 };
 
 const DEFAULT_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const CACHE_STORE_NAME = 'stats-agent-analysis-cache';
-const CACHE_SCHEMA_VERSION = 'v4';
 const AGENT_MAX_TURNS = 12;
-
-interface CacheEntry {
-  cachedAt: number;
-  events: string[]; // raw SSE line strings collected during the run
-}
-
-function buildCacheKey(platform: string, username: string, mode: string): string {
-  const safePlatform = (platform || 'github').toLowerCase().replace(/[^a-z0-9]/g, '');
-  // CNB usernames are case-sensitive; GitHub is case-insensitive — normalize only for GitHub
-  const rawUsername = username || '';
-  const safeUsername = safePlatform === 'cnb'
-    ? rawUsername.replace(/[^a-zA-Z0-9_.-]/g, '')
-    : rawUsername.toLowerCase().replace(/[^a-z0-9_.-]/g, '');
-  const safeMode = (mode || 'readme').toLowerCase().replace(/[^a-z0-9]/g, '');
-  return `analysis/${CACHE_SCHEMA_VERSION}/${safePlatform}/${safeUsername}/${safeMode}.json`;
-}
 
 async function readCache(key: string, cacheTtlMs: number): Promise<CacheEntry | null> {
   try {
@@ -110,37 +101,14 @@ async function writeCache(key: string, events: string[]): Promise<void> {
 
 async function updateLeaderboard(platform: string, username: string, events: string[]): Promise<void> {
   try {
-    let readmeDraft: any = null;
-    let userProfile: any = null;
-
-    for (const raw of events) {
-      if (raw.startsWith('data: ')) {
-        const jsonStr = raw.slice(6).trim();
-        try {
-          const parsed = JSON.parse(jsonStr);
-          if (parsed.type === 'readme_draft') {
-            readmeDraft = parsed;
-          } else if (parsed.type === 'user_profile') {
-            try {
-              userProfile = typeof parsed.content === 'string' ? JSON.parse(parsed.content) : parsed.content;
-            } catch {
-              userProfile = parsed;
-            }
-          }
-        } catch {
-          // ignore
-        }
-      }
-    }
-
+    const { readmeDraft, userProfile } = extractReadmeFromEvents(events);
     if (!readmeDraft) return;
 
     const store = getStore(CACHE_STORE_NAME);
-    const leaderboardKey = 'leaderboard/readme_rankings.json';
     let leaderboard: any[] = [];
 
     try {
-      const entry = await store.get(leaderboardKey, { type: 'json', consistency: 'strong' });
+      const entry = await store.get(LEADERBOARD_KEY, { type: 'json', consistency: 'strong' });
       if (Array.isArray(entry)) {
         leaderboard = entry;
       }
@@ -211,7 +179,7 @@ async function updateLeaderboard(platform: string, username: string, events: str
       leaderboard = leaderboard.slice(0, 100);
     }
 
-    await store.setJSON(leaderboardKey, leaderboard);
+    await store.setJSON(LEADERBOARD_KEY, leaderboard);
     logger.log({ event: 'leaderboard.update.success', platform, username: canonicalUsername, score });
   } catch (err) {
     logger.error({ event: 'leaderboard.update.error', platform, username, error: String(err) });
@@ -249,10 +217,9 @@ async function deleteAnalysisCachesForUser(platform: string, username: string): 
 async function removeFromLeaderboard(platform: string, username: string): Promise<void> {
   try {
     const store = getStore(CACHE_STORE_NAME);
-    const leaderboardKey = 'leaderboard/readme_rankings.json';
     let leaderboard: any[] = [];
     try {
-      const entry = await store.get(leaderboardKey, { type: 'json', consistency: 'strong' });
+      const entry = await store.get(LEADERBOARD_KEY, { type: 'json', consistency: 'strong' });
       if (Array.isArray(entry)) {
         leaderboard = entry;
       }
@@ -266,38 +233,12 @@ async function removeFromLeaderboard(platform: string, username: string): Promis
     );
 
     if (filtered.length !== leaderboard.length) {
-      await store.setJSON(leaderboardKey, filtered);
+      await store.setJSON(LEADERBOARD_KEY, filtered);
       logger.log({ event: 'leaderboard.remove.success', platform, username });
     }
   } catch (err) {
     logger.error({ event: 'leaderboard.remove.error', platform, username, error: String(err) });
   }
-}
-
-function parseAnalysisCacheKey(key: string): { platform: string; username: string; mode: string } | null {
-  const parts = key.split('/');
-  if (parts.length === 4 && parts[0] === 'analysis') {
-    return { platform: parts[1], username: parts[2], mode: parts[3].replace(/\.json$/, '') };
-  }
-  if (parts.length === 5 && parts[0] === 'analysis' && /^v\d+$/.test(parts[1])) {
-    return { platform: parts[2], username: parts[3], mode: parts[4].replace(/\.json$/, '') };
-  }
-  return null;
-}
-
-async function resolveGitHubLogin(username: string): Promise<string> {
-  try {
-    const response = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
-      headers: { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' },
-    });
-    if (response.ok) {
-      const profile = await response.json();
-      return profile.login || username;
-    }
-  } catch {
-    // ignore
-  }
-  return username;
 }
 
 /** Minimal type definition for the EdgeOne Makers agent request context. */
@@ -356,7 +297,7 @@ export async function onRequest(context: AgentContext) {
   const agentMode = frontendState.agent_mode === 'stats' ? 'stats' : 'readme';
   const platform = frontendState.platform || 'github';
   const username = frontendState.username || '';
-  const cacheKey = buildCacheKey(platform, username, agentMode);
+  const cacheKey = buildCacheKeyShared(platform, username, agentMode);
   const cacheTtlMs = Number(env.CACHE_TTL_MS) || DEFAULT_CACHE_TTL_MS;
 
   // Enrich the root span with business context now that platform/username/mode are known.
@@ -621,6 +562,8 @@ export async function onRequest(context: AgentContext) {
       });
 
       let lastTotalTokens = 0;
+      let lastRawResponsesLen = 0;
+      let lastUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
       for await (const event of result.toStream()) {
         if (signal?.aborted) break;
         const toolOutput = extractToolOutput(event);
@@ -644,16 +587,20 @@ export async function onRequest(context: AgentContext) {
           yield* yieldAndCollect(chunk);
         }
 
-        const usage = collectUsage(result.rawResponses);
-        if (usage.total_tokens > lastTotalTokens) {
-          lastTotalTokens = usage.total_tokens;
-          const usageChunk = sseEvent({
-            type: 'usage',
-            input_tokens: usage.input_tokens,
-            output_tokens: usage.output_tokens,
-            total_tokens: usage.total_tokens,
-          });
-          yield* yieldAndCollect(usageChunk);
+        // 增量计算 usage：仅在 rawResponses 长度变化时重新汇总，避免 O(n²) 遍历。
+        if (result.rawResponses.length !== lastRawResponsesLen) {
+          lastRawResponsesLen = result.rawResponses.length;
+          lastUsage = collectUsage(result.rawResponses);
+          if (lastUsage.total_tokens > lastTotalTokens) {
+            lastTotalTokens = lastUsage.total_tokens;
+            const usageChunk = sseEvent({
+              type: 'usage',
+              input_tokens: lastUsage.input_tokens,
+              output_tokens: lastUsage.output_tokens,
+              total_tokens: lastUsage.total_tokens,
+            });
+            yield* yieldAndCollect(usageChunk);
+          }
         }
       }
 
@@ -661,7 +608,7 @@ export async function onRequest(context: AgentContext) {
         'agent.turns': agentTurns,
         'agent.emitted_readme': emittedReadmeDraft,
         'agent.emitted_stats': emittedStatsRecipe,
-        'llm.token.total': collectUsage(result.rawResponses).total_tokens,
+        'llm.token.total': lastUsage.total_tokens,
       });
       if (!agentRunSpanEnded) { agentRunSpan?.end(); agentRunSpanEnded = true; }
 

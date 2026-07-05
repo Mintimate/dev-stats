@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"sort"
@@ -15,6 +16,9 @@ import (
 	"strings"
 	"time"
 )
+
+// githubTokenPattern 预编译一次，避免在 NewClient / PATInfo 的 os.Environ 循环里重复编译。
+var githubTokenPattern = regexp.MustCompile(`^GITHUB_TOKEN_\d+$`)
 
 func NewClient() *Client {
 	tokens := make([]string, 0)
@@ -28,7 +32,7 @@ func NewClient() *Client {
 		if !ok || value == "" {
 			continue
 		}
-		if regexp.MustCompile(`^GITHUB_TOKEN_\d+$`).MatchString(key) {
+		if githubTokenPattern.MatchString(key) {
 			keys = append(keys, key)
 		}
 	}
@@ -188,7 +192,7 @@ func (c *Client) PATInfo(ctx context.Context) map[string]any {
 	subKeys := make([]string, 0)
 	for _, env := range os.Environ() {
 		key, _, ok := strings.Cut(env, "=")
-		if ok && regexp.MustCompile(`^GITHUB_TOKEN_\d+$`).MatchString(key) {
+		if ok && githubTokenPattern.MatchString(key) {
 			subKeys = append(subKeys, key)
 		}
 	}
@@ -261,7 +265,7 @@ func (c *Client) FetchAvatarURL(ctx context.Context, username string) (string, e
 	var u struct {
 		AvatarURL string `json:"avatar_url"`
 	}
-	err := c.restJSON(ctx, "/users/"+username, &u)
+	err := c.restJSON(ctx, "/users/"+url.PathEscape(username), &u)
 	if err != nil {
 		return "", err
 	}

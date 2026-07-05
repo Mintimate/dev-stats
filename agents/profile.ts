@@ -1,52 +1,14 @@
 import { getStore } from '@edgeone/pages-blob';
 import { createLogger, jsonResponse } from './_shared';
+import {
+  buildCacheKey as buildCacheKeyShared,
+  CACHE_STORE_NAME,
+  type CacheEntry,
+  extractReadmeFromEvents,
+  sanitizeEventsForPublicReplay,
+} from './_cache';
 
 const logger = createLogger('profile-agent');
-const CACHE_STORE_NAME = 'stats-agent-analysis-cache';
-
-interface CacheEntry {
-  cachedAt: number;
-  events: string[];
-}
-
-/**
- * 与 agents/chat/index.ts 中 buildCacheKey 保持一致的缓存 key 规则（固定读取 readme 模式的缓存）。
- */
-function buildCacheKey(platform: string, username: string): string {
-  const safePlatform = (platform || 'github').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const rawUsername = username || '';
-  // CNB 用户名大小写敏感，GitHub 不敏感 —— 仅对 GitHub 做小写归一化。
-  const safeUsername = safePlatform === 'cnb'
-    ? rawUsername.replace(/[^a-zA-Z0-9_.-]/g, '')
-    : rawUsername.toLowerCase().replace(/[^a-z0-9_.-]/g, '');
-  return `analysis/${safePlatform}/${safeUsername}/readme.json`;
-}
-
-/** 从缓存的原始 SSE 事件行中提取 README 草稿与用户资料。*/
-function extractReadme(events: string[]): { readmeDraft: any; userProfile: any } {
-  let readmeDraft: any = null;
-  let userProfile: any = null;
-
-  for (const raw of events) {
-    if (!raw.startsWith('data: ')) continue;
-    try {
-      const parsed = JSON.parse(raw.slice(6).trim());
-      if (parsed.type === 'readme_draft') {
-        readmeDraft = parsed;
-      } else if (parsed.type === 'user_profile') {
-        try {
-          userProfile = typeof parsed.content === 'string' ? JSON.parse(parsed.content) : parsed.content;
-        } catch {
-          userProfile = parsed;
-        }
-      }
-    } catch {
-      // ignore malformed lines
-    }
-  }
-
-  return { readmeDraft, userProfile };
-}
 
 /**
  * 只读地返回某个用户已缓存的 README 分析结果，供独立用户主页（/u/:platform/:username）使用。
@@ -59,7 +21,7 @@ export async function onRequest(context: any) {
 
   if (!username) return jsonResponse({ error: "'username' is required" }, 400);
 
-  const cacheKey = buildCacheKey(platform, username);
+  const cacheKey = buildCacheKeyShared(platform, username, 'readme');
 
   try {
     const store = getStore(CACHE_STORE_NAME);
@@ -68,7 +30,7 @@ export async function onRequest(context: any) {
       return jsonResponse({ found: false });
     }
 
-    const { readmeDraft, userProfile } = extractReadme(entry.events);
+    const { readmeDraft, userProfile } = extractReadmeFromEvents(entry.events);
     if (!readmeDraft) {
       return jsonResponse({ found: false });
     }
@@ -80,6 +42,8 @@ export async function onRequest(context: any) {
       cachedAt: entry.cachedAt || 0,
       readmeDraft,
       userProfile,
+      // 仅回放前端终端 UI 实际渲染用得到的精简事件，避免把原始工具入参/输出透传给公开只读接口。
+      events: sanitizeEventsForPublicReplay(entry.events),
     });
   } catch (err) {
     logger.error({ event: 'profile.read.error', platform, username, error: String(err) });
