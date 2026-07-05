@@ -974,6 +974,8 @@
       .mock-editor-window {
         display: flex;
         flex-direction: column;
+        width: 100%;
+        min-width: 0;
         border: 1px solid var(--line-strong);
         border-radius: 8px;
         background: var(--surface);
@@ -1020,6 +1022,7 @@
 
       .editor-tabs {
         display: flex;
+        min-width: 0;
         height: 100%;
         overflow-x: auto;
         scrollbar-width: none; /* Hide scrollbar for tabs */
@@ -1075,6 +1078,7 @@
 
       .editor-workspace {
         position: relative;
+        min-width: 0;
         background: var(--surface);
         min-height: 250px;
       }
@@ -1087,6 +1091,8 @@
       .mock-editor-window .readme-render {
         border: none;
         border-radius: 0;
+        width: 100%;
+        min-width: 0;
         max-height: 480px;
         background: var(--surface);
       }
@@ -1243,6 +1249,7 @@
 
       .readme-render {
         display: grid;
+        min-width: 0;
         gap: 12px;
         max-height: 420px;
         overflow: auto;
@@ -1827,6 +1834,26 @@
         margin-bottom: 12px;
         border-bottom: 1px solid var(--line);
         padding-bottom: 12px;
+      }
+
+      .tab-header .result-tabs {
+        width: min(340px, 100%);
+        min-height: 50px;
+        height: 50px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: stretch;
+      }
+
+      .tab-header .result-tabs button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        min-height: 0;
+        height: 40px;
+        padding: 0 14px;
+        line-height: 1;
+        white-space: nowrap;
       }
 
       /* Dashboard Layout */

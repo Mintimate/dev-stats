@@ -207,7 +207,7 @@ export function AgentResultPanel({
         {readme && (
           <>
             <div className="tab-header">
-              <div className="segmented">
+              <div className="segmented result-tabs">
                 <button type="button" className={tab === "report" ? "active" : ""} onClick={() => setTab("report")}>画像报告</button>
                 <button type="button" className={tab === "readme" ? "active" : ""} onClick={() => setTab("readme")}>README 草稿</button>
               </div>
