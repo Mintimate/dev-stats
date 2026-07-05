@@ -46,7 +46,7 @@ func TestCNBFetchStats(t *testing.T) {
 	})}
 	client := &CNBClient{httpClient: httpClient, token: "test-token"}
 
-	data, err := client.FetchStats(context.Background(), "alice", false, nil, false, false, false, "")
+	data, err := client.FetchStats(context.Background(), StatsQuery{Username: "alice"})
 	if err != nil {
 		t.Fatalf("FetchStats returned an error: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestCNBLivePublicSource(t *testing.T) {
 	ctx := context.Background()
 
 	// Test user (Mintimate)
-	stats, err := client.FetchStats(ctx, "Mintimate", false, nil, false, false, false, "")
+	stats, err := client.FetchStats(ctx, StatsQuery{Username: "Mintimate"})
 	if err != nil || stats.Name == "" || stats.TotalCommits == 0 {
 		t.Fatalf("live stats failed: data=%#v err=%v", stats, err)
 	}
@@ -128,7 +128,7 @@ func TestCNBLivePublicSource(t *testing.T) {
 	}
 
 	// Test group (Commit)
-	groupStats, err := client.FetchStats(ctx, "Commit", false, nil, false, false, false, "")
+	groupStats, err := client.FetchStats(ctx, StatsQuery{Username: "Commit"})
 	if err != nil || groupStats.Name != "Commit" || groupStats.Repositories != 5 {
 		t.Fatalf("live group stats failed: data=%#v err=%v", groupStats, err)
 	}

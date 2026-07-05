@@ -28,7 +28,15 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		writeSVGError(w, err.Error(), "Invalid platform")
 		return
 	}
-	data, err := client.FetchStats(r.Context(), username, parseBool(q.Get("include_all_commits")), parseCSV(q.Get("exclude_repo")), parseBool(q.Get("show_prs_merged")) || strings.Contains(q.Get("show"), "prs_merged"), strings.Contains(q.Get("show"), "discussions_started"), strings.Contains(q.Get("show"), "discussions_answered"), q.Get("commits_year"))
+	data, err := client.FetchStats(r.Context(), service.StatsQuery{
+		Username:                 username,
+		IncludeAllCommits:        parseBool(q.Get("include_all_commits")),
+		ExcludeRepos:             parseCSV(q.Get("exclude_repo")),
+		IncludeMergedPRs:         parseBool(q.Get("show_prs_merged")) || strings.Contains(q.Get("show"), "prs_merged"),
+		IncludeDiscussions:       strings.Contains(q.Get("show"), "discussions_started"),
+		IncludeDiscussionAnswers: strings.Contains(q.Get("show"), "discussions_answered"),
+		CommitsYear:              q.Get("commits_year"),
+	})
 	if err != nil {
 		writeSVGError(w, err.Error(), service.PlatformDisplayName(q.Get("platform"))+" API request failed")
 		return

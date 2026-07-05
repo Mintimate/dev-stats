@@ -7,19 +7,23 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
 
-func (c *Client) FetchStats(ctx context.Context, username string, includeAllCommits bool, excludeRepos []string, includeMergedPRs bool, includeDiscussions bool, includeDiscussionAnswers bool, commitsYear string) (StatsData, error) {
+func (c *Client) FetchStats(ctx context.Context, q StatsQuery) (StatsData, error) {
 	variables := map[string]any{
-		"login":                     username,
-		"includeMergedPullRequests": includeMergedPRs,
-		"includeDiscussions":        includeDiscussions,
-		"includeDiscussionsAnswers": includeDiscussionAnswers,
+		"login":                     q.Username,
+		"includeMergedPullRequests": q.IncludeMergedPRs,
+		"includeDiscussions":        q.IncludeDiscussions,
+		"includeDiscussionsAnswers": q.IncludeDiscussionAnswers,
 	}
-	if commitsYear != "" {
-		variables["startTime"] = commitsYear + "-01-01T00:00:00Z"
+	if q.CommitsYear != "" {
+		if _, err := strconv.Atoi(q.CommitsYear); err != nil || len(q.CommitsYear) != 4 {
+			return StatsData{}, errors.New("commits_year must be a four-digit year")
+		}
+		variables["startTime"] = q.CommitsYear + "-01-01T00:00:00Z"
 	}
 
 	query := `
@@ -80,16 +84,18 @@ query userInfo($login: String!, $includeMergedPullRequests: Boolean!, $includeDi
 	}
 
 	totalCommits := response.User.Commits.TotalCommitContributions
-	if includeAllCommits {
+	if q.IncludeAllCommits {
 		var rest struct {
 			TotalCount int `json:"total_count"`
 		}
-		if err := c.restJSON(ctx, "/search/commits?q=author:"+username, &rest); err == nil && rest.TotalCount > 0 {
+		// author:<username> 需要整体作为 q 参数值转义，避免用户名中的 &/+/空格等字符篡改查询语义。
+		if err := c.restJSON(ctx, "/search/commits?q="+url.QueryEscape("author:"+q.Username), &rest); err == nil && rest.TotalCount > 0 {
 			totalCommits = rest.TotalCount
 		}
 	}
 
-	excluded := setFromStrings(append(excludeRepos, parseCSV(os.Getenv("EXCLUDE_REPO"))...))
+	// 复制一份再 append，避免共享 q.ExcludeRepos 的底层数组（若 StatsQuery 被复用会有数据竞争隐患）。
+	excluded := setFromStrings(append(append([]string{}, q.ExcludeRepos...), parseCSV(os.Getenv("EXCLUDE_REPO"))...))
 	totalStars := 0
 	for _, repo := range response.User.Repositories.Nodes {
 		if !excluded[repo.Name] {
@@ -105,7 +111,7 @@ query userInfo($login: String!, $includeMergedPullRequests: Boolean!, $includeDi
 	if response.User.PullRequests.TotalCount > 0 {
 		mergedPercent = float64(response.User.MergedPullRequests.TotalCount) / float64(response.User.PullRequests.TotalCount) * 100
 	}
-	level, percentile := calculateRank(includeAllCommits, totalCommits, response.User.PullRequests.TotalCount, response.User.OpenIssues.TotalCount+response.User.ClosedIssues.TotalCount, response.User.Reviews.TotalPullRequestReviewContributions, totalStars, response.User.Followers.TotalCount)
+	level, percentile := calculateRank(q.IncludeAllCommits, totalCommits, response.User.PullRequests.TotalCount, response.User.OpenIssues.TotalCount+response.User.ClosedIssues.TotalCount, response.User.Reviews.TotalPullRequestReviewContributions, totalStars, response.User.Followers.TotalCount)
 
 	return StatsData{
 		Name:                     name,

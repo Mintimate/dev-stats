@@ -25,6 +25,17 @@ type Client struct {
 	tokens     []string
 }
 
+// StatsQuery 封装 FetchStats 的全部业务参数，避免 Provider 接口签名随参数增长而膨胀。
+type StatsQuery struct {
+	Username                 string
+	IncludeAllCommits        bool
+	ExcludeRepos             []string
+	IncludeMergedPRs         bool
+	IncludeDiscussions       bool
+	IncludeDiscussionAnswers bool
+	CommitsYear              string
+}
+
 type StatsData struct {
 	Platform                 string
 	Name                     string

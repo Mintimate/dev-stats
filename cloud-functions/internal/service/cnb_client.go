@@ -234,30 +234,31 @@ func aggregateCNBCalendar(calendar map[string]cnbCalendarDay) cnbActivity {
 	return total
 }
 
-func (c *CNBClient) FetchStats(ctx context.Context, username string, _ bool, excludeRepos []string, _ bool, _ bool, _ bool, commitsYear string) (StatsData, error) {
+func (c *CNBClient) FetchStats(ctx context.Context, q StatsQuery) (StatsData, error) {
 	year := time.Now().Year()
-	if commitsYear != "" {
-		parsed, err := strconv.Atoi(commitsYear)
-		if err != nil || len(commitsYear) != 4 {
+	if q.CommitsYear != "" {
+		parsed, err := strconv.Atoi(q.CommitsYear)
+		if err != nil || len(q.CommitsYear) != 4 {
 			return StatsData{}, errors.New("commits_year must be a four-digit year")
 		}
 		year = parsed
 	}
 
-	user, err := c.fetchUser(ctx, username)
+	user, err := c.fetchUser(ctx, q.Username)
 	if err != nil {
 		return StatsData{}, err
 	}
-	repos, err := c.fetchRepos(ctx, username)
+	repos, err := c.fetchRepos(ctx, q.Username)
 	if err != nil {
 		return StatsData{}, err
 	}
-	calendar, err := c.fetchCalendar(ctx, username, year)
+	calendar, err := c.fetchCalendar(ctx, q.Username, year)
 	if err != nil {
 		return StatsData{}, err
 	}
 	activity := aggregateCNBCalendar(calendar)
-	excluded := setFromStrings(append(excludeRepos, parseCSV(os.Getenv("EXCLUDE_REPO"))...))
+	// 复制一份再 append，避免共享 q.ExcludeRepos 的底层数组（若 StatsQuery 被复用会有数据竞争隐患）。
+	excluded := setFromStrings(append(append([]string{}, q.ExcludeRepos...), parseCSV(os.Getenv("EXCLUDE_REPO"))...))
 	totalStars, repositoryCount := 0, 0
 	for _, repo := range repos {
 		if excluded[repo.Name] || excluded[strings.ToLower(repo.Name)] {
