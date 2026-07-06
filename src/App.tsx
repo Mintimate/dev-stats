@@ -43,10 +43,8 @@ export default function App() {
   const shellClass = `agent-home view ${view === "agent" ? "" : "hidden"} split-layout`;
 
   const handleLoadUser = useCallback((item: LeaderboardItem) => {
-    manual.setPlatform(item.platform);
-    agent.setAgentUsername(item.username);
-    void agent.runAgent("readme", false, { platform: item.platform, username: item.username });
-  }, [manual.setPlatform, agent.setAgentUsername, agent.runAgent]);
+    window.location.href = `/u/${item.platform}/${encodeURIComponent(item.username)}`;
+  }, []);
 
   const showResult = agent.result.kind !== "none" || agent.running;
 

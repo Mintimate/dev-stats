@@ -5,10 +5,66 @@ const logger = createLogger('shared-cache');
 export const CACHE_STORE_NAME = 'stats-agent-analysis-cache';
 export const CACHE_SCHEMA_VERSION = 'v4';
 export const LEADERBOARD_KEY = 'leaderboard/readme_rankings.json';
+export const DEFAULT_ANALYSIS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export interface CacheEntry {
   cachedAt: number;
   events: string[];
+}
+
+export function resolveAnalysisCacheTtlMs(env?: Record<string, string | undefined>): number {
+  const raw = Number(env?.CACHE_TTL_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_ANALYSIS_CACHE_TTL_MS;
+}
+
+export function isFreshCacheEntry(entry: unknown, cacheTtlMs: number): entry is CacheEntry {
+  if (!entry || typeof entry !== 'object') return false;
+  const candidate = entry as CacheEntry;
+  if (typeof candidate.cachedAt !== 'number' || !Array.isArray(candidate.events)) return false;
+  return Date.now() - candidate.cachedAt <= cacheTtlMs;
+}
+
+async function readFreshCacheEntry(store: any, key: string, cacheTtlMs: number): Promise<CacheEntry | null> {
+  const entry = await store.get(key, { type: 'json', consistency: 'strong' }) as CacheEntry | null;
+  return isFreshCacheEntry(entry, cacheTtlMs) ? entry : null;
+}
+
+export async function readCompatibleAnalysisCacheFromStore(
+  store: any,
+  platform: string,
+  username: string,
+  mode: string,
+  cacheTtlMs: number,
+): Promise<{ key: string; entry: CacheEntry } | null> {
+  const currentKey = buildCacheKey(platform, username, mode);
+  const current = await readFreshCacheEntry(store, currentKey, cacheTtlMs);
+  if (current) return { key: currentKey, entry: current };
+
+  const safePlatform = (platform || 'github').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const safeMode = (mode || 'readme').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const safeUsername = safePlatform === 'cnb'
+    ? (username || '').replace(/[^a-zA-Z0-9_.-]/g, '')
+    : (username || '').toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+
+  const { blobs } = await store.list({ consistency: 'strong' });
+  const candidates = blobs
+    .map((blob: any) => blob.key)
+    .filter((key: string) => key !== currentKey)
+    .map((key: string) => ({ key, parsed: parseAnalysisCacheKey(key) }))
+    .filter(({ parsed }: { parsed: ReturnType<typeof parseAnalysisCacheKey> }) =>
+      parsed &&
+      parsed.platform === safePlatform &&
+      parsed.mode === safeMode &&
+      parsed.username === safeUsername
+    );
+
+  let newest: { key: string; entry: CacheEntry } | null = null;
+  for (const candidate of candidates) {
+    const entry = await readFreshCacheEntry(store, candidate.key, cacheTtlMs);
+    if (!entry) continue;
+    if (!newest || entry.cachedAt > newest.entry.cachedAt) newest = { key: candidate.key, entry };
+  }
+  return newest;
 }
 
 /** 公开只读回放（/u/:platform/:username）允许透出的事件类型，其余一律丢弃。 */

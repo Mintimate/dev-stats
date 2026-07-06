@@ -1,10 +1,10 @@
 import { getStore } from '@edgeone/pages-blob';
 import { createLogger, jsonResponse } from './_shared';
 import {
-  buildCacheKey as buildCacheKeyShared,
   CACHE_STORE_NAME,
-  type CacheEntry,
   extractReadmeFromEvents,
+  readCompatibleAnalysisCacheFromStore,
+  resolveAnalysisCacheTtlMs,
   sanitizeEventsForPublicReplay,
 } from './_cache';
 
@@ -21,11 +21,11 @@ export async function onRequest(context: any) {
 
   if (!username) return jsonResponse({ error: "'username' is required" }, 400);
 
-  const cacheKey = buildCacheKeyShared(platform, username, 'readme');
-
   try {
     const store = getStore(CACHE_STORE_NAME);
-    const entry = await store.get(cacheKey, { type: 'json' }) as CacheEntry | null;
+    const cacheTtlMs = resolveAnalysisCacheTtlMs(context.env ?? process.env);
+    const cached = await readCompatibleAnalysisCacheFromStore(store, platform, username, 'readme', cacheTtlMs);
+    const entry = cached?.entry ?? null;
     if (!entry || !Array.isArray(entry.events)) {
       return jsonResponse({ found: false });
     }

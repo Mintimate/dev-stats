@@ -13,11 +13,13 @@ import { createLogger, createSSEResponse, getGitHubToken, jsonResponse, sseEvent
 import {
   buildCacheKey as buildCacheKeyShared,
   CACHE_STORE_NAME,
-  type CacheEntry,
   extractReadmeFromEvents,
   LEADERBOARD_KEY,
   parseAnalysisCacheKey,
+  readCompatibleAnalysisCacheFromStore,
   resolveGitHubLogin,
+  resolveAnalysisCacheTtlMs,
+  type CacheEntry,
 } from '../_cache';
 import { buildSystemPrompt, buildUserInput } from './_prompt';
 import { createOpenAIAgentTools } from './_tools';
@@ -39,51 +41,13 @@ const QWEN_THINKING_MODEL_SETTINGS: ModelSettings = {
   },
 };
 
-const DEFAULT_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const AGENT_MAX_TURNS = 12;
 
-async function readCache(key: string, cacheTtlMs: number): Promise<CacheEntry | null> {
+async function readCompatibleAnalysisCache(platform: string, username: string, mode: string, cacheTtlMs: number): Promise<CacheEntry | null> {
   try {
     const store = getStore(CACHE_STORE_NAME);
-    const entry = await store.get(key, { type: 'json' }) as CacheEntry | null;
-    if (!entry || typeof entry.cachedAt !== 'number') return null;
-    if (Date.now() - entry.cachedAt > cacheTtlMs) return null;
-    return entry;
-  } catch {
-    return null;
-  }
-}
-
-async function readCompatibleAnalysisCache(platform: string, username: string, mode: string, currentKey: string, cacheTtlMs: number): Promise<CacheEntry | null> {
-  const current = await readCache(currentKey, cacheTtlMs);
-  if (current) return current;
-
-  try {
-    const store = getStore(CACHE_STORE_NAME);
-    const safePlatform = (platform || 'github').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const safeMode = (mode || 'readme').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const safeUsername = safePlatform === 'cnb'
-      ? (username || '').replace(/[^a-zA-Z0-9_.-]/g, '')
-      : (username || '').toLowerCase().replace(/[^a-z0-9_.-]/g, '');
-    const { blobs } = await store.list();
-    const candidates = blobs
-      .map((blob: any) => blob.key)
-      .filter((key: string) => key !== currentKey)
-      .map((key: string) => ({ key, parsed: parseAnalysisCacheKey(key) }))
-      .filter(({ parsed }: { parsed: ReturnType<typeof parseAnalysisCacheKey> }) =>
-        parsed &&
-        parsed.platform === safePlatform &&
-        parsed.mode === safeMode &&
-        parsed.username === safeUsername
-      );
-
-    let newest: CacheEntry | null = null;
-    for (const candidate of candidates) {
-      const entry = await readCache(candidate.key, cacheTtlMs);
-      if (!entry) continue;
-      if (!newest || entry.cachedAt > newest.cachedAt) newest = entry;
-    }
-    return newest;
+    const result = await readCompatibleAnalysisCacheFromStore(store, platform, username, mode, cacheTtlMs);
+    return result?.entry ?? null;
   } catch {
     return null;
   }
@@ -298,7 +262,7 @@ export async function onRequest(context: AgentContext) {
   const platform = frontendState.platform || 'github';
   const username = frontendState.username || '';
   const cacheKey = buildCacheKeyShared(platform, username, agentMode);
-  const cacheTtlMs = Number(env.CACHE_TTL_MS) || DEFAULT_CACHE_TTL_MS;
+  const cacheTtlMs = resolveAnalysisCacheTtlMs(env);
 
   // Enrich the root span with business context now that platform/username/mode are known.
   // These attrs allow filtering Traces by user or mode in the console panel.
@@ -319,13 +283,13 @@ export async function onRequest(context: AgentContext) {
       ? context.tracer.span(
         'cache.lookup',
         async (span: any) => {
-          const res = await readCompatibleAnalysisCache(platform, username, agentMode, cacheKey, cacheTtlMs);
+          const res = await readCompatibleAnalysisCache(platform, username, agentMode, cacheTtlMs);
           span.setAttributes({ 'cache.hit': !!res });
           return res;
         },
         { 'cache.key': cacheKey, 'agent.mode': agentMode },
       )
-      : readCompatibleAnalysisCache(platform, username, agentMode, cacheKey, cacheTtlMs));
+      : readCompatibleAnalysisCache(platform, username, agentMode, cacheTtlMs));
     if (cached) {
       // Mark root span as cache hit
       context.tracer?.setAttributes({

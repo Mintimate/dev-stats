@@ -3,17 +3,38 @@ import { createLogger, jsonResponse } from './_shared';
 import {
   CACHE_STORE_NAME,
   extractReadmeFromEvents,
+  isFreshCacheEntry,
   LEADERBOARD_KEY,
   parseAnalysisCacheKey,
+  readCompatibleAnalysisCacheFromStore,
   resolveGitHubLogin,
+  resolveAnalysisCacheTtlMs,
 } from './_cache';
 
 const logger = createLogger('leaderboard-agent');
+
+async function filterFreshLeaderboardItems(store: any, leaderboard: any[], cacheTtlMs: number): Promise<any[]> {
+  const checked = await Promise.allSettled(
+    leaderboard.map(async (item) => {
+      const parsed = item && typeof item === 'object'
+        ? { platform: String(item.platform || 'github'), username: String(item.username || '') }
+        : null;
+      if (!parsed?.username) return null;
+      const cached = await readCompatibleAnalysisCacheFromStore(store, parsed.platform, parsed.username, 'readme', cacheTtlMs);
+      return cached ? item : null;
+    }),
+  );
+
+  return checked
+    .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled' && result.value)
+    .map((result) => result.value);
+}
 
 export async function onRequest(context: any) {
   const store = getStore(CACHE_STORE_NAME);
   const body = context.request?.body ?? {};
   const forceRebuild = body.rebuild === true;
+  const cacheTtlMs = resolveAnalysisCacheTtlMs(context.env ?? process.env);
 
   let leaderboard: any[] = [];
   let indexExists = false;
@@ -35,7 +56,7 @@ export async function onRequest(context: any) {
   let cacheKeysCount = 0;
   let blobsList: any[] = [];
   try {
-    const { blobs } = await store.list();
+    const { blobs } = await store.list({ consistency: 'strong' });
     blobsList = blobs;
     const cacheKeys = blobs.filter(b => parseAnalysisCacheKey(b.key)?.mode === 'readme');
     cacheKeysCount = cacheKeys.length;
@@ -49,7 +70,16 @@ export async function onRequest(context: any) {
   const needsRebuild = forceRebuild || !indexExists || leaderboard.length === 0;
 
   if (!needsRebuild) {
-    return jsonResponse({ leaderboard });
+    const freshLeaderboard = await filterFreshLeaderboardItems(store, leaderboard, cacheTtlMs);
+    if (freshLeaderboard.length !== leaderboard.length) {
+      try {
+        await store.setJSON(LEADERBOARD_KEY, freshLeaderboard);
+        logger.log({ event: 'leaderboard.prune_stale.success', before: leaderboard.length, after: freshLeaderboard.length });
+      } catch (err) {
+        logger.error({ event: 'leaderboard.prune_stale.save_error', error: String(err) });
+      }
+    }
+    return jsonResponse({ leaderboard: freshLeaderboard });
   }
 
   try {
@@ -73,7 +103,7 @@ export async function onRequest(context: any) {
           const parsedKey = parseAnalysisCacheKey(blob.key);
           if (!parsedKey) return null;
           const { platform, username } = parsedKey;
-          const cacheEntry: any = await store.get(blob.key, { type: 'json' });
+          const cacheEntry: any = await store.get(blob.key, { type: 'json', consistency: 'strong' });
           return { platform, username, cacheEntry };
         })
       );
@@ -83,7 +113,7 @@ export async function onRequest(context: any) {
         if (!result.value) continue;
         const { platform, username, cacheEntry } = result.value;
         try {
-          if (!cacheEntry || !Array.isArray(cacheEntry.events)) continue;
+          if (!isFreshCacheEntry(cacheEntry, cacheTtlMs)) continue;
 
             const { readmeDraft, userProfile } = extractReadmeFromEvents(cacheEntry.events);
 
