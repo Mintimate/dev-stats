@@ -11,6 +11,7 @@ export interface LeaderboardItem {
   rating: string;
   badges: string[];
   updatedAt: number;
+  expiresAt?: number;
 }
 
 interface LeaderboardPanelProps {

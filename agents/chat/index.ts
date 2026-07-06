@@ -14,6 +14,7 @@ import {
   buildCacheKey as buildCacheKeyShared,
   CACHE_STORE_NAME,
   extractReadmeFromEvents,
+  getCacheExpiresAt,
   LEADERBOARD_KEY,
   parseAnalysisCacheKey,
   readCompatibleAnalysisCacheFromStore,
@@ -53,17 +54,18 @@ async function readCompatibleAnalysisCache(platform: string, username: string, m
   }
 }
 
-async function writeCache(key: string, events: string[]): Promise<void> {
+async function writeCache(key: string, events: string[], cacheTtlMs: number): Promise<void> {
   try {
     const store = getStore(CACHE_STORE_NAME);
-    const entry: CacheEntry = { cachedAt: Date.now(), events };
+    const cachedAt = Date.now();
+    const entry: CacheEntry = { cachedAt, expiresAt: getCacheExpiresAt(cachedAt, undefined, cacheTtlMs), events };
     await store.setJSON(key, entry);
   } catch {
     // Cache write failures are non-fatal
   }
 }
 
-async function updateLeaderboard(platform: string, username: string, events: string[]): Promise<void> {
+async function updateLeaderboard(platform: string, username: string, events: string[], cacheTtlMs: number): Promise<void> {
   try {
     const { readmeDraft, userProfile } = extractReadmeFromEvents(events);
     if (!readmeDraft) return;
@@ -108,6 +110,7 @@ async function updateLeaderboard(platform: string, username: string, events: str
     const rating = readmeDraft.objective_rating || '入门';
     const badges = Array.isArray(readmeDraft.badges) ? readmeDraft.badges : [];
 
+    const updatedAt = Date.now();
     const rankItem = {
       username: displayUsername,
       platform,
@@ -116,7 +119,8 @@ async function updateLeaderboard(platform: string, username: string, events: str
       score,
       rating,
       badges,
-      updatedAt: Date.now(),
+      updatedAt,
+      expiresAt: getCacheExpiresAt(updatedAt, undefined, cacheTtlMs),
     };
 
     // Remove existing entry for same user and platform.
@@ -303,7 +307,7 @@ export async function onRequest(context: AgentContext) {
         cached_at: new Date(cached.cachedAt).toISOString(),
       });
       // Sync casing updates on cache hit; use waitUntil if available to avoid blocking SSE first frame
-      const leaderboardUpdate = updateLeaderboard(platform, username, cached.events);
+      const leaderboardUpdate = updateLeaderboard(platform, username, cached.events, cacheTtlMs);
       if (typeof context.waitUntil === 'function') {
         context.waitUntil(leaderboardUpdate);
       } else {
@@ -637,7 +641,7 @@ export async function onRequest(context: AgentContext) {
           ? tracer.span(
             'cache.write',
             async (span: any) => {
-              await writeCache(cacheKey, collectedEvents);
+              await writeCache(cacheKey, collectedEvents, cacheTtlMs);
               span.setAttributes({
                 'cache.key': cacheKey,
                 'cache.events_count': collectedEvents.length,
@@ -647,7 +651,7 @@ export async function onRequest(context: AgentContext) {
             },
             { 'cache.key': cacheKey },
           )
-          : writeCache(cacheKey, collectedEvents).then(() =>
+          : writeCache(cacheKey, collectedEvents, cacheTtlMs).then(() =>
             logger.log({ event: 'agent.cache.write', cache_key: cacheKey, events_count: collectedEvents.length }),
           ));
         if (emittedReadmeDraft) {
@@ -655,10 +659,10 @@ export async function onRequest(context: AgentContext) {
           await (tracer
             ? tracer.span(
               'leaderboard.update',
-              () => updateLeaderboard(platform, username, collectedEvents),
+              () => updateLeaderboard(platform, username, collectedEvents, cacheTtlMs),
               { 'user.platform': platform, 'user.username': username },
             )
-            : updateLeaderboard(platform, username, collectedEvents));
+            : updateLeaderboard(platform, username, collectedEvents, cacheTtlMs));
           yield* yieldAndCollect(sseEvent({ type: 'leaderboard_updated', platform, username }));
         }
       }

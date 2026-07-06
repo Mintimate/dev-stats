@@ -9,6 +9,7 @@ export const DEFAULT_ANALYSIS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export interface CacheEntry {
   cachedAt: number;
+  expiresAt?: number;
   events: string[];
 }
 
@@ -21,7 +22,13 @@ export function isFreshCacheEntry(entry: unknown, cacheTtlMs: number): entry is 
   if (!entry || typeof entry !== 'object') return false;
   const candidate = entry as CacheEntry;
   if (typeof candidate.cachedAt !== 'number' || !Array.isArray(candidate.events)) return false;
-  return Date.now() - candidate.cachedAt <= cacheTtlMs;
+  return getCacheExpiresAt(candidate.cachedAt, candidate.expiresAt, cacheTtlMs) > Date.now();
+}
+
+export function getCacheExpiresAt(cachedAt: number, expiresAt: unknown, cacheTtlMs: number): number {
+  return typeof expiresAt === 'number' && Number.isFinite(expiresAt)
+    ? expiresAt
+    : cachedAt + cacheTtlMs;
 }
 
 async function readFreshCacheEntry(store: any, key: string, cacheTtlMs: number): Promise<CacheEntry | null> {

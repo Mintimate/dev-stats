@@ -3,31 +3,22 @@ import { createLogger, jsonResponse } from './_shared';
 import {
   CACHE_STORE_NAME,
   extractReadmeFromEvents,
+  getCacheExpiresAt,
   isFreshCacheEntry,
   LEADERBOARD_KEY,
   parseAnalysisCacheKey,
-  readCompatibleAnalysisCacheFromStore,
   resolveGitHubLogin,
   resolveAnalysisCacheTtlMs,
 } from './_cache';
 
 const logger = createLogger('leaderboard-agent');
 
-async function filterFreshLeaderboardItems(store: any, leaderboard: any[], cacheTtlMs: number): Promise<any[]> {
-  const checked = await Promise.allSettled(
-    leaderboard.map(async (item) => {
-      const parsed = item && typeof item === 'object'
-        ? { platform: String(item.platform || 'github'), username: String(item.username || '') }
-        : null;
-      if (!parsed?.username) return null;
-      const cached = await readCompatibleAnalysisCacheFromStore(store, parsed.platform, parsed.username, 'readme', cacheTtlMs);
-      return cached ? item : null;
-    }),
-  );
-
-  return checked
-    .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled' && result.value)
-    .map((result) => result.value);
+function filterFreshLeaderboardItems(leaderboard: any[], cacheTtlMs: number): any[] {
+  const now = Date.now();
+  return leaderboard.filter((item) => {
+    if (!item || typeof item !== 'object' || typeof item.updatedAt !== 'number') return false;
+    return getCacheExpiresAt(item.updatedAt, item.expiresAt, cacheTtlMs) > now;
+  });
 }
 
 export async function onRequest(context: any) {
@@ -52,25 +43,13 @@ export async function onRequest(context: any) {
     }
   }
 
-  // 2. Fetch all cache keys to verify count match
-  let cacheKeysCount = 0;
-  let blobsList: any[] = [];
-  try {
-    const { blobs } = await store.list({ consistency: 'strong' });
-    blobsList = blobs;
-    const cacheKeys = blobs.filter(b => parseAnalysisCacheKey(b.key)?.mode === 'readme');
-    cacheKeysCount = cacheKeys.length;
-  } catch (err) {
-    logger.error({ event: 'leaderboard.list_keys.error', error: String(err) });
-  }
-
-  // 3. Rebuild only if forced, or index does not exist / is empty.
+  // 2. Rebuild only if forced, or index does not exist / is empty.
   // Count mismatch is not a trigger because updateLeaderboard() handles incremental updates;
   // rebuilding on every count difference caused redundant full scans.
   const needsRebuild = forceRebuild || !indexExists || leaderboard.length === 0;
 
   if (!needsRebuild) {
-    const freshLeaderboard = await filterFreshLeaderboardItems(store, leaderboard, cacheTtlMs);
+    const freshLeaderboard = filterFreshLeaderboardItems(leaderboard, cacheTtlMs);
     if (freshLeaderboard.length !== leaderboard.length) {
       try {
         await store.setJSON(LEADERBOARD_KEY, freshLeaderboard);
@@ -83,6 +62,17 @@ export async function onRequest(context: any) {
   }
 
   try {
+    let cacheKeysCount = 0;
+    let blobsList: any[] = [];
+    try {
+      const { blobs } = await store.list({ consistency: 'strong' });
+      blobsList = blobs;
+      const cacheKeys = blobs.filter(b => parseAnalysisCacheKey(b.key)?.mode === 'readme');
+      cacheKeysCount = cacheKeys.length;
+    } catch (err) {
+      logger.error({ event: 'leaderboard.list_keys.error', error: String(err) });
+    }
+
     logger.log({
       event: 'leaderboard.rebuild.start',
       forceRebuild,
@@ -167,6 +157,7 @@ export async function onRequest(context: any) {
               const rating = readmeDraft.objective_rating || '入门';
               const badges = Array.isArray(readmeDraft.badges) ? readmeDraft.badges : [];
               
+              const updatedAt = cacheEntry.cachedAt || Date.now();
               rebuiltList.push({
                 username: displayUsername,
                 platform,
@@ -175,7 +166,8 @@ export async function onRequest(context: any) {
                 score,
                 rating,
                 badges,
-                updatedAt: cacheEntry.cachedAt || Date.now(),
+                updatedAt,
+                expiresAt: getCacheExpiresAt(updatedAt, cacheEntry.expiresAt, cacheTtlMs),
               });
             }
         } catch (err) {
