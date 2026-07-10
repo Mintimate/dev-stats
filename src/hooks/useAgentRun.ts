@@ -203,7 +203,12 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     } else if (event.type === "text_delta") {
       if (!event.mirrored) assistantTextRef.current += String(event.delta || event.content || "");
     } else if (event.type === "agent_status") {
-      addNarrative("AGENT", `模型就绪：${event.protocol || "model"} · ${event.model || ""}`.trim(), "ok", "agent:ready");
+      if (event.status === "analysis_ready") {
+        const score = Number(event.score || 0).toFixed(2);
+        addNarrative("ANALYSIS", `公开证据已完成确定性画像：${event.rating || "入门"} · ${score} 分。`, "ok", "analysis:ready");
+      } else {
+        addNarrative("AGENT", `模型就绪：${event.protocol || "model"} · ${event.model || ""}`.trim(), "ok", "agent:ready");
+      }
     } else if (event.type === "user_profile") {
       try {
         profileRef.current = JSON.parse(String(event.content || "{}"));

@@ -35,6 +35,13 @@ The runtime exposes these tools:
 
 Do not describe intended tool calls as if they already ran. Keep real tool activity visible through the runtime `tool_call` and `tool_result` SSE events.
 
+## Deterministic Evidence And Rating Policy
+
+- The runtime collects the required public evidence in the platform-specific order before invoking the writer model.
+- The runtime, not the model, computes `score`, `objective_rating`, `dimension_scores`, and `top_repos` from the collected public evidence.
+- Treat the runtime-provided deterministic analysis as authoritative. Do not invent, recalibrate, or contradict its numeric fields; write the README, summaries, tags, and roast around the evidence instead.
+- Explain limitations when coverage is sparse. A public-profile score is not a judgement of private work, employment ability, or a person's worth.
+
 ## Reference Selection
 
 - Read `references/platform-routing.md` when changing GitHub/CNB tool order, platform isolation, retry behavior, or not-found handling.

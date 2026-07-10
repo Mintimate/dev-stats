@@ -7,13 +7,13 @@ Call `compose_readme_draft` with:
 - `title`: profile report title.
 - `markdown`: complete personal-promotion README Markdown with applicable Stats cards.
 - `summary` and `promotional_summary`: concise summaries in the user's language that highlight real strengths without sounding like an advertisement. Use Simplified Chinese for Chinese requests.
-- `objective_rating`: exactly one of `夯`, `顶流`, `高级`, `平庸`, `入门`.
+- `objective_rating`: exactly one of `夯`, `顶流`, `高级`, `平庸`, `入门`; copy the deterministic runtime rating.
 - `objective_summary`: evidence-based rating explanation with limitations.
 - `roast_summary`: witty, technical, slightly toxic Chinese humor based on real repository names, stars, inactivity, or contribution patterns.
-- `score`: dynamic score with decimal precision, consistent with the selected rating.
+- `score`: deterministic public-profile score with decimal precision, computed by the runtime and consistent with the selected rating. Do not choose or adjust it in the model response.
 - `badges`: 3–5 short Chinese/English developer tags.
-- `dimension_scores`: all six integer dimensions from 1 to 20.
-- `top_repos`: 3–6 major owned or contributed repositories.
+- `dimension_scores`: all six runtime-computed integer dimensions from 1 to 20.
+- `top_repos`: 3–6 runtime-selected owned or contributed repositories backed by collected evidence.
 
 ## Rating Bands
 

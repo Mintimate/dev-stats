@@ -3,7 +3,9 @@ import { createLogger, getGitHubToken, sseEvent } from './_shared';
 const logger = createLogger('shared-cache');
 
 export const CACHE_STORE_NAME = 'stats-agent-analysis-cache';
-export const CACHE_SCHEMA_VERSION = 'v4';
+// v5 separates deterministic evidence/score generation from writer output.
+// Do not replay v4's model-authored ratings after the scoring contract changed.
+export const CACHE_SCHEMA_VERSION = 'v5';
 export const LEADERBOARD_KEY = 'leaderboard/readme_rankings.json';
 export const LEADERBOARD_ITEM_PREFIX = 'leaderboard/items/';
 export const REFRESH_LEASE_PREFIX = 'refresh-leases/';
