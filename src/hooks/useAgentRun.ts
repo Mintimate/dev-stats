@@ -241,6 +241,9 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
       addEvent("TOKENS", `本轮消耗 ${nextUsage.total || 0} tokens。`);
     } else if (event.type === "leaderboard_updated") {
       window.dispatchEvent(new CustomEvent("devstats:leaderboard-updated"));
+    } else if (event.type === "refresh_joined") {
+      setStatus("stopped");
+      addNarrative("WAIT", "同一目标已有分析任务在运行，本次已自动合并，请稍后重新载入结果。", "ok", "refresh:joined");
     } else if (event.type === "error_message") {
       const message = String(event.content || "Agent error");
       if (hasResultRef.current && /Max turns/i.test(message)) {

@@ -22,6 +22,12 @@ interface ProfileResponse {
   cachedAt?: number;
   expiresAt?: number;
   stale?: boolean;
+  refresh?: {
+    status: "idle" | "running";
+    runId?: string;
+    startedAt?: number;
+    expiresAt?: number;
+  };
   readmeDraft?: Record<string, unknown>;
   userProfile?: { nickname?: string; bio?: string; avatar?: string } | null;
   events?: string[];
@@ -278,7 +284,8 @@ export function UserPage({ platform, username }: { platform: Platform; username:
   const [cachedAt, setCachedAt] = useState(0);
   const [events, setEvents] = useState<string[]>([]);
   const [isStale, setIsStale] = useState(false);
-  const [refreshState, setRefreshState] = useState<"idle" | "refreshing" | "updated" | "failed">("idle");
+  const [refreshState, setRefreshState] = useState<"idle" | "waiting" | "refreshing" | "updated" | "failed">("idle");
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -296,7 +303,7 @@ export function UserPage({ platform, username }: { platform: Platform; username:
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "makers-conversation-id": "user-profile-lookup",
+              "makers-conversation-id": crypto.randomUUID(),
             },
             body: JSON.stringify({ platform, username }),
           });
@@ -316,6 +323,48 @@ export function UserPage({ platform, username }: { platform: Platform; username:
           return true;
         }
 
+        async function consumeRefreshStream(response: Response) {
+          if (!response.body) throw new Error("Refresh stream is unavailable");
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const frames = buffer.split("\n\n");
+            buffer = frames.pop() || "";
+            for (const frame of frames) {
+              const line = frame.split("\n").find((item) => item.startsWith("data: "));
+              if (!line || line === "data: [DONE]") continue;
+              try {
+                const event = JSON.parse(line.slice(6));
+                if (event.type === "refresh_joined" || event.type === "refresh_superseded") setRefreshState("waiting");
+                if (event.type === "agent_status") setRefreshState("refreshing");
+                if (event.type === "error_message") throw new Error(String(event.content || "Refresh failed"));
+              } catch (error) {
+                if (error instanceof SyntaxError) continue;
+                throw error;
+              }
+            }
+          }
+        }
+
+        async function waitForFreshProfile(previousCachedAt: number) {
+          const deadline = Date.now() + 15 * 60 * 1000;
+          while (!cancelled && Date.now() < deadline) {
+            const refreshed = await loadProfile();
+            if (cancelled) return false;
+            if (applyProfile(refreshed) && !refreshed.stale && (refreshed.cachedAt || 0) > previousCachedAt) {
+              return true;
+            }
+            if (refreshed.refresh?.status !== "running") return false;
+            setRefreshState("waiting");
+            await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+          }
+          return false;
+        }
+
         const data = await loadProfile();
         if (cancelled) return;
 
@@ -326,7 +375,7 @@ export function UserPage({ platform, username }: { platform: Platform; username:
 
         // 先保留并展示最近一次成功快照；超过 24h 后，进入页面即在后台强制重算。
         if (data.stale) {
-          setRefreshState("refreshing");
+          setRefreshState(data.refresh?.status === "running" ? "waiting" : "refreshing");
           const activeConfig = { ...defaultConfig, platform, username, agent_mode: "readme" as const };
           const conversationId = crypto.randomUUID();
           const refreshResponse = await fetch("/chat", {
@@ -338,21 +387,15 @@ export function UserPage({ platform, username }: { platform: Platform; username:
             body: JSON.stringify({
               message: buildAgentMessage(activeConfig, "readme"),
               state: activeConfig,
-              force_reanalyze: true,
+              refresh_if_stale: true,
             }),
           });
           if (!refreshResponse.ok) throw new Error(`Refresh HTTP ${refreshResponse.status}`);
-          // 必须消费完整 SSE 流，分析完成后新的缓存和排行榜才会落盘。
-          await refreshResponse.text();
+          // 增量消费生命周期事件；如果已有任务在运行，服务端会返回 refresh_joined，随后转为轮询共享结果。
+          await consumeRefreshStream(refreshResponse);
           if (cancelled) return;
 
-          const refreshed = await loadProfile();
-          if (cancelled) return;
-          if (applyProfile(refreshed) && !refreshed.stale && (refreshed.cachedAt || 0) > (data.cachedAt || 0)) {
-            setRefreshState("updated");
-          } else {
-            setRefreshState("failed");
-          }
+          setRefreshState(await waitForFreshProfile(data.cachedAt || 0) ? "updated" : "failed");
         }
       } catch {
         if (!cancelled) {
@@ -364,7 +407,7 @@ export function UserPage({ platform, username }: { platform: Platform; username:
     })();
 
     return () => { cancelled = true; };
-  }, [platform, username]);
+  }, [platform, username, refreshAttempt]);
 
   const profileUrl = platform === "cnb"
     ? `https://cnb.cool/u/${encodeURIComponent(username)}`
@@ -422,8 +465,8 @@ export function UserPage({ platform, username }: { platform: Platform; username:
               <h2 className="panel-title">
                 {result?.title || `${username} 的开发者画像`}
                 {state === "found" && (
-                  <span className="build-status build-status--ok">
-                    <span className="status-dot" /> {refreshState === "refreshing" ? "REFRESHING" : refreshState === "failed" ? "STALE SNAPSHOT" : refreshState === "updated" ? "UPDATED" : "BUILD OK"}
+                  <span className={`build-status ${refreshState === "failed" ? "build-status--error" : refreshState === "waiting" || refreshState === "refreshing" ? "build-status--warning" : "build-status--ok"}`}>
+                    <span className="status-dot" /> {refreshState === "waiting" ? "WAITING" : refreshState === "refreshing" ? "REFRESHING" : refreshState === "failed" ? "STALE SNAPSHOT" : refreshState === "updated" ? "UPDATED" : "BUILD OK"}
                   </span>
                 )}
               </h2>
@@ -432,6 +475,7 @@ export function UserPage({ platform, username }: { platform: Platform; username:
                   ? result.summary
                   : "// 最近一次成功的分析快照"}
                 {isStale && refreshState === "refreshing" && " · 已超过 24h，正在后台重新分析"}
+                {isStale && refreshState === "waiting" && " · 已有访客触发更新，正在等待共享结果"}
                 {isStale && refreshState === "failed" && " · 自动更新失败，暂时保留旧结果"}
               </span>
             </div>
@@ -444,6 +488,11 @@ export function UserPage({ platform, username }: { platform: Platform; username:
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M7.975 1.069a5.25 5.25 0 100 10.5 5.25 5.25 0 000-10.5z" stroke="currentColor" strokeWidth="1.2"/><path d="M11.925 11.119l2.85 2.85" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
                 访问{platformLabel}
               </button>
+              {refreshState === "failed" && (
+                <button className="btn btn--outline" type="button" onClick={() => setRefreshAttempt((value) => value + 1)}>
+                  重新尝试
+                </button>
+              )}
               {result && !result.is_ghost && <ShareModal result={result} platform={platform} username={username} />}
             </div>
           </div>

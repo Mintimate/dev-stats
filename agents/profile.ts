@@ -4,6 +4,7 @@ import {
   CACHE_STORE_NAME,
   extractReadmeFromEvents,
   getCacheExpiresAt,
+  readRefreshLease,
   readCompatibleAnalysisCacheFromStore,
   resolveAnalysisCacheTtlMs,
   sanitizeEventsForPublicReplay,
@@ -24,16 +25,20 @@ export async function onRequest(context: any) {
 
   try {
     const store = getStore(CACHE_STORE_NAME);
-    const cacheTtlMs = resolveAnalysisCacheTtlMs(context.env ?? process.env);
+    const cacheTtlMs = resolveAnalysisCacheTtlMs(context.env);
+    const refreshLease = await readRefreshLease(store, platform, username, 'readme').catch(() => null);
+    const refresh = refreshLease
+      ? { status: 'running', runId: refreshLease.runId, startedAt: refreshLease.startedAt, expiresAt: refreshLease.expiresAt }
+      : { status: 'idle' };
     const cached = await readCompatibleAnalysisCacheFromStore(store, platform, username, 'readme', cacheTtlMs, false);
     const entry = cached?.entry ?? null;
     if (!entry || !Array.isArray(entry.events)) {
-      return jsonResponse({ found: false });
+      return jsonResponse({ found: false, refresh });
     }
 
     const { readmeDraft, userProfile } = extractReadmeFromEvents(entry.events);
     if (!readmeDraft) {
-      return jsonResponse({ found: false });
+      return jsonResponse({ found: false, refresh });
     }
 
     const expiresAt = getCacheExpiresAt(entry.cachedAt, entry.expiresAt, cacheTtlMs);
@@ -45,6 +50,7 @@ export async function onRequest(context: any) {
       cachedAt: entry.cachedAt || 0,
       expiresAt,
       stale: expiresAt <= Date.now(),
+      refresh,
       readmeDraft,
       userProfile,
       // 仅回放前端终端 UI 实际渲染用得到的精简事件，避免把原始工具入参/输出透传给公开只读接口。

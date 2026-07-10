@@ -5,6 +5,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test:concurrency": "node --test test/concurrency.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -46,28 +46,30 @@ const PAGE_SIZE = 10;
 function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
   const [list, setList] = useState<LeaderboardItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [activeTab, setActiveTab] = useState<Platform>("github");
   const [page, setPage] = useState(1);
 
   const fetchRankings = useCallback(async (forceRebuild = false) => {
     setLoading(true);
+    setLoadError("");
     try {
       const res = await fetch("/leaderboard", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "makers-conversation-id": "refresh-leaderboard"
+          "makers-conversation-id": crypto.randomUUID()
         },
         body: JSON.stringify({ rebuild: forceRebuild })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.leaderboard)) {
-          setList(data.leaderboard);
-        }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (Array.isArray(data.leaderboard)) {
+        setList(data.leaderboard);
       }
     } catch (err) {
       console.error("Failed to fetch rankings:", err);
+      setLoadError("排行榜暂时加载失败，已有数据不会被清空。");
     } finally {
       setLoading(false);
     }
@@ -103,7 +105,7 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
           <h2 className="panel-title">开发者荣誉榜</h2>
           <span className="panel-note">榜单保留最近一次成功结果，超过 24h 的画像会在进入后自动更新</span>
         </div>
-        <button className="btn" type="button" onClick={() => void fetchRankings(true)}>
+        <button className="btn" type="button" onClick={() => void fetchRankings()}>
           刷新
         </button>
       </div>
@@ -142,6 +144,11 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
               </div>
             ))}
           </div>
+        ) : loadError && filteredList.length === 0 ? (
+          <div className="leaderboard-empty">
+            <p>{loadError}</p>
+            <button className="btn subtle" type="button" onClick={() => void fetchRankings()}>重新加载</button>
+          </div>
         ) : filteredList.length === 0 ? (
           <div className="leaderboard-empty">
             <p>该平台暂无排行数据。快去分析第一个开发者，开启荣誉榜吧！</p>
@@ -163,7 +170,8 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
                 : "/favicon.svg";
 
               return (
-                <div
+                <button
+                  type="button"
                   key={`${item.platform}-${item.username}`}
                   className="leaderboard-row"
                   onClick={() => onLoadUser(item)}
@@ -228,7 +236,7 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
                       <span className="action-arrow">→</span>
                     </div>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>

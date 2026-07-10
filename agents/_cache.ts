@@ -5,12 +5,89 @@ const logger = createLogger('shared-cache');
 export const CACHE_STORE_NAME = 'stats-agent-analysis-cache';
 export const CACHE_SCHEMA_VERSION = 'v4';
 export const LEADERBOARD_KEY = 'leaderboard/readme_rankings.json';
+export const LEADERBOARD_ITEM_PREFIX = 'leaderboard/items/';
+export const REFRESH_LEASE_PREFIX = 'refresh-leases/';
 export const DEFAULT_ANALYSIS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+export const DEFAULT_REFRESH_LEASE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 export interface CacheEntry {
   cachedAt: number;
   expiresAt?: number;
   events: string[];
+}
+
+export interface RefreshLease {
+  runId: string;
+  platform: string;
+  username: string;
+  mode: string;
+  startedAt: number;
+  expiresAt: number;
+}
+
+function normalizeCacheIdentity(platform: string, username: string, mode = 'readme') {
+  const safePlatform = (platform || 'github').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const rawUsername = username || '';
+  const safeUsername = safePlatform === 'cnb'
+    ? rawUsername.replace(/[^a-zA-Z0-9_.-]/g, '')
+    : rawUsername.toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+  const safeMode = (mode || 'readme').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return { safePlatform, safeUsername, safeMode };
+}
+
+export function buildRefreshLeaseKey(platform: string, username: string, mode: string): string {
+  const { safePlatform, safeUsername, safeMode } = normalizeCacheIdentity(platform, username, mode);
+  return `${REFRESH_LEASE_PREFIX}${safePlatform}/${safeUsername}/${safeMode}.json`;
+}
+
+export function buildLeaderboardItemKey(platform: string, username: string): string {
+  const { safePlatform, safeUsername } = normalizeCacheIdentity(platform, username);
+  return `${LEADERBOARD_ITEM_PREFIX}${safePlatform}/${safeUsername.toLowerCase()}.json`;
+}
+
+export function isActiveRefreshLease(value: unknown, now = Date.now()): value is RefreshLease {
+  if (!value || typeof value !== 'object') return false;
+  const lease = value as RefreshLease;
+  return typeof lease.runId === 'string' && lease.runId.length > 0 &&
+    typeof lease.expiresAt === 'number' && lease.expiresAt > now;
+}
+
+export async function readRefreshLease(store: any, platform: string, username: string, mode: string): Promise<RefreshLease | null> {
+  const key = buildRefreshLeaseKey(platform, username, mode);
+  const lease = await store.get(key, { type: 'json', consistency: 'strong' });
+  return isActiveRefreshLease(lease) ? lease : null;
+}
+
+export async function acquireRefreshLease(
+  store: any,
+  platform: string,
+  username: string,
+  mode: string,
+  runId: string,
+  now = Date.now(),
+  ttlMs = DEFAULT_REFRESH_LEASE_TTL_MS,
+): Promise<{ acquired: boolean; lease: RefreshLease }> {
+  const key = buildRefreshLeaseKey(platform, username, mode);
+  const existing = await store.get(key, { type: 'json', consistency: 'strong' });
+  if (isActiveRefreshLease(existing, now)) return { acquired: false, lease: existing };
+
+  // Blob 没有 compare-and-swap；过期租约先删除，再通过 onlyIfNew 竞争新租约。
+  if (existing) await store.delete(key);
+  const lease: RefreshLease = { runId, platform, username, mode, startedAt: now, expiresAt: now + ttlMs };
+  try {
+    await store.setJSON(key, lease, { onlyIfNew: true, cacheControl: 'no-store' });
+    return { acquired: true, lease };
+  } catch {
+    const winner = await store.get(key, { type: 'json', consistency: 'strong' });
+    if (isActiveRefreshLease(winner, now)) return { acquired: false, lease: winner };
+    throw new Error('Failed to acquire analysis refresh lease');
+  }
+}
+
+export async function releaseRefreshLease(store: any, lease: RefreshLease): Promise<void> {
+  const key = buildRefreshLeaseKey(lease.platform, lease.username, lease.mode);
+  const current = await store.get(key, { type: 'json', consistency: 'strong' });
+  if (current?.runId === lease.runId) await store.delete(key);
 }
 
 export function resolveAnalysisCacheTtlMs(env?: Record<string, string | undefined>): number {
@@ -173,9 +250,9 @@ export function parseAnalysisCacheKey(key: string): { platform: string; username
  * GitHub 用户名不区分大小写，但 API 返回的 login 是权威大小写。
  * 带上 token 以避开未认证 60 req/h 限流，避免 leaderboard 全量重建时触发限流。
  */
-export async function resolveGitHubLogin(username: string): Promise<string> {
+export async function resolveGitHubLogin(username: string, env?: Record<string, string | undefined>): Promise<string> {
   try {
-    const token = getGitHubToken(process.env as Record<string, string | undefined>);
+    const token = getGitHubToken(env);
     const headers: Record<string, string> = { 'User-Agent': 'EdgeOne-Stats-Agent/1.0' };
     if (token) headers.Authorization = `Bearer ${token}`;
     const response = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, { headers });
@@ -228,11 +305,6 @@ export function extractReadmeFromEvents(events: string[]): {
  * CNB 用户名大小写敏感，GitHub 不敏感 —— 仅对 GitHub 做小写归一化。
  */
 export function buildCacheKey(platform: string, username: string, mode: string): string {
-  const safePlatform = (platform || 'github').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const rawUsername = username || '';
-  const safeUsername = safePlatform === 'cnb'
-    ? rawUsername.replace(/[^a-zA-Z0-9_.-]/g, '')
-    : rawUsername.toLowerCase().replace(/[^a-z0-9_.-]/g, '');
-  const safeMode = (mode || 'readme').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const { safePlatform, safeUsername, safeMode } = normalizeCacheIdentity(platform, username, mode);
   return `analysis/${CACHE_SCHEMA_VERSION}/${safePlatform}/${safeUsername}/${safeMode}.json`;
 }
