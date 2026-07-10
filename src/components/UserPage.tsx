@@ -2,8 +2,8 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { Footer } from "./Footer";
 import { ReadmeReport } from "./ReadmeReport";
 import { ShareModal } from "./ShareModal";
-import { normalizeReadmeResult, narrativeForTool } from "../lib/agentLogic";
-import { toolchainItems } from "../lib/constants";
+import { buildAgentMessage, normalizeReadmeResult, narrativeForTool } from "../lib/agentLogic";
+import { defaultConfig, toolchainItems } from "../lib/constants";
 import type { Platform, ReadmeResult } from "../lib/types";
 
 type LoadState = "loading" | "found" | "not_found" | "error";
@@ -20,6 +20,8 @@ const USER_PAGE_SUBTITLES = (platformLabel: string, username: string) => [
 interface ProfileResponse {
   found: boolean;
   cachedAt?: number;
+  expiresAt?: number;
+  stale?: boolean;
   readmeDraft?: Record<string, unknown>;
   userProfile?: { nickname?: string; bio?: string; avatar?: string } | null;
   events?: string[];
@@ -267,47 +269,97 @@ function AnalysisReportTerminal({
 
 
 /**
- * 独立的用户历史/画像只读页面（/u/:platform/:username）。
- * 数据完全来自后端只读缓存接口 /profile，不触发 Agent 分析、不产生 token 消耗。
+ * 独立的用户历史/画像页面（/u/:platform/:username）。
+ * 始终先展示 /profile 返回的最近一次成功快照；快照超过 24h 时再后台触发 Agent 更新。
  */
 export function UserPage({ platform, username }: { platform: Platform; username: string }) {
   const [state, setState] = useState<LoadState>("loading");
   const [result, setResult] = useState<ReadmeResult | null>(null);
   const [cachedAt, setCachedAt] = useState(0);
   const [events, setEvents] = useState<string[]>([]);
+  const [isStale, setIsStale] = useState(false);
+  const [refreshState, setRefreshState] = useState<"idle" | "refreshing" | "updated" | "failed">("idle");
 
   useEffect(() => {
     let cancelled = false;
     setState("loading");
     setResult(null);
     setEvents([]);
+    setIsStale(false);
+    setRefreshState("idle");
 
     (async () => {
+      let hasSnapshot = false;
       try {
-        const res = await fetch("/profile", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "makers-conversation-id": "user-profile-lookup",
-          },
-          body: JSON.stringify({ platform, username }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as ProfileResponse;
+        async function loadProfile() {
+          const res = await fetch("/profile", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "makers-conversation-id": "user-profile-lookup",
+            },
+            body: JSON.stringify({ platform, username }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return (await res.json()) as ProfileResponse;
+        }
+
+        function applyProfile(data: ProfileResponse) {
+          if (!data.found || !data.readmeDraft) return false;
+          const normalized = normalizeReadmeResult(data.readmeDraft, { platform, username }, data.userProfile || null, "");
+          setResult(normalized);
+          setCachedAt(data.cachedAt || 0);
+          setEvents(data.events || []);
+          setIsStale(Boolean(data.stale));
+          setState("found");
+          hasSnapshot = true;
+          return true;
+        }
+
+        const data = await loadProfile();
         if (cancelled) return;
 
-        if (!data.found || !data.readmeDraft) {
+        if (!applyProfile(data)) {
           setState("not_found");
           return;
         }
 
-        const normalized = normalizeReadmeResult(data.readmeDraft, { platform, username }, data.userProfile || null, "");
-        setResult(normalized);
-        setCachedAt(data.cachedAt || 0);
-        setEvents(data.events || []);
-        setState("found");
+        // 先保留并展示最近一次成功快照；超过 24h 后，进入页面即在后台强制重算。
+        if (data.stale) {
+          setRefreshState("refreshing");
+          const activeConfig = { ...defaultConfig, platform, username, agent_mode: "readme" as const };
+          const conversationId = crypto.randomUUID();
+          const refreshResponse = await fetch("/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "makers-conversation-id": conversationId,
+            },
+            body: JSON.stringify({
+              message: buildAgentMessage(activeConfig, "readme"),
+              state: activeConfig,
+              force_reanalyze: true,
+            }),
+          });
+          if (!refreshResponse.ok) throw new Error(`Refresh HTTP ${refreshResponse.status}`);
+          // 必须消费完整 SSE 流，分析完成后新的缓存和排行榜才会落盘。
+          await refreshResponse.text();
+          if (cancelled) return;
+
+          const refreshed = await loadProfile();
+          if (cancelled) return;
+          if (applyProfile(refreshed) && !refreshed.stale && (refreshed.cachedAt || 0) > (data.cachedAt || 0)) {
+            setRefreshState("updated");
+          } else {
+            setRefreshState("failed");
+          }
+        }
       } catch {
-        if (!cancelled) setState("error");
+        if (!cancelled) {
+          // 已经展示出旧快照时，后台刷新失败不应把可用内容替换成错误页。
+          if (hasSnapshot) setRefreshState("failed");
+          else setState("error");
+        }
       }
     })();
 
@@ -371,14 +423,16 @@ export function UserPage({ platform, username }: { platform: Platform; username:
                 {result?.title || `${username} 的开发者画像`}
                 {state === "found" && (
                   <span className="build-status build-status--ok">
-                    <span className="status-dot" /> BUILD OK
+                    <span className="status-dot" /> {refreshState === "refreshing" ? "REFRESHING" : refreshState === "failed" ? "STALE SNAPSHOT" : refreshState === "updated" ? "UPDATED" : "BUILD OK"}
                   </span>
                 )}
               </h2>
               <span className="panel-note panel-note--muted">
                 {result?.summary
                   ? result.summary
-                  : "// 只读缓存视图 — 不消耗 token、不触发 Agent"}
+                  : "// 最近一次成功的分析快照"}
+                {isStale && refreshState === "refreshing" && " · 已超过 24h，正在后台重新分析"}
+                {isStale && refreshState === "failed" && " · 自动更新失败，暂时保留旧结果"}
               </span>
             </div>
             <div className="result-actions result-actions--compact">
@@ -398,7 +452,7 @@ export function UserPage({ platform, username }: { platform: Platform; username:
               <div className="user-page-loading">
                 <div className="loading-terminal">
                   <span className="terminal-prompt">$</span>
-                  <span className="terminal-cmd">fetch profile --platform={platform} --user={username} --from-cache</span>
+                  <span className="terminal-cmd">fetch profile --platform={platform} --user={username} --from-cache --refresh-stale</span>
                   <span className="terminal-cursor" />
                 </div>
               </div>

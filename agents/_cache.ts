@@ -19,10 +19,18 @@ export function resolveAnalysisCacheTtlMs(env?: Record<string, string | undefine
 }
 
 export function isFreshCacheEntry(entry: unknown, cacheTtlMs: number): entry is CacheEntry {
+  if (!isCacheEntry(entry)) return false;
+  return getCacheExpiresAt(entry.cachedAt, entry.expiresAt, cacheTtlMs) > Date.now();
+}
+
+/**
+ * 校验缓存的结构是否可用，但不把 24h 刷新周期误当成数据保留期。
+ * 排行榜和公开画像可读取旧快照；Agent 自身复用缓存时仍使用 isFreshCacheEntry。
+ */
+export function isCacheEntry(entry: unknown): entry is CacheEntry {
   if (!entry || typeof entry !== 'object') return false;
   const candidate = entry as CacheEntry;
-  if (typeof candidate.cachedAt !== 'number' || !Array.isArray(candidate.events)) return false;
-  return getCacheExpiresAt(candidate.cachedAt, candidate.expiresAt, cacheTtlMs) > Date.now();
+  return typeof candidate.cachedAt === 'number' && Number.isFinite(candidate.cachedAt) && Array.isArray(candidate.events);
 }
 
 export function getCacheExpiresAt(cachedAt: number, expiresAt: unknown, cacheTtlMs: number): number {
@@ -36,15 +44,24 @@ async function readFreshCacheEntry(store: any, key: string, cacheTtlMs: number):
   return isFreshCacheEntry(entry, cacheTtlMs) ? entry : null;
 }
 
+async function readCacheEntry(store: any, key: string): Promise<CacheEntry | null> {
+  const entry = await store.get(key, { type: 'json', consistency: 'strong' }) as CacheEntry | null;
+  return isCacheEntry(entry) ? entry : null;
+}
+
 export async function readCompatibleAnalysisCacheFromStore(
   store: any,
   platform: string,
   username: string,
   mode: string,
   cacheTtlMs: number,
+  freshOnly = true,
 ): Promise<{ key: string; entry: CacheEntry } | null> {
   const currentKey = buildCacheKey(platform, username, mode);
-  const current = await readFreshCacheEntry(store, currentKey, cacheTtlMs);
+  const readEntry = freshOnly
+    ? (key: string) => readFreshCacheEntry(store, key, cacheTtlMs)
+    : (key: string) => readCacheEntry(store, key);
+  const current = await readEntry(currentKey);
   if (current) return { key: currentKey, entry: current };
 
   const safePlatform = (platform || 'github').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -67,7 +84,7 @@ export async function readCompatibleAnalysisCacheFromStore(
 
   let newest: { key: string; entry: CacheEntry } | null = null;
   for (const candidate of candidates) {
-    const entry = await readFreshCacheEntry(store, candidate.key, cacheTtlMs);
+    const entry = await readEntry(candidate.key);
     if (!entry) continue;
     if (!newest || entry.cachedAt > newest.entry.cachedAt) newest = { key: candidate.key, entry };
   }

@@ -101,7 +101,7 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
       <div className="panel-head">
         <div>
           <h2 className="panel-title">开发者荣誉榜</h2>
-          <span className="panel-note">基于已完成分析的缓存数据排行榜，点击一键载入</span>
+          <span className="panel-note">榜单保留最近一次成功结果，超过 24h 的画像会在进入后自动更新</span>
         </div>
         <button className="btn" type="button" onClick={() => void fetchRankings(true)}>
           刷新
@@ -156,6 +156,7 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
               const displayHandle = `@${item.username}`;
               const displayTags = item.badges.slice(0, 3);
               const extraTagsCount = Math.max(0, item.badges.length - 3);
+              const isStale = typeof item.expiresAt === "number" && item.expiresAt <= Date.now();
 
               const avatarUrl = (item.username && item.platform)
                 ? `/api/avatar?platform=${item.platform}&username=${item.username}`
@@ -166,7 +167,7 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
                   key={`${item.platform}-${item.username}`}
                   className="leaderboard-row"
                   onClick={() => onLoadUser(item)}
-                  title={`点击快速载入 ${item.username} 的完整画像`}
+                  title={isStale ? `载入 ${item.username} 的旧快照，并自动重新分析` : `点击快速载入 ${item.username} 的完整画像`}
                 >
                   <div className={`leaderboard-rank ${isTopRank ? `rank-top rank-${rank}` : ""}`}>
                     <span className="rank-num">{rank}</span>
@@ -195,6 +196,7 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
                       )}
                     </div>
                     <div className="leaderboard-tags">
+                      {isStale && <span className="leaderboard-tag plus-tag">待更新</span>}
                       {displayTags.map((tag, tagIndex) => (
                         <span
                           key={tag}
