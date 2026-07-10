@@ -11,16 +11,20 @@ import { getStore } from '@edgeone/pages-blob';
 import { resolveModelName } from '../_model';
 import { createLogger, createSSEResponse, getGitHubToken, jsonResponse, sseEvent, truncateText } from '../_shared';
 import {
+  acquireRefreshLease,
+  buildLeaderboardItemKey,
   buildCacheKey as buildCacheKeyShared,
   CACHE_STORE_NAME,
   extractReadmeFromEvents,
   getCacheExpiresAt,
-  LEADERBOARD_KEY,
   parseAnalysisCacheKey,
+  readRefreshLease,
+  releaseRefreshLease,
   readCompatibleAnalysisCacheFromStore,
   resolveGitHubLogin,
   resolveAnalysisCacheTtlMs,
   type CacheEntry,
+  type RefreshLease,
 } from '../_cache';
 import { buildSystemPrompt, buildUserInput } from './_prompt';
 import { createOpenAIAgentTools } from './_tools';
@@ -65,30 +69,25 @@ async function writeCache(key: string, events: string[], cacheTtlMs: number): Pr
   }
 }
 
-async function updateLeaderboard(platform: string, username: string, events: string[], cacheTtlMs: number): Promise<void> {
+async function updateLeaderboard(
+  platform: string,
+  username: string,
+  events: string[],
+  cacheTtlMs: number,
+  env?: Record<string, string | undefined>,
+): Promise<void> {
   try {
     const { readmeDraft, userProfile } = extractReadmeFromEvents(events);
     if (!readmeDraft) return;
 
     const store = getStore(CACHE_STORE_NAME);
-    let leaderboard: any[] = [];
-
-    try {
-      const entry = await store.get(LEADERBOARD_KEY, { type: 'json', consistency: 'strong' });
-      if (Array.isArray(entry)) {
-        leaderboard = entry;
-      }
-    } catch {
-      // ignore
-    }
-
     const nickname = userProfile?.nickname || readmeDraft.user?.nickname || readmeDraft.user?.name || username;
     // 优先使用平台 API 校验时捕获的“权威大小写”用户名（写入 user_profile.username），
     // 而不是访客提交表单时的原始大小写，避免同一账号在榜单里因为大小写不同被当成两条记录、
     // 或者展示出和平台真实用户名不一致的大小写。旧缓存没有该字段时回退到原始 username。
     let canonicalUsername = userProfile?.username || username;
     if (platform === 'github') {
-      canonicalUsername = await resolveGitHubLogin(canonicalUsername);
+      canonicalUsername = await resolveGitHubLogin(canonicalUsername, env);
     }
     let avatar = userProfile?.avatar || readmeDraft.user?.avatar || '';
     if (avatar && !avatar.startsWith('http') && platform === 'cnb') {
@@ -123,31 +122,8 @@ async function updateLeaderboard(platform: string, username: string, events: str
       expiresAt: getCacheExpiresAt(updatedAt, undefined, cacheTtlMs),
     };
 
-    // Remove existing entry for same user and platform.
-    // Use case-insensitive match for both platforms: CNB doesn't allow two accounts
-    // with the same name differing only in case, and this also cleans up any legacy
-    // lowercase entries written by an older version of the code.
-    leaderboard = leaderboard.filter(
-      (item) => !(item.platform === platform && item.username.toLowerCase() === canonicalUsername.toLowerCase())
-    );
-
-    // Add new entry
-    leaderboard.push(rankItem);
-
-    // Sort by score desc, then by updatedAt desc
-    leaderboard.sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      return b.updatedAt - a.updatedAt;
-    });
-
-    // Keep top 100
-    if (leaderboard.length > 100) {
-      leaderboard = leaderboard.slice(0, 100);
-    }
-
-    await store.setJSON(LEADERBOARD_KEY, leaderboard);
+    // 每个用户独立写入，避免多个分析任务对整份排行榜执行 read-modify-write 时相互覆盖。
+    await store.setJSON(buildLeaderboardItemKey(platform, canonicalUsername), rankItem, { cacheControl: 'no-store' });
     logger.log({ event: 'leaderboard.update.success', platform, username: canonicalUsername, score });
   } catch (err) {
     logger.error({ event: 'leaderboard.update.error', platform, username, error: String(err) });
@@ -185,25 +161,14 @@ async function deleteAnalysisCachesForUser(platform: string, username: string): 
 async function removeFromLeaderboard(platform: string, username: string): Promise<void> {
   try {
     const store = getStore(CACHE_STORE_NAME);
-    let leaderboard: any[] = [];
-    try {
-      const entry = await store.get(LEADERBOARD_KEY, { type: 'json', consistency: 'strong' });
-      if (Array.isArray(entry)) {
-        leaderboard = entry;
-      }
-    } catch {
-      return;
-    }
-
-    // Case-insensitive match for both platforms (see updateLeaderboard for rationale)
-    const filtered = leaderboard.filter(
-      (item) => !(item.platform === platform && item.username.toLowerCase() === username.toLowerCase())
-    );
-
-    if (filtered.length !== leaderboard.length) {
-      await store.setJSON(LEADERBOARD_KEY, filtered);
-      logger.log({ event: 'leaderboard.remove.success', platform, username });
-    }
+    // 墓碑会在读取/重建榜单时覆盖旧的聚合索引，且不会与其他用户的写入竞争。
+    await store.setJSON(buildLeaderboardItemKey(platform, username), {
+      platform,
+      username,
+      removed: true,
+      updatedAt: Date.now(),
+    }, { cacheControl: 'no-store' });
+    logger.log({ event: 'leaderboard.remove.success', platform, username });
   } catch (err) {
     logger.error({ event: 'leaderboard.remove.error', platform, username, error: String(err) });
   }
@@ -235,6 +200,7 @@ export async function onRequest(context: AgentContext) {
   const message = typeof body.message === 'string' ? body.message.trim() : '';
   const state = body.state ?? {};
   const forceReanalyze = body.force_reanalyze === true;
+  const refreshIfStale = body.refresh_if_stale === true;
   const signal = context.request?.signal as AbortSignal | undefined;
   const headers = context.request?.headers ?? {};
   const conversationId =
@@ -281,8 +247,8 @@ export async function onRequest(context: AgentContext) {
     'agent.execution_type': 'full_run',
   });
 
-  // --- Cache read: skip if force_reanalyze ---
-  if (!forceReanalyze) {
+  // 自动刷新会再次确认缓存是否仍过期，避免页面读取旧快照后另一请求已经完成刷新却又重复运行。
+  if (!forceReanalyze || refreshIfStale) {
     const cached = await (context.tracer
       ? context.tracer.span(
         'cache.lookup',
@@ -307,7 +273,7 @@ export async function onRequest(context: AgentContext) {
         cached_at: new Date(cached.cachedAt).toISOString(),
       });
       // Sync casing updates on cache hit; use waitUntil if available to avoid blocking SSE first frame
-      const leaderboardUpdate = updateLeaderboard(platform, username, cached.events, cacheTtlMs);
+      const leaderboardUpdate = updateLeaderboard(platform, username, cached.events, cacheTtlMs, env);
       if (typeof context.waitUntil === 'function') {
         context.waitUntil(leaderboardUpdate);
       } else {
@@ -327,6 +293,40 @@ export async function onRequest(context: AgentContext) {
         }
       }, signal);
     }
+  }
+
+  let refreshLease: RefreshLease | null = null;
+  let refreshLeaseStore: any = null;
+  try {
+    refreshLeaseStore = getStore(CACHE_STORE_NAME);
+    const leaseResult = await acquireRefreshLease(
+      refreshLeaseStore,
+      platform,
+      username,
+      agentMode,
+      runId || conversationId,
+    );
+    if (!leaseResult.acquired) {
+      context.tracer?.setAttributes({
+        'agent.execution_type': 'refresh_joined',
+        'refresh.owner_run_id': leaseResult.lease.runId,
+      });
+      return createSSEResponse(async function* () {
+        yield sseEvent({
+          type: 'refresh_joined',
+          platform,
+          username,
+          mode: agentMode,
+          run_id: leaseResult.lease.runId,
+          started_at: leaseResult.lease.startedAt,
+          expires_at: leaseResult.lease.expiresAt,
+        });
+      }, signal);
+    }
+    refreshLease = leaseResult.lease;
+  } catch (error) {
+    // 锁服务异常时保持原有可用性，但记录 fail-open，便于观测偶发重复分析。
+    logger.error({ event: 'agent.refresh_lease.fail_open', platform, username, mode: agentMode, error: String(error) });
   }
 
   // Capture tracer for use inside the SSE generator closure.
@@ -636,6 +636,14 @@ export async function onRequest(context: AgentContext) {
 
       // Write to cache only on successful completion (has useful result)
       if (emittedReadmeDraft || emittedStatsRecipe) {
+        const currentLease = refreshLease && refreshLeaseStore
+          ? await readRefreshLease(refreshLeaseStore, platform, username, agentMode).catch(() => null)
+          : null;
+        if (refreshLease && currentLease?.runId !== refreshLease.runId) {
+          logger.log({ event: 'agent.refresh_lease.superseded', run_id: refreshLease.runId, owner_run_id: currentLease?.runId });
+          yield sseEvent({ type: 'refresh_superseded', platform, username, mode: agentMode });
+          return;
+        }
         // Span: cache write — shows serialization + Blob persistence latency
         await (tracer
           ? tracer.span(
@@ -659,10 +667,10 @@ export async function onRequest(context: AgentContext) {
           await (tracer
             ? tracer.span(
               'leaderboard.update',
-              () => updateLeaderboard(platform, username, collectedEvents, cacheTtlMs),
+              () => updateLeaderboard(platform, username, collectedEvents, cacheTtlMs, env),
               { 'user.platform': platform, 'user.username': username },
             )
-            : updateLeaderboard(platform, username, collectedEvents, cacheTtlMs));
+            : updateLeaderboard(platform, username, collectedEvents, cacheTtlMs, env));
           yield* yieldAndCollect(sseEvent({ type: 'leaderboard_updated', platform, username }));
         }
       }
@@ -690,6 +698,12 @@ export async function onRequest(context: AgentContext) {
         yield sseEvent({ type: 'leaderboard_updated', platform, username, removed: true });
       }
       yield sseEvent({ type: 'error_message', content: err.message });
+    } finally {
+      if (refreshLease && refreshLeaseStore) {
+        await releaseRefreshLease(refreshLeaseStore, refreshLease).catch((error) => {
+          logger.error({ event: 'agent.refresh_lease.release_error', run_id: refreshLease?.runId, error: String(error) });
+        });
+      }
     }
   }, signal);
 }

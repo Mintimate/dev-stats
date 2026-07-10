@@ -2,10 +2,13 @@
   "name": "dev-stats",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "npm run sync:agent-skill && vite",
+    "sync:agent-skill": "node scripts/sync-dev-stats-agent-skill.mjs",
+    "check:agent-skill": "node scripts/sync-dev-stats-agent-skill.mjs --check",
+    "build": "npm run sync:agent-skill && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "test:concurrency": "node --test test/concurrency.test.mjs",
+    "typecheck": "npm run check:agent-skill && tsc --noEmit"
   },
   "dependencies": {
     "@edgeone/pages-blob": "^0.0.14",

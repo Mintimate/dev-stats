@@ -288,6 +288,16 @@
         background: rgba(16, 185, 129, 0.08);
         border: 1px solid rgba(16, 185, 129, 0.18);
       }
+      .build-status--warning {
+        color: #d97706;
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.22);
+      }
+      .build-status--error {
+        color: var(--coral);
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+      }
       .status-dot {
         width: 6px;
         height: 6px;
@@ -2976,6 +2986,7 @@
 
       .leaderboard-row {
         display: flex;
+        width: 100%;
         align-items: center;
         background: var(--surface);
         border: 1px solid var(--line);
@@ -2986,6 +2997,9 @@
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
         position: relative;
         overflow: hidden;
+        color: inherit;
+        font: inherit;
+        text-align: left;
       }
 
       .leaderboard-row:hover {

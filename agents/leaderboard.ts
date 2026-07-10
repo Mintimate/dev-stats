@@ -4,7 +4,8 @@ import {
   CACHE_STORE_NAME,
   extractReadmeFromEvents,
   getCacheExpiresAt,
-  isFreshCacheEntry,
+  isCacheEntry,
+  LEADERBOARD_ITEM_PREFIX,
   LEADERBOARD_KEY,
   parseAnalysisCacheKey,
   resolveGitHubLogin,
@@ -13,52 +14,93 @@ import {
 
 const logger = createLogger('leaderboard-agent');
 
-function filterFreshLeaderboardItems(leaderboard: any[], cacheTtlMs: number): any[] {
-  const now = Date.now();
-  return leaderboard.filter((item) => {
-    if (!item || typeof item !== 'object' || typeof item.updatedAt !== 'number') return false;
-    return getCacheExpiresAt(item.updatedAt, item.expiresAt, cacheTtlMs) > now;
-  });
+function filterValidLeaderboardItems(leaderboard: any[]): any[] {
+  return leaderboard.filter((item) => item && typeof item === 'object' && typeof item.updatedAt === 'number');
+}
+
+function leaderboardItemId(item: any): string {
+  return `${String(item?.platform || '').toLowerCase()}/${String(item?.username || '').toLowerCase()}`;
+}
+
+export function mergeLeaderboardItems(base: any[], changes: any[]): any[] {
+  const byUser = new Map<string, any>();
+  for (const item of filterValidLeaderboardItems(base)) byUser.set(leaderboardItemId(item), item);
+
+  for (const item of changes) {
+    if (!item || typeof item !== 'object' || typeof item.updatedAt !== 'number') continue;
+    const id = leaderboardItemId(item);
+    if (id === '/') continue;
+    const existing = byUser.get(id);
+    if (existing && existing.updatedAt > item.updatedAt) continue;
+    if (item.removed === true) byUser.delete(id);
+    else byUser.set(id, item);
+  }
+
+  return Array.from(byUser.values());
+}
+
+function sortLeaderboard(items: any[]): any[] {
+  return items.sort((a, b) => b.score !== a.score ? b.score - a.score : b.updatedAt - a.updatedAt);
+}
+
+async function readLeaderboardItems(store: any): Promise<any[]> {
+  const { blobs } = await store.list({ prefix: LEADERBOARD_ITEM_PREFIX, consistency: 'strong' });
+  const items: any[] = [];
+  const batchSize = 10;
+  for (let i = 0; i < blobs.length; i += batchSize) {
+    const batch = blobs.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map((blob: any) => store.get(blob.key, { type: 'json', consistency: 'strong' })),
+    );
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value) items.push(result.value);
+    }
+  }
+  return items;
 }
 
 export async function onRequest(context: any) {
   const store = getStore(CACHE_STORE_NAME);
   const body = context.request?.body ?? {};
-  const forceRebuild = body.rebuild === true;
-  const cacheTtlMs = resolveAnalysisCacheTtlMs(context.env ?? process.env);
+  const configuredRebuildToken = String(context.env?.LEADERBOARD_REBUILD_TOKEN || '');
+  const suppliedRebuildToken = String(body.rebuild_token || context.request?.headers?.['x-leaderboard-rebuild-token'] || '');
+  const forceRebuild = body.rebuild === true && configuredRebuildToken.length > 0 && suppliedRebuildToken === configuredRebuildToken;
+  const cacheTtlMs = resolveAnalysisCacheTtlMs(context.env);
+
+  if (body.rebuild === true && !forceRebuild) {
+    logger.error({ event: 'leaderboard.rebuild.denied', reason: configuredRebuildToken ? 'invalid_token' : 'token_not_configured' });
+  }
 
   let leaderboard: any[] = [];
   let indexExists = false;
 
-  // 1. Try reading the compiled index if not forcing a rebuild
-  if (!forceRebuild) {
-    try {
-      const entry = await store.get(LEADERBOARD_KEY, { type: 'json', consistency: 'strong' });
-      if (Array.isArray(entry)) {
-        leaderboard = entry;
-        indexExists = true;
-      }
-    } catch {
-      // ignore
+  // 1. 排行榜索引是长期快照，即使强制重建也先读取，避免扫描异常时把已有榜单清空。
+  try {
+    const entry = await store.get(LEADERBOARD_KEY, { type: 'json', consistency: 'strong' });
+    if (Array.isArray(entry)) {
+      leaderboard = filterValidLeaderboardItems(entry);
+      indexExists = true;
     }
+  } catch {
+    // ignore
+  }
+
+  let leaderboardItems: any[] = [];
+  try {
+    leaderboardItems = await readLeaderboardItems(store);
+    leaderboard = mergeLeaderboardItems(leaderboard, leaderboardItems);
+  } catch (err) {
+    logger.error({ event: 'leaderboard.read_items.error', error: String(err) });
   }
 
   // 2. Rebuild only if forced, or index does not exist / is empty.
   // Count mismatch is not a trigger because updateLeaderboard() handles incremental updates;
   // rebuilding on every count difference caused redundant full scans.
-  const needsRebuild = forceRebuild || !indexExists || leaderboard.length === 0;
+  const needsRebuild = forceRebuild || (!indexExists && leaderboardItems.length === 0) ||
+    (leaderboard.length === 0 && leaderboardItems.length === 0);
 
   if (!needsRebuild) {
-    const freshLeaderboard = filterFreshLeaderboardItems(leaderboard, cacheTtlMs);
-    if (freshLeaderboard.length !== leaderboard.length) {
-      try {
-        await store.setJSON(LEADERBOARD_KEY, freshLeaderboard);
-        logger.log({ event: 'leaderboard.prune_stale.success', before: leaderboard.length, after: freshLeaderboard.length });
-      } catch (err) {
-        logger.error({ event: 'leaderboard.prune_stale.save_error', error: String(err) });
-      }
-    }
-    return jsonResponse({ leaderboard: freshLeaderboard });
+    return jsonResponse({ leaderboard: sortLeaderboard(leaderboard).slice(0, 100) });
   }
 
   try {
@@ -81,7 +123,12 @@ export async function onRequest(context: any) {
       cacheCount: cacheKeysCount
     });
 
-    const rebuiltList: any[] = [];
+    // 以现有索引为底稿，只更新扫描到的快照；分析缓存缺失或扫描失败都不会删除榜单用户。
+    const rebuiltByUser = new Map<string, any>();
+    for (const item of leaderboard) {
+      const key = `${String(item.platform).toLowerCase()}/${String(item.username).toLowerCase()}`;
+      rebuiltByUser.set(key, item);
+    }
     const cacheKeys = blobsList.filter(b => parseAnalysisCacheKey(b.key)?.mode === 'readme');
 
     // Process blobs in parallel batches of 5 for performance
@@ -103,7 +150,7 @@ export async function onRequest(context: any) {
         if (!result.value) continue;
         const { platform, username, cacheEntry } = result.value;
         try {
-          if (!isFreshCacheEntry(cacheEntry, cacheTtlMs)) continue;
+          if (!isCacheEntry(cacheEntry)) continue;
 
             const { readmeDraft, userProfile } = extractReadmeFromEvents(cacheEntry.events);
 
@@ -141,7 +188,7 @@ export async function onRequest(context: any) {
                 }
               }
               if (platform === 'github') {
-                displayUsername = await resolveGitHubLogin(displayUsername);
+                displayUsername = await resolveGitHubLogin(displayUsername, context.env);
               }
 
               if (avatar && !avatar.startsWith('http') && platform === 'cnb') {
@@ -158,7 +205,7 @@ export async function onRequest(context: any) {
               const badges = Array.isArray(readmeDraft.badges) ? readmeDraft.badges : [];
               
               const updatedAt = cacheEntry.cachedAt || Date.now();
-              rebuiltList.push({
+              const item = {
                 username: displayUsername,
                 platform,
                 nickname,
@@ -168,7 +215,10 @@ export async function onRequest(context: any) {
                 badges,
                 updatedAt,
                 expiresAt: getCacheExpiresAt(updatedAt, cacheEntry.expiresAt, cacheTtlMs),
-              });
+              };
+              const itemKey = `${platform}/${String(displayUsername).toLowerCase()}`;
+              const existing = rebuiltByUser.get(itemKey);
+              if (!existing || updatedAt >= existing.updatedAt) rebuiltByUser.set(itemKey, item);
             }
         } catch (err) {
           logger.error({ event: 'leaderboard.rebuild.item_error', platform, username, error: String(err) });
@@ -177,12 +227,9 @@ export async function onRequest(context: any) {
     }
 
     // Sort by score desc, then by updatedAt desc
-    rebuiltList.sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      return b.updatedAt - a.updatedAt;
-    });
+    // 用户独立条目（含删除墓碑）是最终权威来源，覆盖旧聚合索引与分析缓存扫描结果。
+    const rebuiltList = mergeLeaderboardItems(Array.from(rebuiltByUser.values()), leaderboardItems);
+    sortLeaderboard(rebuiltList);
 
     const sliced = rebuiltList.slice(0, 100);
 

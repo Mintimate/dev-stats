@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevStats Agent"
+  short_description: "维护 GitHub/CNB 画像分析与 Stats 推荐行为"
+  default_prompt: "Use $dev-stats-agent to maintain the DevStats Agent behavior and prompt rules."
