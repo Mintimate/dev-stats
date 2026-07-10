@@ -109,6 +109,17 @@ After each analysis, results are automatically written to KV Blob storage and th
 | `GET /agents/leaderboard` | Retrieve the developer leaderboard |
 | `GET /agents/profile` | Get cached analysis result for a specific user |
 
+### Maintaining the Agent Skill
+
+`skills/dev-stats-agent/` is the single source of truth for Agent behavior. Platform routing, profile scoring/output, and Stats recipe rules live in its `references/` directory. Run `npm run sync:agent-skill` to generate `agents/chat/_skill.ts`; do not edit the generated file directly.
+
+```bash
+npm run sync:agent-skill   # Sync the runtime prompt after editing the Skill
+npm run check:agent-skill  # Verify the Skill and generated output are aligned
+```
+
+`npm run dev` and `npm run build` sync automatically, while `npm run typecheck` rejects stale generated output. See [`AGENTS.md`](./AGENTS.md) for the complete repository maintenance boundaries.
+
 ### Environment Variables (Agent)
 
 The Agent feature requires additional LLM access credentials:

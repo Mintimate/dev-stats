@@ -109,6 +109,17 @@ Agent 会基于公开数据对开发者进行多维度打分（每维度 1–20 
 | `GET /agents/leaderboard` | 获取开发者排行榜 |
 | `GET /agents/profile` | 获取指定用户的缓存分析结果 |
 
+### Agent Skill 维护
+
+`skills/dev-stats-agent/` 是 Agent 行为规范的唯一维护入口。平台路由、评分输出和 Stats 配方规则分别位于其 `references/` 目录；运行时代码由 `npm run sync:agent-skill` 生成到 `agents/chat/_skill.ts`，请勿直接修改生成文件。
+
+```bash
+npm run sync:agent-skill   # 修改 Skill 后同步运行时提示
+npm run check:agent-skill  # 检查 Skill 与生成文件是否一致
+```
+
+`npm run dev` 和 `npm run build` 会自动同步，`npm run typecheck` 会拒绝未同步的 Skill 变更。更完整的仓库维护边界见 [`AGENTS.md`](./AGENTS.md)。
+
 ### 环境变量（Agent 功能）
 
 Agent 功能需要额外配置大模型访问令牌：
