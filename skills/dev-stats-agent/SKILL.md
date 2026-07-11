@@ -20,7 +20,7 @@ Keep behavior policy and output requirements in this skill. Keep executable APIs
 - Generate personal-profile README Markdown, developer ratings, evidence summaries, humorous technical roasts, capability dimensions, major repositories, and applicable Stats card combinations.
 - Preserve the requested platform throughout tool calls, conclusions, URLs, and generated card options.
 - When public data is sparse, finish with the best available evidence instead of repeatedly calling the same tool.
-- Use relative card image URLs such as `/api?username=...` so generated Markdown works on the current deployed domain.
+- For exported README Markdown, use the runtime-provided deployed site origin and absolute card image URLs such as `https://your-domain.example/api?username=...`. Relative `/api` URLs are only suitable for the in-site preview and break when pasted into GitHub/CNB README files.
 
 ## Runtime Tool Policy
 

@@ -35,6 +35,15 @@ const GITHUB_CARDS = new Set([
 const CNB_CARDS = new Set([
   'stats', 'top-langs', 'pin', 'streak', 'profile-summary', 'contribution-calendar', 'recent-activity', 'repo-languages',
 ]);
+const THIRD_PARTY_STATS_CARD_HOST = /(^|\.)(github-readme-stats(?:-[a-z0-9-]+)?\.vercel\.app|github-readme-streak-stats\.herokuapp\.com|streak-stats\.demolab\.com|github-profile-summary-cards\.vercel\.app|github-profile-trophy\.vercel\.app|github-readme-activity-graph\.vercel\.app|github-contributor-stats\.vercel\.app)$/i;
+const IMAGE_URL_RE = /!\[[^\]]*\]\(([^\s)]+)(?:\s+[^)]*)?\)|<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+
+export type ReadmeCardTarget = {
+  platform: AnalysisPlatform;
+  username: string;
+  siteOrigin: string;
+  theme?: string;
+};
 
 function numberOf(value: unknown): number {
   const valueAsNumber = Number(value);
@@ -102,6 +111,88 @@ function uniqueRepos(repos: AnalysisRepo[]): AnalysisRepo[] {
     seen.add(key);
     return true;
   }).slice(0, 6);
+}
+
+function canonicalSiteOrigin(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+function cardImageUrl(target: ReadmeCardTarget, card: 'stats' | 'top-langs'): string {
+  const siteOrigin = canonicalSiteOrigin(target.siteOrigin);
+  if (!siteOrigin) throw new Error('A deployed site origin is required for exported Stats card URLs.');
+  const url = new URL(card === 'stats' ? '/api' : '/api/top-langs', siteOrigin);
+  url.searchParams.set('username', target.username);
+  if (target.platform === 'cnb') url.searchParams.set('platform', 'cnb');
+  if (target.theme) url.searchParams.set('theme', target.theme);
+  if (card === 'stats') url.searchParams.set('show_icons', 'true');
+  else url.searchParams.set('layout', 'compact');
+  return url.toString();
+}
+
+function profileUrl(target: ReadmeCardTarget): string {
+  const username = encodeURIComponent(target.username);
+  return target.platform === 'cnb' ? `https://cnb.cool/u/${username}` : `https://github.com/${username}`;
+}
+
+function isManagedStatsCardUrl(value: string, siteOrigin: string): boolean {
+  const origin = canonicalSiteOrigin(siteOrigin);
+  if (!origin) return false;
+  try {
+    const url = new URL(value, origin);
+    if (THIRD_PARTY_STATS_CARD_HOST.test(url.hostname)) return true;
+    if (url.origin !== origin) return false;
+    return /^\/api(?:\/(?:top-langs|pin|streak|profile-summary|contribution-calendar|recent-activity|repo-languages|org))?$/.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function lineContainsReplaceableStatsCard(line: string, siteOrigin: string): boolean {
+  IMAGE_URL_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = IMAGE_URL_RE.exec(line))) {
+    const url = match[1] || match[2];
+    if (url && isManagedStatsCardUrl(url, siteOrigin)) return true;
+  }
+  return false;
+}
+
+function managedCardLines(target: ReadmeCardTarget): string[] {
+  const targetUrl = profileUrl(target);
+  return [
+    `[![DevStats](${cardImageUrl(target, 'stats')})](${targetUrl})`,
+    '',
+    `[![Top Languages](${cardImageUrl(target, 'top-langs')})](${targetUrl})`,
+  ];
+}
+
+/**
+ * Keep a generated README portable: known third-party or legacy DevStats card images are
+ * replaced at their original location, while unrelated badges and images stay untouched.
+ */
+export function replaceReadmeStatsCards(markdown: string, target: ReadmeCardTarget): string {
+  const input = String(markdown || '').trim();
+  const output: string[] = [];
+  let replaced = false;
+  for (const line of input.split(/\r?\n/)) {
+    if (!lineContainsReplaceableStatsCard(line, target.siteOrigin)) {
+      output.push(line);
+      continue;
+    }
+    if (!replaced) output.push(...managedCardLines(target));
+    replaced = true;
+  }
+  if (!replaced) {
+    if (output.length && output[output.length - 1] !== '') output.push('');
+    output.push('## DevStats 卡片', '', ...managedCardLines(target));
+  }
+  return output.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 export function createDeterministicAnalysis(
@@ -225,14 +316,18 @@ function scoreCNB(inspected: Record<string, any>, requestedUsername: string): De
   };
 }
 
-export function validateReadmeDraft(input: Record<string, unknown>, analysis: DeterministicAnalysis): Record<string, unknown> {
+export function validateReadmeDraft(
+  input: Record<string, unknown>,
+  analysis: DeterministicAnalysis,
+  cardTarget?: ReadmeCardTarget,
+): Record<string, unknown> {
   const badges = Array.isArray(input.badges)
     ? input.badges.map((badge) => textOf(badge)).filter(Boolean).slice(0, 5)
     : [];
   return {
     ok: true,
     title: textOf(input.title) || `${analysis.username} README Draft`,
-    markdown: textOf(input.markdown),
+    markdown: cardTarget ? replaceReadmeStatsCards(textOf(input.markdown), cardTarget) : textOf(input.markdown),
     summary: textOf(input.summary),
     promotional_summary: textOf(input.promotional_summary) || textOf(input.summary),
     objective_rating: analysis.objective_rating,

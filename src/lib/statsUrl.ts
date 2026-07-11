@@ -46,7 +46,9 @@ export function buildStatsUrl(config: ManualConfig, cardOverride?: CardType) {
     url.searchParams.set("repo", config.repo || "dev-stats");
   }
 
-  return `${url.pathname}${url.search}`;
+  // 手动面板导出的 Markdown 会被粘贴到 GitHub/CNB 等站外 README；必须保留当前部署域名，
+  // 否则 `/api?...` 会被解释为目标仓库的相对路径而无法渲染。
+  return url.toString();
 }
 
 export function buildMarkdown(config: ManualConfig, url: string) {

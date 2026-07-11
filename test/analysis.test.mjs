@@ -15,6 +15,7 @@ async function importTypeScriptModule(entryPoint) {
 }
 
 const analysis = await importTypeScriptModule("agents/chat/_analysis.ts");
+const statsUrl = await importTypeScriptModule("src/lib/statsUrl.ts");
 
 const githubEvidence = {
   user: {
@@ -65,6 +66,55 @@ test("README validation overrides all model-controlled rating fields", () => {
   assert.deepEqual(draft.dimension_scores, trusted.dimension_scores);
   assert.deepEqual(draft.top_repos, trusted.top_repos);
   assert.equal(draft.analysis_version, "v1");
+});
+
+test("README card normalization replaces known third-party cards but preserves unrelated badges", () => {
+  const markdown = [
+    "# Example Dev",
+    "![Custom badge](https://img.shields.io/badge/TypeScript-blue)",
+    "![GitHub Stats](https://github-readme-stats.vercel.app/api?username=exampledev)",
+    "![Streak](https://streak-stats.demolab.com?user=exampledev)",
+  ].join("\n");
+  const normalized = analysis.replaceReadmeStatsCards(markdown, {
+    platform: "github",
+    username: "ExampleDev",
+    siteOrigin: "https://stats.example.dev",
+    theme: "github_dark",
+  });
+
+  assert.match(normalized, /https:\/\/stats\.example\.dev\/api\?username=ExampleDev&theme=github_dark&show_icons=true/);
+  assert.match(normalized, /https:\/\/stats\.example\.dev\/api\/top-langs\?username=ExampleDev&theme=github_dark&layout=compact/);
+  assert.doesNotMatch(normalized, /github-readme-stats\.vercel\.app|streak-stats\.demolab\.com/);
+  assert.match(normalized, /img\.shields\.io/);
+});
+
+test("manual Stats links retain the deployed hostname for README export", () => {
+  globalThis.window = { location: { origin: "https://stats.example.dev" } };
+  const config = {
+    platform: "github",
+    username: "Mintimate/oh-my-rime",
+    card: "stats",
+    repo: "dev-stats",
+    theme: "github_dark",
+    custom_title: "",
+    layout: "normal",
+    langs_count: 8,
+    activity_count: 5,
+    card_width: 0,
+    show_icons: true,
+    hide_border: false,
+    include_all_commits: false,
+    prs_merged: false,
+    hide_title: false,
+    hide_rank: false,
+    disable_animations: false,
+    text_bold: true,
+    agent_mode: "stats",
+  };
+  const url = statsUrl.buildStatsUrl(config);
+
+  assert.equal(url, "https://stats.example.dev/api?username=Mintimate%2Foh-my-rime&theme=github_dark&show_icons=true");
+  assert.match(statsUrl.buildMarkdown(config, url), /https:\/\/stats\.example\.dev\/api\?/);
 });
 
 test("GitHub repository cards never use an external contribution path as the owner repository", () => {

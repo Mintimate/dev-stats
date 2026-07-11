@@ -22,5 +22,6 @@ Useful options include `platform`, `username`, `theme`, `layout`, `show_icons`, 
 
 - A full README result should include applicable Stats card Markdown.
 - Map `stats` to `/api`; map other card names to `/api/<card>`, for example `/api/top-langs`, `/api/pin`, and `/api/repo-languages`. Do not encode a card as `/api?card=<name>`.
-- Use relative image URLs. Pass `username` for user cards, `repo` for repository-dependent cards, `platform=cnb` for CNB, and `org` instead of `username` for the GitHub organization card.
+- For exported README Markdown, prefix every card URL with the runtime-provided deployed site origin. Pass `username` for user cards, `repo` for repository-dependent cards, `platform=cnb` for CNB, and `org` instead of `username` for the GitHub organization card.
+- When an existing GitHub Profile README contains known third-party or legacy DevStats statistics cards, replace those card images with the canonical DevStats card block. Preserve unrelated images, badges, and prose.
 - Keep usernames, repository paths, and platform query parameters consistent with the inspected target.

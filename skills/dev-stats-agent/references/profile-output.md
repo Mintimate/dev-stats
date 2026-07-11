@@ -51,3 +51,4 @@ Return integers from 1 to 20 for:
 - Add technology, activity, or contact sections only when public data supports them. Never invent contact details, employers, roles, or skills.
 - Treat an existing GitHub Profile README as source material. Preserve verified identity, links, and still-relevant facts, but reorganize or rewrite weak presentation when useful.
 - Do not silently discard distinctive existing content. If major existing sections are omitted because they are outdated, irrelevant, or unverifiable, make the rewritten README internally coherent without claiming they were preserved verbatim.
+- Replace existing third-party or legacy DevStats statistics-card images with the runtime-provided canonical DevStats card block. Preserve unrelated badges, screenshots, and identity images.

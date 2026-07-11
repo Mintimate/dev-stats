@@ -27,7 +27,13 @@ import {
   type RefreshLease,
 } from '../_cache';
 import { buildSystemPrompt, buildUserInput } from './_prompt';
-import { createDeterministicAnalysis, fallbackStatsRecipe, type DeterministicAnalysis } from './_analysis';
+import {
+  createDeterministicAnalysis,
+  fallbackStatsRecipe,
+  replaceReadmeStatsCards,
+  type DeterministicAnalysis,
+  type ReadmeCardTarget,
+} from './_analysis';
 import { readEvidenceCache, writeEvidenceCache } from './_evidence-cache';
 import { createOpenAIAgentTools, executeStatsTool } from './_tools';
 
@@ -37,6 +43,8 @@ interface FrontendState {
   platform?: string;
   username?: string;
   agent_mode?: string;
+  theme?: string;
+  site_origin?: string;
 }
 
 const QWEN_THINKING_MODEL_SETTINGS: ModelSettings = {
@@ -49,6 +57,50 @@ const QWEN_THINKING_MODEL_SETTINGS: ModelSettings = {
 };
 
 const WRITER_MAX_TURNS = 2;
+
+function headerValue(headers: Record<string, string>, name: string): string {
+  const expected = name.toLowerCase();
+  const entry = Object.entries(headers).find(([key]) => key.toLowerCase() === expected);
+  return entry ? String(entry[1] || '') : '';
+}
+
+function validHttpOrigin(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolvePublicSiteOrigin(
+  env: Record<string, string | undefined>,
+  headers: Record<string, string>,
+  requestedOrigin?: string,
+): string | null {
+  for (const candidate of [env.PUBLIC_SITE_URL, requestedOrigin, headerValue(headers, 'origin')]) {
+    const origin = validHttpOrigin(candidate);
+    if (origin) return origin;
+  }
+  const host = (headerValue(headers, 'x-forwarded-host') || headerValue(headers, 'host')).split(',')[0].trim();
+  if (!host || /[\s/\\]/.test(host)) return null;
+  const proto = headerValue(headers, 'x-forwarded-proto').split(',')[0].trim() || 'https';
+  return validHttpOrigin(`${proto === 'http' ? 'http' : 'https'}://${host}`);
+}
+
+function rewriteCachedReadmeCards(events: string[], target: ReadmeCardTarget): string[] {
+  return events.map((raw) => {
+    if (!raw.startsWith('data: ')) return raw;
+    try {
+      const event = JSON.parse(raw.slice(6).trim());
+      if (event?.type !== 'readme_draft' || typeof event.markdown !== 'string') return raw;
+      return sseEvent({ ...event, markdown: replaceReadmeStatsCards(event.markdown, target) });
+    } catch {
+      return raw;
+    }
+  });
+}
 
 async function readCompatibleAnalysisCache(platform: string, username: string, mode: string, cacheTtlMs: number): Promise<CacheEntry | null> {
   try {
@@ -233,6 +285,18 @@ export async function onRequest(context: AgentContext) {
   const agentMode = frontendState.agent_mode === 'stats' ? 'stats' : 'readme';
   const platform: 'github' | 'cnb' = frontendState.platform === 'cnb' ? 'cnb' : 'github';
   const username = frontendState.username || '';
+  const siteOrigin = resolvePublicSiteOrigin(env, headers, frontendState.site_origin);
+  const cardTarget: ReadmeCardTarget | null = agentMode === 'readme' && siteOrigin
+    ? {
+      platform,
+      username,
+      siteOrigin,
+      theme: String(frontendState.theme || 'github_dark').replace(/[^a-zA-Z0-9_-]/g, '') || 'github_dark',
+    }
+    : null;
+  if (agentMode === 'readme' && !cardTarget) {
+    return jsonResponse({ error: 'Missing public site origin. Configure PUBLIC_SITE_URL or call from the deployed site.' }, 500);
+  }
   const cacheKey = buildCacheKeyShared(platform, username, agentMode);
   const cacheTtlMs = resolveAnalysisCacheTtlMs(env);
 
@@ -263,6 +327,7 @@ export async function onRequest(context: AgentContext) {
       )
       : readCompatibleAnalysisCache(platform, username, agentMode, cacheTtlMs));
     if (cached) {
+      const cachedEvents = cardTarget ? rewriteCachedReadmeCards(cached.events, cardTarget) : cached.events;
       // Mark root span as cache hit
       context.tracer?.setAttributes({
         'cache.hit': true,
@@ -275,7 +340,7 @@ export async function onRequest(context: AgentContext) {
         cached_at: new Date(cached.cachedAt).toISOString(),
       });
       // Sync casing updates on cache hit; use waitUntil if available to avoid blocking SSE first frame
-      const leaderboardUpdate = updateLeaderboard(platform, username, cached.events, cacheTtlMs, env);
+      const leaderboardUpdate = updateLeaderboard(platform, username, cachedEvents, cacheTtlMs, env);
       if (typeof context.waitUntil === 'function') {
         context.waitUntil(leaderboardUpdate);
       } else {
@@ -290,7 +355,7 @@ export async function onRequest(context: AgentContext) {
           username,
           mode: agentMode,
         });
-        for (const raw of cached.events) {
+        for (const raw of cachedEvents) {
           yield raw;
         }
       }, signal);
@@ -573,6 +638,7 @@ export async function onRequest(context: AgentContext) {
         prefetchedProfile,
         env,
         analysis,
+        cardTarget: cardTarget || undefined,
         allowedToolNames: [finalTool],
       });
 
@@ -603,7 +669,7 @@ export async function onRequest(context: AgentContext) {
       });
       let agentTurns = 0;
 
-      const result = await run(agent, buildWriterInput(message, state, inspectResult, profileReadme, analysis), {
+      const result = await run(agent, buildWriterInput(message, state, inspectResult, profileReadme, analysis, cardTarget || undefined), {
         stream: true,
         signal,
         session,
@@ -673,7 +739,7 @@ export async function onRequest(context: AgentContext) {
       }
 
       if (agentMode === 'readme' && !emittedReadmeDraft) {
-        const fallback = sseEvent(createDeterministicFallbackReadmeDraft(analysis, inspectResult));
+        const fallback = sseEvent(createDeterministicFallbackReadmeDraft(analysis, inspectResult, cardTarget!));
         emittedReadmeDraft = true;
         yield* yieldAndCollect(fallback);
       }
@@ -783,6 +849,7 @@ function buildWriterInput(
   inspected: Record<string, any>,
   profileReadme: Record<string, any> | null,
   analysis: DeterministicAnalysis,
+  cardTarget?: ReadmeCardTarget,
 ): string {
   const evidence = {
     deterministic_analysis: analysis,
@@ -795,6 +862,7 @@ function buildWriterInput(
     existing_profile_readme: profileReadme?.ok
       ? String(profileReadme.readme || '').slice(0, 16_000)
       : null,
+    devstats_card_target: cardTarget,
   };
   return [
     buildUserInput(message, state),
@@ -807,6 +875,7 @@ function buildWriterInput(
 function createDeterministicFallbackReadmeDraft(
   analysis: DeterministicAnalysis,
   inspected: Record<string, any>,
+  cardTarget: ReadmeCardTarget,
 ): Record<string, unknown> {
   const user = inspected.user ?? {};
   const nickname = String(user.nickname || user.name || user.login || analysis.username);
@@ -821,7 +890,6 @@ function createDeterministicFallbackReadmeDraft(
   const projectLines = analysis.top_repos.length
     ? analysis.top_repos.map((repo) => `- [${repo.name}](${repoUrl(repo.name)}) · ${repo.stars} stars · ${repo.contributions_desc}`)
     : ['- 公开资料暂未提供可展示的代表仓库。'];
-  const platformParam = analysis.platform === 'cnb' ? '&platform=cnb' : '';
   const markdown = [
     `# ${nickname}`,
     '',
@@ -833,17 +901,12 @@ function createDeterministicFallbackReadmeDraft(
     '',
     ...projectLines,
     '',
-    '## Stats',
-    '',
-    `![Stats](/api?username=${encodeURIComponent(analysis.username)}&show_icons=true${platformParam})`,
-    '',
-    `![Top Languages](/api/top-langs?username=${encodeURIComponent(analysis.username)}&layout=compact${platformParam})`,
   ].join('\n');
   return {
     type: 'readme_draft',
     ok: true,
     title: `${analysis.username} README Draft`,
-    markdown,
+    markdown: replaceReadmeStatsCards(markdown, cardTarget),
     summary: analysis.evidence_summary,
     promotional_summary: `${nickname} 的 README 已根据公开资料生成，可继续补充个人叙事和联系信息。`,
     objective_rating: analysis.objective_rating,

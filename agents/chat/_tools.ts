@@ -1,5 +1,5 @@
 import { getGitHubToken, sseEvent } from '../_shared';
-import { validateReadmeDraft, validateStatsRecipe, type DeterministicAnalysis } from './_analysis';
+import { validateReadmeDraft, validateStatsRecipe, type DeterministicAnalysis, type ReadmeCardTarget } from './_analysis';
 import { tool } from '@openai/agents';
 
 const GITHUB_API = 'https://api.github.com';
@@ -90,6 +90,7 @@ export function createOpenAIAgentTools(options: {
   prefetchedProfile?: Record<string, unknown>;
   env?: Record<string, string | undefined>;
   analysis?: DeterministicAnalysis;
+  cardTarget?: ReadmeCardTarget;
   allowedToolNames?: readonly string[];
 }) {
   const allowed = options.allowedToolNames ? new Set(options.allowedToolNames) : null;
@@ -269,6 +270,7 @@ export async function executeStatsTool(
     prefetchedProfile?: Record<string, unknown>;
     env?: Record<string, string | undefined>;
     analysis?: DeterministicAnalysis;
+    cardTarget?: ReadmeCardTarget;
   },
 ) {
   const sseQueue = options.sseQueue ?? [];
@@ -607,7 +609,7 @@ export async function executeStatsTool(
       top_repos: Array.isArray(input.top_repos) ? input.top_repos : [],
     };
     const payload = options.analysis
-      ? validateReadmeDraft(modelPayload, options.analysis)
+      ? validateReadmeDraft(modelPayload, options.analysis, options.cardTarget)
       : modelPayload;
     sseQueue.push(sseEvent({ type: 'readme_draft', ...payload }));
     return payload;

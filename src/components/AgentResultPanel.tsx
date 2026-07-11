@@ -96,7 +96,7 @@ function StatsRecipeDashboard({
             <div className={`image-loading-overlay ${preview.loading ? "" : "hidden"}`} aria-hidden={!preview.loading}>加载预览中</div>
             <div className="recipe-preview-meta">
               <span className="preview-url-label">实时 API 地址:</span>
-              <code className="preview-url-code">{window.location.origin + activeUrl}</code>
+              <code className="preview-url-code">{activeUrl}</code>
             </div>
           </div>
           <div className="recipe-json-section">
