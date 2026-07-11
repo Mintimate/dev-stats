@@ -27,6 +27,7 @@ If `fetch_github_profile_readme` confirms that `username/username` has no README
 ## Errors And Repetition
 
 - Never repeat `inspect_github_user`, `inspect_cnb_user`, or the same `browser_fetch` URL in one run.
+- A fresh runtime evidence-cache hit is equivalent to the completed platform inspection for routing purposes. Emit the cache-hit status and reuse only its structured collector output; do not re-run the upstream inspection merely to satisfy a mode change.
 - If a tool returns sparse or empty data, continue to the final composition tool with explicit caveats. Do not loop or retry.
 - If GitHub profile or README retrieval fails without a verified 404, state the limitation and continue from other public data.
 - If `inspect_cnb_user` reports `ok = false` or HTTP 404, stop without composing a fallback result. Explain that the CNB username was not found and that CNB usernames are case-sensitive, for example `Mintimate` may exist while `mintimate` returns 404.

@@ -5,7 +5,7 @@ import { ReadmeReport } from "./ReadmeReport";
 import { ShareModal } from "./ShareModal";
 import { cardMetadata } from "../lib/constants";
 import { renderMarkdown } from "../lib/markdown";
-import { buildUrlForRecipeCard } from "../lib/statsUrl";
+import { buildMarkdownForRecipe, buildUrlForRecipeCard, recipeCards } from "../lib/statsUrl";
 import type { CardType, GlobalStatus, ManualConfig, StatsRecipe, ViewName } from "../lib/types";
 
 const loadingPhases = ["BOOT", "DIG", "ROAST", "POLISH", "SHIP"];
@@ -57,7 +57,7 @@ function StatsRecipeDashboard({
   recipe: StatsRecipe;
   summary: string;
 }) {
-  const cards = recipe.cards?.length ? recipe.cards : ["stats" as CardType];
+  const cards = recipeCards(recipe);
   const [activeCard, setActiveCard] = useState(cards[0]);
   const activeUrl = buildUrlForRecipeCard(recipe, activeCard);
   const preview = useImagePreview(activeUrl);
@@ -67,6 +67,7 @@ function StatsRecipeDashboard({
       <div className="recipe-intro">
         <div className="card-title">配置方案分析</div>
         <p className="recipe-rationale">{recipe.rationale || summary || "根据公开仓库特征为您挑选的卡片配方。"}</p>
+        <p className="recipe-export-hint">这套配方包含 {cards.length} 张卡片，可直接复制为完整 README 片段。</p>
       </div>
       <div className="recipe-grid">
         <div className="recipe-left">
@@ -75,7 +76,7 @@ function StatsRecipeDashboard({
             {cards.map((card) => {
               const meta = cardMetadata[card] || { name: card, desc: "自定义统计卡片" };
               return (
-                <div key={card} className={`recipe-card-item ${activeCard === card ? "active" : ""}`} onClick={() => setActiveCard(card)}>
+                <button key={card} type="button" className={`recipe-card-item ${activeCard === card ? "active" : ""}`} onClick={() => setActiveCard(card)}>
                   <div className="recipe-card-header">
                     <span className="recipe-card-name">{meta.name}</span>
                     <div className="recipe-card-pills">
@@ -84,7 +85,7 @@ function StatsRecipeDashboard({
                     </div>
                   </div>
                   <p className="recipe-card-desc">{meta.desc}</p>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -96,7 +97,7 @@ function StatsRecipeDashboard({
             <div className={`image-loading-overlay ${preview.loading ? "" : "hidden"}`} aria-hidden={!preview.loading}>加载预览中</div>
             <div className="recipe-preview-meta">
               <span className="preview-url-label">实时 API 地址:</span>
-              <code className="preview-url-code">{window.location.origin + activeUrl}</code>
+              <code className="preview-url-code">{activeUrl}</code>
             </div>
           </div>
           <div className="recipe-json-section">
@@ -142,10 +143,13 @@ export function AgentResultPanel({
 }) {
   const [tab, setTab] = useState<"report" | "readme">("report");
   const [editorTab, setEditorTab] = useState<"preview" | "source" | "html">("preview");
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [humorQuote] = useState(() => humorQuotes[Math.floor(Math.random() * humorQuotes.length)]);
   const resultVisible = agent.result.kind !== "none" || agent.running;
   const readme = agent.result.kind === "readme" ? agent.result.data : null;
   const recipe = agent.result.kind === "stats" ? agent.result.recipe : null;
+  const recipeToApply = recipe || agent.lastRecipe;
+  const recipeMarkdown = recipe ? buildMarkdownForRecipe(recipe) : "";
   const title = readme?.title || (recipe ? "卡片配方方案" : "分析结果");
   const summary = readme?.summary || (agent.result.kind === "stats" ? agent.result.summary : "正在等待分析指标数据...");
 
@@ -182,24 +186,63 @@ export function AgentResultPanel({
           <span className="panel-note">{summary}</span>
         </div>
         <div className="result-actions">
-          <button className="btn" type="button" onClick={() => agent.resetAgent()}>返回主页</button>
-          <button className="btn" type="button" onClick={() => window.open(profileUrl, "_blank", "noopener,noreferrer")}>前往平台主页</button>
-          <span className="result-token-chip">Tokens: {agent.usage?.total || "--"}</span>
           {readme && !readme.is_ghost && (
-            <>
-              <button className="btn primary" type="button" onClick={() => void copy(readme.markdown, "README 代码")}>复制 README</button>
-              <button className="btn" type="button" onClick={() => downloadReadme(readme.markdown)}>下载 README.md</button>
-            </>
+            <button className="btn primary" type="button" onClick={() => void copy(readme.markdown, "README 代码")}>复制 README</button>
           )}
-          {(recipe || agent.lastRecipe) && (
+          {!readme && recipe && (
+            <button className="btn primary" type="button" onClick={() => void copy(recipeMarkdown, "整套 README 卡片")}>复制整套 README 卡片</button>
+          )}
+          {!readme && recipeToApply && (
             <button className="btn" type="button" onClick={() => {
-              applyRecipe(recipe || agent.lastRecipe!);
+              applyRecipe(recipeToApply);
               setView("manual");
+              setGlobalStatus({ label: "已载入配方首张卡片；整套 Markdown 可直接复制到 README" });
             }}>
-              应用到手动配置
+              微调首张卡片
             </button>
           )}
-          <ShareModal result={readme} platform={config.platform} username={config.username} />
+          <div className="result-more-actions">
+            <button
+              className="btn"
+              type="button"
+              aria-expanded={moreActionsOpen}
+              aria-controls="result-more-actions-menu"
+              onClick={() => setMoreActionsOpen((open) => !open)}
+            >
+              更多操作
+            </button>
+            {moreActionsOpen && (
+              <div className="result-more-menu" id="result-more-actions-menu">
+                {recipeToApply && readme && (
+                  <button className="result-more-menu-item" type="button" onClick={() => {
+                    applyRecipe(recipeToApply);
+                    setView("manual");
+                    setMoreActionsOpen(false);
+                  }}>
+                    微调首张卡片
+                  </button>
+                )}
+                {readme && !readme.is_ghost && (
+                  <button className="result-more-menu-item" type="button" onClick={() => {
+                    downloadReadme(readme.markdown);
+                    setMoreActionsOpen(false);
+                  }}>
+                    下载 README.md
+                  </button>
+                )}
+                <button className="result-more-menu-item" type="button" onClick={() => {
+                  window.open(profileUrl, "_blank", "noopener,noreferrer");
+                  setMoreActionsOpen(false);
+                }}>前往平台主页</button>
+                <span className="result-more-menu-meta">本轮消耗 {agent.usage?.total || "--"} tokens</span>
+                <ShareModal result={readme} platform={config.platform} username={config.username} />
+                <button className="result-more-menu-item" type="button" onClick={() => {
+                  agent.resetAgent();
+                  setMoreActionsOpen(false);
+                }}>返回主页</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div className={`result-body ${agent.running ? "is-loading" : ""}`}>

@@ -46,7 +46,9 @@ export function buildStatsUrl(config: ManualConfig, cardOverride?: CardType) {
     url.searchParams.set("repo", config.repo || "dev-stats");
   }
 
-  return `${url.pathname}${url.search}`;
+  // 手动面板导出的 Markdown 会被粘贴到 GitHub/CNB 等站外 README；必须保留当前部署域名，
+  // 否则 `/api?...` 会被解释为目标仓库的相对路径而无法渲染。
+  return url.toString();
 }
 
 export function buildMarkdown(config: ManualConfig, url: string) {
@@ -58,13 +60,36 @@ export function buildMarkdown(config: ManualConfig, url: string) {
   return `[![${label}](${url})](${target})`;
 }
 
+export function recipeCards(recipe: StatsRecipe): CardType[] {
+  const cards = recipe.cards?.length ? recipe.cards : ["stats" as CardType];
+  const platform = recipe.platform || "github";
+  const supported = cards.filter((card) => platform !== "cnb" || card !== "org");
+  const uniqueCards = Array.from(new Set(supported)).slice(0, 4);
+  return uniqueCards.length ? uniqueCards : ["stats" as CardType];
+}
+
+/** Build a portable, vertically stacked README snippet for the whole Agent recipe. */
+export function buildMarkdownForRecipe(recipe: StatsRecipe) {
+  const platform = recipe.platform || "github";
+  const username = recipe.username || "Mintimate";
+  const target = profileUrlFor({ platform, username });
+  return recipeCards(recipe)
+    .map((card) => {
+      const url = buildUrlForRecipeCard(recipe, card);
+      return `[![${platform} ${card}](${url})](${target})`;
+    })
+    .join("\n\n");
+}
+
 export function recipeToConfig(recipe: StatsRecipe, fallback: ManualConfig): ManualConfig {
   const options = recipe.options || {};
+  const platform = (recipe.platform || fallback.platform) as Platform;
+  const requestedCard = recipe.cards?.[0] || fallback.card;
   return {
     ...fallback,
-    platform: (recipe.platform || fallback.platform) as Platform,
+    platform,
     username: recipe.username || fallback.username,
-    card: recipe.cards?.[0] || fallback.card,
+    card: platform === "cnb" && requestedCard === "org" ? "stats" : requestedCard,
     theme: recipe.theme || fallback.theme,
     repo: String(options.repo || fallback.repo),
     custom_title: String(options.custom_title || fallback.custom_title),
@@ -107,5 +132,5 @@ export function buildUrlForRecipeCard(recipe: StatsRecipe, card: CardType) {
     text_bold: true,
     agent_mode: "stats",
   });
-  return buildStatsUrl(config, card);
+  return buildStatsUrl(config, config.card);
 }

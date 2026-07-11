@@ -69,6 +69,12 @@ export type TopRepo = {
   contributions_desc?: string;
 };
 
+export type EvidenceCoverage = {
+  sampled_repos?: number;
+  external_contribution_repos?: number;
+  activity_signals?: number;
+};
+
 export type UserProfile = {
   nickname?: string;
   name?: string;
@@ -91,6 +97,9 @@ export type ReadmeResult = {
   dimension_scores: DimensionScores;
   top_repos: TopRepo[];
   avatarUrl: string;
+  analysis_version?: string;
+  evidence_summary?: string;
+  coverage?: EvidenceCoverage;
 };
 
 export type StatsRecipe = {

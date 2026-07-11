@@ -1,4 +1,5 @@
 import { getGitHubToken, sseEvent } from '../_shared';
+import { validateReadmeDraft, validateStatsRecipe, type DeterministicAnalysis, type ReadmeCardTarget } from './_analysis';
 import { tool } from '@openai/agents';
 
 const GITHUB_API = 'https://api.github.com';
@@ -81,8 +82,19 @@ export const STATS_TOOL_NAMES = [
   'compose_readme_draft',
 ] as const;
 
-export function createOpenAIAgentTools(options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any; tracer?: any; prefetchedProfile?: Record<string, unknown>; env?: Record<string, string | undefined> }) {
-  return getToolSchemas().map((schema) => tool({
+export function createOpenAIAgentTools(options: {
+  sseQueue?: string[];
+  signal?: AbortSignal;
+  sandbox?: any;
+  tracer?: any;
+  prefetchedProfile?: Record<string, unknown>;
+  env?: Record<string, string | undefined>;
+  analysis?: DeterministicAnalysis;
+  cardTarget?: ReadmeCardTarget;
+  allowedToolNames?: readonly string[];
+}) {
+  const allowed = options.allowedToolNames ? new Set(options.allowedToolNames) : null;
+  return getToolSchemas().filter((schema) => !allowed || allowed.has(schema.name)).map((schema) => tool({
     name: schema.name,
     description: schema.description,
     parameters: cloneSchema(schema.input_schema) as any,
@@ -250,7 +262,16 @@ function cloneSchema(schema: unknown) {
 export async function executeStatsTool(
   name: string,
   input: Record<string, unknown>,
-  options: { sseQueue?: string[]; signal?: AbortSignal; sandbox?: any; tracer?: any; prefetchedProfile?: Record<string, unknown>; env?: Record<string, string | undefined> },
+  options: {
+    sseQueue?: string[];
+    signal?: AbortSignal;
+    sandbox?: any;
+    tracer?: any;
+    prefetchedProfile?: Record<string, unknown>;
+    env?: Record<string, string | undefined>;
+    analysis?: DeterministicAnalysis;
+    cardTarget?: ReadmeCardTarget;
+  },
 ) {
   const sseQueue = options.sseQueue ?? [];
   const signal = options.signal;
@@ -269,14 +290,14 @@ export async function executeStatsTool(
       ? tracer.span('github.fetch_profile', () => fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}`, gitHubHeaders, signal), { 'github.username': username })
       : fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}`, gitHubHeaders, signal));
     const repos = await (tracer
-      ? tracer.span('github.fetch_repos', () => fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=12`, gitHubHeaders, signal), { 'github.username': username })
-      : fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=12`, gitHubHeaders, signal));
+      ? tracer.span('github.fetch_repos', () => fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?type=owner&sort=updated&per_page=100`, gitHubHeaders, signal), { 'github.username': username })
+      : fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?type=owner&sort=updated&per_page=100`, gitHubHeaders, signal));
 
     let contributions: any[] = [];
     try {
       const prs = await (tracer
-        ? tracer.span('github.search_prs', () => fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr&per_page=60`, gitHubHeaders, signal), { 'github.username': username })
-        : fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr&per_page=60`, gitHubHeaders, signal));
+        ? tracer.span('github.search_prs', () => fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr+state:closed&sort=updated&order=desc&per_page=100`, gitHubHeaders, signal), { 'github.username': username })
+        : fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr+state:closed&sort=updated&order=desc&per_page=100`, gitHubHeaders, signal));
       if (prs && Array.isArray(prs.items)) {
         const repoMap = new Map<string, { prCount: number }>();
         for (const item of prs.items) {
@@ -329,9 +350,13 @@ export async function executeStatsTool(
       platform: 'github',
       user: pick(user, ['login', 'name', 'bio', 'company', 'blog', 'location', 'public_repos', 'followers', 'following', 'created_at', 'updated_at', 'html_url', 'avatar_url']),
       repos: Array.isArray(repos)
-        ? repos.map((repo) => pick(repo, ['name', 'description', 'language', 'stargazers_count', 'forks_count', 'updated_at', 'html_url', 'topics']))
+        ? repos.map((repo) => pick(repo, ['name', 'description', 'language', 'stargazers_count', 'forks_count', 'updated_at', 'pushed_at', 'created_at', 'html_url', 'topics', 'fork', 'archived', 'size', 'open_issues_count', 'license']))
         : [],
       contributions,
+      coverage: {
+        sampled_repos: Array.isArray(repos) ? repos.length : 0,
+        searched_closed_prs: Array.isArray(contributions) ? contributions.reduce((total, repo) => total + Number(repo.pr_count || 0), 0) : 0,
+      },
     };
   }
 
@@ -554,19 +579,21 @@ export async function executeStatsTool(
   }
 
   if (name === 'compose_stats_recipe') {
-    const payload = { ok: true, recipe: input };
+    const payload = options.analysis
+      ? validateStatsRecipe(input, options.analysis)
+      : { ok: true, recipe: input };
     sseQueue.push(sseEvent({ type: 'stats_recipe', ...payload }));
     return payload;
   }
 
   if (name === 'compose_readme_draft') {
-    const payload = {
+    const modelPayload = {
       ok: true,
       title: String(input.title || 'README Draft'),
       markdown: String(input.markdown || ''),
       summary: String(input.summary || ''),
       promotional_summary: String(input.promotional_summary || input.summary || ''),
-      objective_rating: coerceRating(input.objective_rating),
+      objective_rating: String(input.objective_rating || '入门'),
       objective_summary: String(input.objective_summary || input.summary || ''),
       roast_summary: String(input.roast_summary || ''),
       score: Number(input.score ?? 60.00),
@@ -581,16 +608,14 @@ export async function executeStatsTool(
       },
       top_repos: Array.isArray(input.top_repos) ? input.top_repos : [],
     };
+    const payload = options.analysis
+      ? validateReadmeDraft(modelPayload, options.analysis, options.cardTarget)
+      : modelPayload;
     sseQueue.push(sseEvent({ type: 'readme_draft', ...payload }));
     return payload;
   }
 
   return { ok: false, error: `Unknown tool: ${name}` };
-}
-
-function coerceRating(value: unknown): string {
-  const text = String(value || '');
-  return ['夯', '顶流', '高级', '平庸', '入门'].includes(text) ? text : '入门';
 }
 
 async function fetchWithSandboxBrowser(url: string, sandbox: any, signal?: AbortSignal) {

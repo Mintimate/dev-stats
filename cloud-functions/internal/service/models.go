@@ -68,10 +68,11 @@ type RepoData struct {
 }
 
 type LanguageStat struct {
-	Name  string
-	Color string
-	Size  float64
-	Count int
+	Name         string
+	Color        string
+	Size         float64
+	Count        int
+	CoverageOnly bool
 }
 
 type GistData struct {
@@ -141,6 +142,7 @@ type RepoLanguagesData struct {
 	TotalSize     int
 	TotalLabel    string
 	Languages     []LanguageStat
+	CoverageOnly  bool
 }
 
 type OrganizationData struct {

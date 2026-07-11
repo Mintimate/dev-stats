@@ -15,7 +15,11 @@ export function useManualStats() {
   }
 
   function setPlatform(platform: Platform) {
-    updateConfig({ platform });
+    setConfig((current) => ({
+      ...current,
+      platform,
+      card: platform === "cnb" && current.card === "org" ? "stats" : current.card,
+    }));
   }
 
   function resetOptions() {

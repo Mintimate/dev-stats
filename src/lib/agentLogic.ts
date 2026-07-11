@@ -4,14 +4,14 @@ import type { AgentMode, ManualConfig, ReadmeResult, StatsRecipe, ToolchainState
 export function buildAgentMessage(config: ManualConfig, mode: AgentMode) {
   if (config.platform === "cnb") {
     if (mode === "readme") {
-      return `请为 CNB 用户 ${config.username} 生成个人自我介绍 README。只调用一次 inspect_cnb_user 获取结构化公开资料，然后必须立即调用 compose_readme_draft 输出完整 Markdown 草稿、画像评分和推荐 Stats 组合。不要重复 inspect_cnb_user，不要尝试用 browser_fetch 或任何 GitHub 接口。`;
+      return `请为 CNB 用户 ${config.username} 生成个人自我介绍 README。运行时会一次性采集结构化公开资料并计算可信画像；请基于这些证据输出完整 Markdown 草稿和推荐 Stats 组合。`;
     }
-    return `请为 CNB 用户 ${config.username} 推荐 README Stats 组合。只调用一次 inspect_cnb_user 分析公开项目资料，然后必须立即调用 compose_stats_recipe 输出配置。不要重复 inspect_cnb_user，不要尝试用 browser_fetch 或任何 GitHub 接口。`;
+    return `请为 CNB 用户 ${config.username} 推荐 README Stats 组合。运行时会采集公开项目资料；请仅基于提供证据输出配置。`;
   }
   if (mode === "readme") {
-    return `请为 GitHub 用户 ${config.username} 生成个人自我介绍 README。请调用 fetch_github_profile_readme 获取 Profile README，并调用 inspect_github_user 分析公开资料，最后输出完整 Markdown 草稿并推荐适合的 Stats 组合。`;
+    return `请为 GitHub 用户 ${config.username} 生成个人自我介绍 README。运行时会读取 Profile README、采集公开资料并计算可信画像；请输出完整 Markdown 草稿并推荐适合的 Stats 组合。`;
   }
-  return `请为 GitHub 用户 ${config.username} 推荐 README Stats 组合。请调用 inspect_github_user 分析公开资料，最后调用 compose_stats_recipe 输出配置。`;
+  return `请为 GitHub 用户 ${config.username} 推荐 README Stats 组合。运行时会采集公开资料；请仅基于提供证据输出配置。`;
 }
 
 export function normalizeToolName(name?: string) {
@@ -174,6 +174,9 @@ export function normalizeReadmeResult(
         }))
       : [],
     avatarUrl,
+    analysis_version: String(event.analysis_version || ""),
+    evidence_summary: sanitizePlatformCopy(String(event.evidence_summary || ""), isCnb),
+    coverage: (event.coverage as ReadmeResult["coverage"]) || undefined,
   };
   result.user = {
     ...user,

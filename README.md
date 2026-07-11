@@ -176,6 +176,7 @@ GitHub 数据源需要令牌，CNB 公开数据源无需令牌：
 - **`OPENAI_API_KEY`**：大模型 API Key（支持 OpenAI 兼容接口）✅ **Agent 功能必需**
 - **`OPENAI_BASE_URL`**：自定义模型 API 地址，可接入国产模型或其他兼容服务（可选）
 - **`OPENAI_MODEL`**：指定使用的模型名称（可选）
+- **`PUBLIC_SITE_URL`**：部署站点的公开 HTTPS 地址，例如 `https://your-project.pages.dev`。Agent 导出的 README Stats 卡片会使用该域名的绝对 URL；浏览器请求会自动回退到当前页面域名。
 
 > **注意**：EdgeOne Makers 在部署后加载环境变量，每次更改环境变量后需要重新触发部署使变量生效。
 
