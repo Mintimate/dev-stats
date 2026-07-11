@@ -142,10 +142,12 @@ export function AgentResultPanel({
 }) {
   const [tab, setTab] = useState<"report" | "readme">("report");
   const [editorTab, setEditorTab] = useState<"preview" | "source" | "html">("preview");
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [humorQuote] = useState(() => humorQuotes[Math.floor(Math.random() * humorQuotes.length)]);
   const resultVisible = agent.result.kind !== "none" || agent.running;
   const readme = agent.result.kind === "readme" ? agent.result.data : null;
   const recipe = agent.result.kind === "stats" ? agent.result.recipe : null;
+  const recipeToApply = recipe || agent.lastRecipe;
   const title = readme?.title || (recipe ? "卡片配方方案" : "分析结果");
   const summary = readme?.summary || (agent.result.kind === "stats" ? agent.result.summary : "正在等待分析指标数据...");
 
@@ -182,24 +184,59 @@ export function AgentResultPanel({
           <span className="panel-note">{summary}</span>
         </div>
         <div className="result-actions">
-          <button className="btn" type="button" onClick={() => agent.resetAgent()}>返回主页</button>
-          <button className="btn" type="button" onClick={() => window.open(profileUrl, "_blank", "noopener,noreferrer")}>前往平台主页</button>
-          <span className="result-token-chip">Tokens: {agent.usage?.total || "--"}</span>
           {readme && !readme.is_ghost && (
-            <>
-              <button className="btn primary" type="button" onClick={() => void copy(readme.markdown, "README 代码")}>复制 README</button>
-              <button className="btn" type="button" onClick={() => downloadReadme(readme.markdown)}>下载 README.md</button>
-            </>
+            <button className="btn primary" type="button" onClick={() => void copy(readme.markdown, "README 代码")}>复制 README</button>
           )}
-          {(recipe || agent.lastRecipe) && (
-            <button className="btn" type="button" onClick={() => {
-              applyRecipe(recipe || agent.lastRecipe!);
+          {!readme && recipeToApply && (
+            <button className="btn primary" type="button" onClick={() => {
+              applyRecipe(recipeToApply);
               setView("manual");
             }}>
               应用到手动配置
             </button>
           )}
-          <ShareModal result={readme} platform={config.platform} username={config.username} />
+          <div className="result-more-actions">
+            <button
+              className="btn"
+              type="button"
+              aria-expanded={moreActionsOpen}
+              aria-controls="result-more-actions-menu"
+              onClick={() => setMoreActionsOpen((open) => !open)}
+            >
+              更多操作
+            </button>
+            {moreActionsOpen && (
+              <div className="result-more-menu" id="result-more-actions-menu">
+                {recipeToApply && readme && (
+                  <button className="result-more-menu-item" type="button" onClick={() => {
+                    applyRecipe(recipeToApply);
+                    setView("manual");
+                    setMoreActionsOpen(false);
+                  }}>
+                    应用 Stats 配方
+                  </button>
+                )}
+                {readme && !readme.is_ghost && (
+                  <button className="result-more-menu-item" type="button" onClick={() => {
+                    downloadReadme(readme.markdown);
+                    setMoreActionsOpen(false);
+                  }}>
+                    下载 README.md
+                  </button>
+                )}
+                <button className="result-more-menu-item" type="button" onClick={() => {
+                  window.open(profileUrl, "_blank", "noopener,noreferrer");
+                  setMoreActionsOpen(false);
+                }}>前往平台主页</button>
+                <span className="result-more-menu-meta">本轮消耗 {agent.usage?.total || "--"} tokens</span>
+                <ShareModal result={readme} platform={config.platform} username={config.username} />
+                <button className="result-more-menu-item" type="button" onClick={() => {
+                  agent.resetAgent();
+                  setMoreActionsOpen(false);
+                }}>返回主页</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div className={`result-body ${agent.running ? "is-loading" : ""}`}>

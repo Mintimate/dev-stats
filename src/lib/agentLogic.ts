@@ -174,6 +174,9 @@ export function normalizeReadmeResult(
         }))
       : [],
     avatarUrl,
+    analysis_version: String(event.analysis_version || ""),
+    evidence_summary: sanitizePlatformCopy(String(event.evidence_summary || ""), isCnb),
+    coverage: (event.coverage as ReadmeResult["coverage"]) || undefined,
   };
   result.user = {
     ...user,
