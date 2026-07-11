@@ -1,8 +1,8 @@
 package card
 
 import (
-	"fmt"
 	"dev-stats/cloud-functions/internal/service"
+	"fmt"
 	"html"
 	"math"
 	"strconv"
@@ -198,7 +198,11 @@ func activityColor(kind string, opts Options) string {
 func RenderRepoLanguagesCard(data service.RepoLanguagesData, opts Options) string {
 	title := opts.CustomTitle
 	if title == "" {
-		title = data.NameWithOwner + " Languages"
+		if data.CoverageOnly {
+			title = data.NameWithOwner + " Language Coverage"
+		} else {
+			title = data.NameWithOwner + " Languages"
+		}
 	}
 	offset := cardContentOffset(opts)
 	barWidth := 445.0
@@ -210,7 +214,11 @@ func RenderRepoLanguagesCard(data service.RepoLanguagesData, opts Options) strin
 		bar.WriteString(fmt.Sprintf(`<rect x="%.2f" y="70" width="%.2f" height="12" fill="%s"/>`, x, width, lang.Color))
 		x += width
 		col, row := i%2, i/2
-		legend.WriteString(fmt.Sprintf(`<g transform="translate(%d,%d)"><circle cx="5" cy="5" r="5" fill="%s"/><text x="17" y="9" class="lang-name">%s %.2f%%</text></g>`, 25+col*225, 105+offset+row*25, lang.Color, html.EscapeString(lang.Name), percent))
+		label := fmt.Sprintf("%s %.2f%%", lang.Name, percent)
+		if data.CoverageOnly {
+			label = lang.Name
+		}
+		legend.WriteString(fmt.Sprintf(`<g transform="translate(%d,%d)"><circle cx="5" cy="5" r="5" fill="%s"/><text x="17" y="9" class="lang-name">%s</text></g>`, 25+col*225, 105+offset+row*25, lang.Color, html.EscapeString(label)))
 	}
 	totalLabel := data.TotalLabel
 	if totalLabel == "" {

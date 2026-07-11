@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -293,7 +292,7 @@ func (c *CNBClient) FetchStats(ctx context.Context, q StatsQuery) (StatsData, er
 	}, nil
 }
 
-func (c *CNBClient) FetchTopLanguages(ctx context.Context, username string, excludeRepos []string, sizeWeight float64, countWeight float64) ([]LanguageStat, error) {
+func (c *CNBClient) FetchTopLanguages(ctx context.Context, username string, excludeRepos []string, _, _ float64) ([]LanguageStat, error) {
 	repos, err := c.fetchRepos(ctx, username)
 	if err != nil {
 		return nil, err
@@ -309,28 +308,25 @@ func (c *CNBClient) FetchTopLanguages(ctx context.Context, username string, excl
 			languages[0].Language = repo.Language
 		}
 		seen := map[string]bool{}
-		for index, language := range languages {
+		for _, language := range languages {
 			if language.Language == "" || seen[language.Language] {
 				continue
 			}
 			seen[language.Language] = true
 			stat := stats[language.Language]
 			if stat == nil {
-				stat = &LanguageStat{Name: language.Language, Color: defaultColor(language.Color, colorForName(language.Language))}
+				stat = &LanguageStat{Name: language.Language, Color: defaultColor(language.Color, colorForName(language.Language)), CoverageOnly: true}
 				stats[language.Language] = stat
 			}
-			weight := 1.0
-			if index == 0 {
-				weight = 2
-			}
-			stat.Size += weight
+			// CNB public metadata exposes language names but not byte sizes. Count each
+			// repository signal once so the renderer can describe coverage, not code share.
+			stat.Size++
 			stat.Count++
 		}
 	}
 	result := make([]LanguageStat, 0, len(stats))
 	for _, stat := range stats {
-		score := math.Pow(stat.Size, sizeWeight) * math.Pow(float64(max(1, stat.Count)), countWeight)
-		result = append(result, LanguageStat{Name: stat.Name, Color: stat.Color, Size: score, Count: stat.Count})
+		result = append(result, LanguageStat{Name: stat.Name, Color: stat.Color, Size: stat.Size, Count: stat.Count, CoverageOnly: true})
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].Size > result[j].Size })
 	return result, nil
@@ -439,12 +435,12 @@ func (c *CNBClient) FetchRepoLanguages(ctx context.Context, username, repo strin
 		if language.Language == "" {
 			continue
 		}
-		languages = append(languages, LanguageStat{Name: language.Language, Color: defaultColor(language.Color, colorForName(language.Language)), Size: 1, Count: 1})
+		languages = append(languages, LanguageStat{Name: language.Language, Color: defaultColor(language.Color, colorForName(language.Language)), Size: 1, Count: 1, CoverageOnly: true})
 	}
 	if count > 0 && len(languages) > count {
 		languages = languages[:count]
 	}
-	return RepoLanguagesData{Name: result.Name, NameWithOwner: result.Path, TotalSize: len(languages), TotalLabel: fmt.Sprintf("%d languages", len(languages)), Languages: languages}, nil
+	return RepoLanguagesData{Name: result.Name, NameWithOwner: result.Path, TotalSize: len(languages), TotalLabel: fmt.Sprintf("%d detected languages", len(languages)), Languages: languages, CoverageOnly: true}, nil
 }
 
 func (c *CNBClient) FetchContributionCalendar(ctx context.Context, username string) (string, []ContributionDay, error) {

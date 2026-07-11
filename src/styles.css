@@ -2503,6 +2503,12 @@
         color: var(--ink);
       }
 
+      .recipe-export-hint {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
       .recipe-grid {
         display: grid;
         grid-template-columns: 1fr 1.2fr;
@@ -2523,12 +2529,16 @@
 
       .recipe-card-item {
         display: flex;
+        width: 100%;
         flex-direction: column;
         gap: 8px;
         padding: 12px;
         border: 1px solid var(--line);
         border-radius: 6px;
         background: var(--surface);
+        color: inherit;
+        font: inherit;
+        text-align: left;
         cursor: pointer;
         transition: all 0.2s ease;
       }
@@ -2536,6 +2546,11 @@
       .recipe-card-item:hover, .recipe-card-item.active {
         border-color: var(--green);
         background: var(--green-2);
+      }
+
+      .recipe-card-item:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
       }
 
       .recipe-card-header {

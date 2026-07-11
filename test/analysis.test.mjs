@@ -117,6 +117,44 @@ test("manual Stats links retain the deployed hostname for README export", () => 
   assert.match(statsUrl.buildMarkdown(config, url), /https:\/\/stats\.example\.dev\/api\?/);
 });
 
+test("Stats recipes export every supported card and fall back from CNB organization cards", () => {
+  globalThis.window = { location: { origin: "https://stats.example.dev" } };
+  const recipe = {
+    platform: "cnb",
+    username: "Mintimate",
+    cards: ["stats", "org", "top-langs", "stats"],
+    theme: "github_dark",
+    options: {},
+  };
+  const markdown = statsUrl.buildMarkdownForRecipe(recipe);
+  const config = statsUrl.recipeToConfig({ ...recipe, cards: ["org"] }, {
+    platform: "github",
+    username: "Mintimate",
+    card: "org",
+    repo: "dev-stats",
+    theme: "default",
+    custom_title: "",
+    layout: "normal",
+    langs_count: 8,
+    activity_count: 5,
+    card_width: 0,
+    show_icons: true,
+    hide_border: false,
+    include_all_commits: false,
+    prs_merged: false,
+    hide_title: false,
+    hide_rank: false,
+    disable_animations: false,
+    text_bold: true,
+    agent_mode: "stats",
+  });
+
+  assert.match(markdown, /\/api\?username=Mintimate&platform=cnb/);
+  assert.match(markdown, /\/api\/top-langs\?username=Mintimate&platform=cnb/);
+  assert.doesNotMatch(markdown, /\/api\/org/);
+  assert.equal(config.card, "stats");
+});
+
 test("GitHub repository cards never use an external contribution path as the owner repository", () => {
   const trusted = analysis.createDeterministicAnalysis("github", githubEvidence, "exampledev");
   const result = analysis.validateStatsRecipe({

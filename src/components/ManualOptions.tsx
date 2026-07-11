@@ -29,6 +29,7 @@ export function ManualOptions({
   resetOptions: () => void;
 }) {
   const needsRepo = config.card === "pin" || config.card === "repo-languages";
+  const availableCardOptions = cardOptions.filter((option) => config.platform !== "cnb" || option.value !== "org");
   // top-langs 与 repo-languages 都需要 layout 与 langs_count，合并为单一判定。
   const needsLangLayout = config.card === "top-langs" || config.card === "repo-languages";
   const needsActivityCount = config.card === "recent-activity";
@@ -88,7 +89,7 @@ export function ManualOptions({
           <div className="editor-row-content">
             <span className="code-keyword">const</span> <span className="code-var">WIDGET_MODULE</span> = <span className="code-type">Widget</span><span className="code-operator">.</span>
             <select id="card-type" value={config.card} onChange={(event) => updateConfig({ card: event.target.value as CardType })}>
-              {cardOptions.map((option) => {
+              {availableCardOptions.map((option) => {
                 const chineseLabel = option.label.split(" (")[0];
                 const codeVal = option.value.toUpperCase().replace(/-/g, "_");
                 return (

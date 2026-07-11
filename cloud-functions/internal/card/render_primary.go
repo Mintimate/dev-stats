@@ -1,8 +1,8 @@
 package card
 
 import (
-	"fmt"
 	"dev-stats/cloud-functions/internal/service"
+	"fmt"
 	"html"
 	"strings"
 )
@@ -186,9 +186,14 @@ func RenderTopLangsCard(langs []service.LanguageStat, opts Options, count int, h
 		}
 	}
 	filtered, total := filterLangs(langs, count, hide)
+	coverageOnly := len(filtered) > 0 && filtered[0].CoverageOnly
 	title := opts.CustomTitle
 	if title == "" {
-		title = "Most Used Languages"
+		if coverageOnly {
+			title = "Repository Language Coverage"
+		} else {
+			title = "Most Used Languages"
+		}
 	}
 	if len(filtered) == 0 {
 		width := opts.CardWidth
@@ -205,18 +210,18 @@ func RenderTopLangsCard(langs []service.LanguageStat, opts Options, count int, h
 	}
 	switch opts.Layout {
 	case "compact":
-		return renderCompactLangs(filtered, total, opts, title)
+		return renderCompactLangs(filtered, total, opts, title, coverageOnly)
 	case "donut", "donut-vertical", "pie":
-		return renderDonutLangs(filtered, total, opts, title)
+		return renderDonutLangs(filtered, total, opts, title, coverageOnly)
 	default:
 		if opts.HideProgress {
-			return renderCompactLangs(filtered, total, opts, title)
+			return renderCompactLangs(filtered, total, opts, title, coverageOnly)
 		}
-		return renderNormalLangs(filtered, total, opts, title)
+		return renderNormalLangs(filtered, total, opts, title, coverageOnly)
 	}
 }
 
-func renderNormalLangs(filtered []service.LanguageStat, total float64, opts Options, title string) string {
+func renderNormalLangs(filtered []service.LanguageStat, total float64, opts Options, title string, coverageOnly bool) string {
 	width := opts.CardWidth
 	if width < 280 {
 		width = 300
@@ -231,6 +236,9 @@ func renderNormalLangs(filtered []service.LanguageStat, total float64, opts Opti
 		percent := percentOf(lang.Size, total)
 		y := 55 + contentOffset + i*40
 		display := langDisplayValue(lang.Size, percent, opts.StatsFormat)
+		if coverageOnly {
+			display = fmt.Sprintf("%d repos", lang.Count)
+		}
 		progress := ""
 		if !opts.HideProgress {
 			progress = fmt.Sprintf(`<text x="%.1f" y="34" class="lang-name">%s</text><rect x="0" y="25" width="%.1f" height="8" rx="5" fill="#ddd" opacity=".35"/><rect x="0" y="25" width="%.1f" height="8" rx="5" fill="%s"/>`, contentWidth+10, html.EscapeString(display), contentWidth, contentWidth*percent/100, lang.Color)
@@ -244,7 +252,7 @@ func renderNormalLangs(filtered []service.LanguageStat, total float64, opts Opti
 	return SVG(width, max(90, height), opts, title, rows.String(), "")
 }
 
-func renderCompactLangs(filtered []service.LanguageStat, total float64, opts Options, title string) string {
+func renderCompactLangs(filtered []service.LanguageStat, total float64, opts Options, title string, coverageOnly bool) string {
 	width := opts.CardWidth
 	if width < 280 {
 		width = 300
@@ -261,7 +269,9 @@ func renderCompactLangs(filtered []service.LanguageStat, total float64, opts Opt
 		x := 25 + col*((width-50)/2)
 		y := 65 + contentOffset + row*25
 		label := lang.Name
-		if !opts.HideProgress {
+		if coverageOnly {
+			label = fmt.Sprintf("%s · %d repos", label, lang.Count)
+		} else if !opts.HideProgress {
 			label = fmt.Sprintf("%s %.2f%%", label, percent)
 		}
 		rows.WriteString(fmt.Sprintf(`<g transform="translate(%d,%d)"><circle cx="5" cy="6" r="5" fill="%s"/><text x="17" y="10" class="lang-name">%s</text></g>`, x, y, lang.Color, html.EscapeString(label)))
@@ -273,7 +283,7 @@ func renderCompactLangs(filtered []service.LanguageStat, total float64, opts Opt
 	return SVG(width, height, opts, title, rows.String(), "")
 }
 
-func renderDonutLangs(filtered []service.LanguageStat, total float64, opts Options, title string) string {
+func renderDonutLangs(filtered []service.LanguageStat, total float64, opts Options, title string, coverageOnly bool) string {
 	legend := strings.Builder{}
 	contentOffset := 0
 	if opts.HideTitle {
@@ -299,10 +309,18 @@ func renderDonutLangs(filtered []service.LanguageStat, total float64, opts Optio
 			row := i / 2
 			x := 25 + col*135
 			y := 275 + contentOffset + row*25
-			legend.WriteString(fmt.Sprintf(`<g transform="translate(%d,%d)"><circle cx="5" cy="6" r="5" fill="%s"/><text x="17" y="10" class="lang-name">%s %.2f%%</text></g>`, x, y, lang.Color, html.EscapeString(lang.Name), percent))
+			label := fmt.Sprintf("%s %.2f%%", lang.Name, percent)
+			if coverageOnly {
+				label = fmt.Sprintf("%s · %d repos", lang.Name, lang.Count)
+			}
+			legend.WriteString(fmt.Sprintf(`<g transform="translate(%d,%d)"><circle cx="5" cy="6" r="5" fill="%s"/><text x="17" y="10" class="lang-name">%s</text></g>`, x, y, lang.Color, html.EscapeString(label)))
 		} else {
 			y := 55 + contentOffset + i*32
-			legend.WriteString(fmt.Sprintf(`<g transform="translate(25,%d)"><circle cx="5" cy="6" r="5" fill="%s"/><text x="22" y="11" class="lang-name">%s %.2f%%</text></g>`, y, lang.Color, html.EscapeString(lang.Name), percent))
+			label := fmt.Sprintf("%s %.2f%%", lang.Name, percent)
+			if coverageOnly {
+				label = fmt.Sprintf("%s · %d repos", lang.Name, lang.Count)
+			}
+			legend.WriteString(fmt.Sprintf(`<g transform="translate(25,%d)"><circle cx="5" cy="6" r="5" fill="%s"/><text x="22" y="11" class="lang-name">%s</text></g>`, y, lang.Color, html.EscapeString(label)))
 		}
 		if opts.Layout == "pie" {
 			if len(filtered) == 1 {

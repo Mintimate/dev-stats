@@ -78,7 +78,7 @@ func TestCNBRepositoryAndLanguageMapping(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchTopLanguages returned an error: %v", err)
 	}
-	if len(languages) != 2 || languages[0].Name != "Go" || languages[0].Count != 2 {
+	if len(languages) != 2 || languages[0].Name != "Go" || languages[0].Count != 2 || languages[0].Size != 2 || !languages[0].CoverageOnly {
 		t.Fatalf("unexpected language mapping: %#v", languages)
 	}
 	repo, err := client.FetchRepo(context.Background(), "alice", "one")
@@ -87,6 +87,10 @@ func TestCNBRepositoryAndLanguageMapping(t *testing.T) {
 	}
 	if repo.NameWithOwner != "alice/team/one" || repo.PrimaryLang != "Go" || repo.Stars != 3 {
 		t.Fatalf("unexpected repository mapping: %#v", repo)
+	}
+	repoLanguages, err := client.FetchRepoLanguages(context.Background(), "alice", "one", 6)
+	if err != nil || !repoLanguages.CoverageOnly || repoLanguages.TotalLabel != "1 detected languages" {
+		t.Fatalf("unexpected repository language coverage: %#v, err=%v", repoLanguages, err)
 	}
 }
 

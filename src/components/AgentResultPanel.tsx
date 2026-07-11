@@ -5,7 +5,7 @@ import { ReadmeReport } from "./ReadmeReport";
 import { ShareModal } from "./ShareModal";
 import { cardMetadata } from "../lib/constants";
 import { renderMarkdown } from "../lib/markdown";
-import { buildUrlForRecipeCard } from "../lib/statsUrl";
+import { buildMarkdownForRecipe, buildUrlForRecipeCard, recipeCards } from "../lib/statsUrl";
 import type { CardType, GlobalStatus, ManualConfig, StatsRecipe, ViewName } from "../lib/types";
 
 const loadingPhases = ["BOOT", "DIG", "ROAST", "POLISH", "SHIP"];
@@ -57,7 +57,7 @@ function StatsRecipeDashboard({
   recipe: StatsRecipe;
   summary: string;
 }) {
-  const cards = recipe.cards?.length ? recipe.cards : ["stats" as CardType];
+  const cards = recipeCards(recipe);
   const [activeCard, setActiveCard] = useState(cards[0]);
   const activeUrl = buildUrlForRecipeCard(recipe, activeCard);
   const preview = useImagePreview(activeUrl);
@@ -67,6 +67,7 @@ function StatsRecipeDashboard({
       <div className="recipe-intro">
         <div className="card-title">配置方案分析</div>
         <p className="recipe-rationale">{recipe.rationale || summary || "根据公开仓库特征为您挑选的卡片配方。"}</p>
+        <p className="recipe-export-hint">这套配方包含 {cards.length} 张卡片，可直接复制为完整 README 片段。</p>
       </div>
       <div className="recipe-grid">
         <div className="recipe-left">
@@ -75,7 +76,7 @@ function StatsRecipeDashboard({
             {cards.map((card) => {
               const meta = cardMetadata[card] || { name: card, desc: "自定义统计卡片" };
               return (
-                <div key={card} className={`recipe-card-item ${activeCard === card ? "active" : ""}`} onClick={() => setActiveCard(card)}>
+                <button key={card} type="button" className={`recipe-card-item ${activeCard === card ? "active" : ""}`} onClick={() => setActiveCard(card)}>
                   <div className="recipe-card-header">
                     <span className="recipe-card-name">{meta.name}</span>
                     <div className="recipe-card-pills">
@@ -84,7 +85,7 @@ function StatsRecipeDashboard({
                     </div>
                   </div>
                   <p className="recipe-card-desc">{meta.desc}</p>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -148,6 +149,7 @@ export function AgentResultPanel({
   const readme = agent.result.kind === "readme" ? agent.result.data : null;
   const recipe = agent.result.kind === "stats" ? agent.result.recipe : null;
   const recipeToApply = recipe || agent.lastRecipe;
+  const recipeMarkdown = recipe ? buildMarkdownForRecipe(recipe) : "";
   const title = readme?.title || (recipe ? "卡片配方方案" : "分析结果");
   const summary = readme?.summary || (agent.result.kind === "stats" ? agent.result.summary : "正在等待分析指标数据...");
 
@@ -187,12 +189,16 @@ export function AgentResultPanel({
           {readme && !readme.is_ghost && (
             <button className="btn primary" type="button" onClick={() => void copy(readme.markdown, "README 代码")}>复制 README</button>
           )}
+          {!readme && recipe && (
+            <button className="btn primary" type="button" onClick={() => void copy(recipeMarkdown, "整套 README 卡片")}>复制整套 README 卡片</button>
+          )}
           {!readme && recipeToApply && (
-            <button className="btn primary" type="button" onClick={() => {
+            <button className="btn" type="button" onClick={() => {
               applyRecipe(recipeToApply);
               setView("manual");
+              setGlobalStatus({ label: "已载入配方首张卡片；整套 Markdown 可直接复制到 README" });
             }}>
-              应用到手动配置
+              微调首张卡片
             </button>
           )}
           <div className="result-more-actions">
@@ -213,7 +219,7 @@ export function AgentResultPanel({
                     setView("manual");
                     setMoreActionsOpen(false);
                   }}>
-                    应用 Stats 配方
+                    微调首张卡片
                   </button>
                 )}
                 {readme && !readme.is_ghost && (
