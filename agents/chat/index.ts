@@ -28,6 +28,7 @@ import {
 } from '../_cache';
 import { buildSystemPrompt, buildUserInput } from './_prompt';
 import { createDeterministicAnalysis, fallbackStatsRecipe, type DeterministicAnalysis } from './_analysis';
+import { readEvidenceCache, writeEvidenceCache } from './_evidence-cache';
 import { createOpenAIAgentTools, executeStatsTool } from './_tools';
 
 const logger = createLogger('stats-agent');
@@ -499,20 +500,54 @@ export async function onRequest(context: AgentContext) {
       };
 
       let profileReadme: Record<string, any> | null = null;
-      let inspectResult: Record<string, any>;
+      let inspectResult: Record<string, any> | null = null;
       if (platform === 'github') {
         if (agentMode === 'readme') {
           profileReadme = await runCollector('fetch_github_profile_readme');
           for (const sideEffect of drainSseQueue(sseQueue)) yield* yieldAndCollect(sideEffect);
         }
-        inspectResult = await runCollector('inspect_github_user');
-      } else {
-        inspectResult = await runCollector('inspect_cnb_user');
-        if (!inspectResult.ok) throw new Error(String(inspectResult.error || 'CNB public profile could not be inspected.'));
       }
-      for (const sideEffect of drainSseQueue(sseQueue)) yield* yieldAndCollect(sideEffect);
+      let analysis: DeterministicAnalysis | null = null;
+      let evidenceCacheHit = false;
+      let evidenceStore: any = null;
+      let cachedEvidence: any = null;
+      try {
+        evidenceStore = getStore(CACHE_STORE_NAME);
+        cachedEvidence = await readEvidenceCache(evidenceStore, platform, username);
+      } catch (error) {
+        logger.error({ event: 'agent.evidence_cache.fail_open', platform, username, error: String(error) });
+      }
 
-      const analysis = createDeterministicAnalysis(platform, inspectResult, username);
+      if (cachedEvidence) {
+        inspectResult = cachedEvidence.inspected;
+        analysis = cachedEvidence.analysis;
+        evidenceCacheHit = true;
+        yield* yieldAndCollect(sseEvent({
+          type: 'agent_status',
+          status: 'evidence_cache_hit',
+          cached_at: cachedEvidence.cachedAt,
+          expires_at: cachedEvidence.expiresAt,
+        }));
+      } else {
+        inspectResult = await runCollector(platform === 'github' ? 'inspect_github_user' : 'inspect_cnb_user');
+        if (platform === 'cnb' && !inspectResult.ok) {
+          throw new Error(String(inspectResult.error || 'CNB public profile could not be inspected.'));
+        }
+        for (const sideEffect of drainSseQueue(sseQueue)) yield* yieldAndCollect(sideEffect);
+        analysis = createDeterministicAnalysis(platform, inspectResult, username);
+        if (evidenceStore) {
+          try {
+            await writeEvidenceCache(evidenceStore, platform, username, inspectResult, analysis, cacheTtlMs);
+          } catch (error) {
+            logger.error({ event: 'agent.evidence_cache.write_error', platform, username, error: String(error) });
+          }
+        }
+      }
+
+      if (!inspectResult || !analysis) {
+        throw new Error('Public evidence could not be collected.');
+      }
+
       const analysisChunk = sseEvent({
         type: 'agent_status',
         status: 'analysis_ready',
@@ -520,6 +555,7 @@ export async function onRequest(context: AgentContext) {
         score: analysis.score,
         rating: analysis.objective_rating,
         coverage: analysis.coverage,
+        evidence_cache_hit: evidenceCacheHit,
       });
       yield* yieldAndCollect(analysisChunk);
 

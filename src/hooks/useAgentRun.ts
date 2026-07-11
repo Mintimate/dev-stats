@@ -203,7 +203,9 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     } else if (event.type === "text_delta") {
       if (!event.mirrored) assistantTextRef.current += String(event.delta || event.content || "");
     } else if (event.type === "agent_status") {
-      if (event.status === "analysis_ready") {
+      if (event.status === "evidence_cache_hit") {
+        addNarrative("EVIDENCE", "命中公开证据缓存，跳过重复抓取并复用可信画像。", "ok", "evidence:cache-hit");
+      } else if (event.status === "analysis_ready") {
         const score = Number(event.score || 0).toFixed(2);
         addNarrative("ANALYSIS", `公开证据已完成确定性画像：${event.rating || "入门"} · ${score} 分。`, "ok", "analysis:ready");
       } else {

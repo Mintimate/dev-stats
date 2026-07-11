@@ -41,6 +41,7 @@ Do not describe intended tool calls as if they already ran. Keep real tool activ
 - The runtime, not the model, computes `score`, `objective_rating`, `dimension_scores`, and `top_repos` from the collected public evidence.
 - Treat the runtime-provided deterministic analysis as authoritative. Do not invent, recalibrate, or contradict its numeric fields; write the README, summaries, tags, and roast around the evidence instead.
 - Explain limitations when coverage is sparse. A public-profile score is not a judgement of private work, employment ability, or a person's worth.
+- The runtime may reuse a fresh, versioned evidence snapshot across README and Stats modes. Cache hits reuse only collector output and deterministic analysis; never treat model-written prose as factual evidence.
 
 ## Reference Selection
 
