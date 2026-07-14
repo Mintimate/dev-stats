@@ -131,12 +131,36 @@ function parseCachedRunMeta(rawEvents: string[], username: string): CachedRunMet
         }
         
         if (event.type === "agent_status") {
-          events.push({
-            id,
-            command: "AGENT",
-            text: `模型就绪：${event.protocol || "model"} · ${event.model || ""}`.trim(),
-            type: "ok"
-          });
+          if (event.status === "evidence_cache_hit") {
+            events.push({
+              id,
+              command: "EVIDENCE",
+              text: "命中公开证据缓存，复用可信画像。",
+              type: "ok"
+            });
+          } else if (event.status === "analysis_ready") {
+            const score = Number(event.score || 0).toFixed(2);
+            events.push({
+              id,
+              command: "ANALYSIS",
+              text: `公开证据已完成确定性画像：${event.rating || "入门"} · ${score} 分。`,
+              type: "ok"
+            });
+          } else if (event.status === "model_ready" || event.protocol || event.model) {
+            events.push({
+              id,
+              command: "AGENT",
+              text: `模型就绪：${event.protocol || "model"} · ${event.model || ""}`.trim(),
+              type: "ok"
+            });
+          } else if (event.message) {
+            events.push({
+              id,
+              command: "STATUS",
+              text: String(event.message),
+              type: "ok"
+            });
+          }
         } else if (event.type === "tool_call" || event.type === "tool_called") {
           const name = String(event.name || "");
           events.push({
@@ -169,11 +193,6 @@ function parseCachedRunMeta(rawEvents: string[], username: string): CachedRunMet
         } else if (event.type === "usage") {
           const total = Number(event.total_tokens || 0);
           tokens = total;
-          events.push({
-            id,
-            command: "TOKENS",
-            text: `本轮消耗 ${total} tokens。`
-          });
         } else if (event.type === "error_message") {
           events.push({
             id,
@@ -196,24 +215,21 @@ function parseCachedRunMeta(rawEvents: string[], username: string): CachedRunMet
     runId = Math.abs(hash).toString(16).slice(0, 8);
   }
   
-  if (events.length > 0) {
-    events.push({
-      id: `done-${Date.now()}`,
-      command: "DONE",
-      text: DONE_TEXT,
-      type: "ok"
-    });
-  } else {
-    events.push({
-      id: `agent-fallback-${Date.now()}`,
+  const seenEvents = new Set<string>();
+  const replayEvents = events
+    .filter((event) => {
+      const fingerprint = `${event.command}\u0000${event.text}`;
+      if (seenEvents.has(fingerprint)) return false;
+      seenEvents.add(fingerprint);
+      return true;
+    })
+    .map((event, eventIndex) => ({ ...event, id: `replay-${eventIndex}` }));
+
+  if (replayEvents.length === 0) {
+    replayEvents.push({
+      id: "agent-fallback",
       command: "AGENT",
       text: "从云原生构建只读缓存成功载入画像数据。",
-      type: "ok"
-    });
-    events.push({
-      id: `done-fallback-${Date.now()}`,
-      command: "DONE",
-      text: DONE_TEXT,
       type: "ok"
     });
   }
@@ -223,7 +239,7 @@ function parseCachedRunMeta(rawEvents: string[], username: string): CachedRunMet
     elapsed,
     tokens,
     progress,
-    events
+    events: replayEvents
   };
 }
 

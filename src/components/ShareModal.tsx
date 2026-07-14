@@ -36,12 +36,25 @@ function buildShareData(result: ReadmeResult, platform: string, username: string
   };
 }
 
-export function ShareModal({ result, platform, username }: { result: ReadmeResult | null; platform: string; username: string }) {
+export function ShareModal({
+  result,
+  platform,
+  username,
+  prominent = false,
+}: {
+  result: ReadmeResult | null;
+  platform: string;
+  username: string;
+  prominent?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState("");
   const [dataUrl, setDataUrl] = useState("");
   const [objectUrl, setObjectUrl] = useState("");
   const generationRef = useRef(0);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   const shareData = useMemo(() => (result ? buildShareData(result, platform, username) : null), [platform, result, username]);
 
@@ -54,11 +67,52 @@ export function ShareModal({ result, platform, username }: { result: ReadmeResul
     });
   }, [shareData]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    window.requestAnimationFrame(() => {
+      const firstControl = dialog?.querySelector<HTMLElement>("button, a[href], [tabindex]:not([tabindex='-1'])");
+      (firstControl || dialog)?.focus();
+    });
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+      const controls = Array.from(dialog.querySelectorAll<HTMLElement>("button:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])"));
+      if (!controls.length) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      (previousFocus || triggerRef.current)?.focus();
+    };
+  }, [open]);
+
   if (!result || result.is_ghost || !shareData) return null;
 
   async function prepare() {
     if (!shareData) return;
     setGenerating(true);
+    setGenerationError("");
     try {
       const generation = generationRef.current;
       const nextUrl = await createShareImage(shareData);
@@ -76,16 +130,14 @@ export function ShareModal({ result, platform, username }: { result: ReadmeResul
     }
   }
 
-  function showModal(event: React.MouseEvent<HTMLAnchorElement>) {
-    event.preventDefault();
+  function showModal() {
     setOpen(true);
-    if (!dataUrl || !objectUrl) {
+    if ((!dataUrl || !objectUrl) && !generating) {
       void (async () => {
         try {
           await prepare();
         } catch {
-          alert("图片生成失败，请稍后重试。");
-          setOpen(false);
+          setGenerationError("图片生成失败，请稍后重试。");
         }
       })();
     }
@@ -103,28 +155,36 @@ export function ShareModal({ result, platform, username }: { result: ReadmeResul
 
   return (
     <>
-      <a
-        className="btn"
-        href={objectUrl || "#"}
-        download={`${username || "developer"}-readme-stats-share.png`}
+      <button
+        ref={triggerRef}
+        type="button"
+        className={`btn ${prominent ? "primary result-share-button" : ""}`}
         onPointerDown={warmup}
         onClick={showModal}
       >
         分享画像
-      </a>
-      <div className={`share-modal-overlay ${open ? "visible" : "hidden"}`} onClick={(event) => {
+      </button>
+      {open && <div className="share-modal-overlay visible" onClick={(event) => {
         if (event.target === event.currentTarget) setOpen(false);
       }}>
-        <div className="share-modal-content">
+        <div
+          className="share-modal-content"
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="share-modal-title"
+          aria-describedby="share-modal-description"
+          tabIndex={-1}
+        >
           <div className="share-modal-header">
-            <h3>分享画像</h3>
-            <button type="button" className="close-btn" onClick={() => setOpen(false)}>
+            <h3 id="share-modal-title">分享画像</h3>
+            <button type="button" className="close-btn" aria-label="关闭分享画像弹窗" onClick={() => setOpen(false)}>
               &times;
             </button>
           </div>
           <div className="share-modal-body">
-            <p className="share-modal-tip">
-              {generating ? "正在绘制画像报告，请稍候..." : "画像已生成，可右键复制图片，或点击下方按钮下载。"}
+            <p className={`share-modal-tip ${generationError ? "is-error" : ""}`} id="share-modal-description" role={generationError ? "alert" : "status"}>
+              {generationError || (generating ? "正在绘制画像报告，请稍候..." : "画像已生成，可右键复制图片，或点击下方按钮下载。")}
             </p>
             <div className="share-image-container" style={{ position: "relative", minHeight: 240 }}>
               {generating && (
@@ -134,22 +194,24 @@ export function ShareModal({ result, platform, username }: { result: ReadmeResul
               )}
               {dataUrl && <img src={dataUrl} alt="Share Preview" style={{ opacity: generating ? 0.3 : 1 }} />}
             </div>
+            {generationError && <button className="btn subtle" type="button" onClick={() => void prepare()}>重新生成</button>}
           </div>
           <div className="share-modal-footer">
             <a
               className="btn"
-              style={generating ? { cursor: "not-allowed", opacity: 0.55, pointerEvents: "none" } : undefined}
-              href={generating ? "#" : (objectUrl || dataUrl || "#")}
+              aria-disabled={generating || !dataUrl}
+              style={generating || !dataUrl ? { cursor: "not-allowed", opacity: 0.55, pointerEvents: "none" } : undefined}
+              href={generating || !dataUrl ? "#" : (objectUrl || dataUrl)}
               download={`${username || "developer"}-readme-stats-share.png`}
               onClick={(event) => {
-                if (generating) event.preventDefault();
+                if (generating || !dataUrl) event.preventDefault();
               }}
             >
-              {generating ? "正在生成中..." : "保存到本地"}
+              {generating ? "正在生成中..." : dataUrl ? "保存到本地" : "等待生成"}
             </a>
           </div>
         </div>
-      </div>
+      </div>}
     </>
   );
 }

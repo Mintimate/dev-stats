@@ -64,7 +64,7 @@ export function ManualOptions({
             <span className="panel-note">// 参数变化将即时触发实时渲染管线，更新编译预览与 Markdown</span>
           </div>
         </div>
-        <button className="btn subtle" type="button" onClick={resetOptions}>git reset --hard</button>
+        <button className="btn subtle" type="button" title="恢复平台、卡片、主题和高级选项的默认值" onClick={resetOptions}>恢复默认配置</button>
       </div>
       <div className="editor-container">
 
@@ -79,6 +79,7 @@ export function ManualOptions({
           <div className="editor-row-gutter">{getLine()}</div>
           <div className="editor-row-content">
             <span className="code-keyword">const</span> <span className="code-var">DEVELOPER_ID</span> = <span className="code-string">"</span>
+            <label className="sr-only" htmlFor="username">开发者或组织用户名</label>
             <input id="username" value={config.username} placeholder="e.g. Mintimate" autoComplete="off" onChange={(event) => updateConfig({ username: event.target.value })} />
             <span className="code-string">"</span><span className="code-operator">;</span> <span className="code-comment">// 开发者/组织用户名</span>
           </div>
@@ -88,6 +89,7 @@ export function ManualOptions({
           <div className="editor-row-gutter">{getLine()}</div>
           <div className="editor-row-content">
             <span className="code-keyword">const</span> <span className="code-var">WIDGET_MODULE</span> = <span className="code-type">Widget</span><span className="code-operator">.</span>
+            <label className="sr-only" htmlFor="card-type">统计卡片类型</label>
             <select id="card-type" value={config.card} onChange={(event) => updateConfig({ card: event.target.value as CardType })}>
               {availableCardOptions.map((option) => {
                 const chineseLabel = option.label.split(" (")[0];
@@ -107,6 +109,7 @@ export function ManualOptions({
           <div className="editor-row-gutter">{getLine()}</div>
           <div className="editor-row-content">
             <span className="code-keyword">const</span> <span className="code-var">THEME_SCHEME</span> = <span className="code-type">Theme</span><span className="code-operator">.</span>
+            <label className="sr-only" htmlFor="theme">卡片配色主题</label>
             <select id="theme" value={config.theme} onChange={(event) => updateConfig({ theme: event.target.value })}>
               {themes.map((theme) => {
                 const label = THEME_DESCRIPTIONS[theme] || theme;
@@ -127,16 +130,24 @@ export function ManualOptions({
             <div className="editor-row-gutter">{getLine()}</div>
             <div className="editor-row-content">
               <span className="code-keyword">const</span> <span className="code-var">TARGET_REPOSITORY</span> = <span className="code-string">"</span>
+              <label className="sr-only" htmlFor="repo">目标仓库名</label>
               <input id="repo" value={config.repo} placeholder="e.g. dev-stats" autoComplete="off" onChange={(event) => updateConfig({ repo: event.target.value })} />
               <span className="code-string">"</span><span className="code-operator">;</span> <span className="code-comment">// 关联的具体项目仓库名</span>
             </div>
           </div>
         )}
 
+        <details className="editor-advanced">
+          <summary>
+            <span>高级选项</span>
+            <span className="editor-advanced-hint">标题、布局、画布与显示开关</span>
+          </summary>
+          <div className="editor-advanced-content">
         <div className="editor-row">
           <div className="editor-row-gutter">{getLine()}</div>
           <div className="editor-row-content">
             <span className="code-keyword">let</span> <span className="code-var">CUSTOM_HEADER</span> = <span className="code-string">"</span>
+            <label className="sr-only" htmlFor="custom-title">自定义卡片标题</label>
             <input id="custom-title" value={config.custom_title} placeholder="// 留空则使用默认配置" onChange={(event) => updateConfig({ custom_title: event.target.value })} />
             <span className="code-string">"</span><span className="code-operator">;</span> <span className="code-comment">// 自定义标题头名称</span>
           </div>
@@ -147,6 +158,7 @@ export function ManualOptions({
             <div className="editor-row-gutter">{getLine()}</div>
             <div className="editor-row-content">
               <span className="code-keyword">let</span> <span className="code-var">GRID_LAYOUT</span> = <span className="code-type">Layout</span><span className="code-operator">.</span>
+              <label className="sr-only" htmlFor="layout">语言卡片布局</label>
               <select id="layout" value={config.layout} onChange={(event) => updateConfig({ layout: event.target.value })}>
                 <option value="normal">NORMAL // 默认布局</option>
                 <option value="compact">COMPACT // 紧凑布局</option>
@@ -165,6 +177,7 @@ export function ManualOptions({
               <span className="code-keyword">let</span> <span className="code-var">LANG_LIMIT</span> = <span className="code-number"></span>
               <input
                 id="langs-count"
+                aria-label="展示语言数量"
                 type="number"
                 min={1}
                 max={20}
@@ -183,6 +196,7 @@ export function ManualOptions({
               <span className="code-keyword">let</span> <span className="code-var">ACT_LIMIT</span> = <span className="code-number"></span>
               <input
                 id="activity-count"
+                aria-label="最近动态条数"
                 type="number"
                 min={1}
                 max={20}
@@ -200,6 +214,7 @@ export function ManualOptions({
             <span className="code-keyword">let</span> <span className="code-var">CANVAS_WIDTH</span> = <span className="code-number"></span>
             <input
               id="card-width"
+              aria-label="自定义卡片宽度"
               type="number"
               min={0}
               max={1200}
@@ -217,20 +232,27 @@ export function ManualOptions({
           </div>
         </div>
 
-        {displayOptions.map(({ key, label }) => (
+        {displayOptions.map(({ key, label }) => {
+          const inputId = `flag-${key}`;
+          return (
           <div className="editor-row" key={key}>
             <div className="editor-row-gutter">{getLine()}</div>
             <div className="editor-row-content indent-1">
               <span className="code-key">"{key}"</span><span className="code-operator">:</span>
-              <input
-                type="checkbox"
-                checked={Boolean(config[key as keyof ManualConfig])}
-                onChange={(event) => updateConfig({ [key]: event.target.checked } as Partial<ManualConfig>)}
-              />
-              <span className="code-operator">,</span> <span className="code-comment">// {label}</span>
+              <label className="editor-flag-control" htmlFor={inputId}>
+                <input
+                  id={inputId}
+                  type="checkbox"
+                  aria-label={label}
+                  checked={Boolean(config[key as keyof ManualConfig])}
+                  onChange={(event) => updateConfig({ [key]: event.target.checked } as Partial<ManualConfig>)}
+                />
+                <span className="code-operator">,</span> <span className="code-comment">// {label}</span>
+              </label>
             </div>
           </div>
-        ))}
+          );
+        })}
 
         <div className="editor-row">
           <div className="editor-row-gutter">{getLine()}</div>
@@ -238,6 +260,8 @@ export function ManualOptions({
             <span className="code-operator">{'};'}</span>
           </div>
         </div>
+          </div>
+        </details>
 
       </div>
     </section>

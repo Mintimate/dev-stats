@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAgentRun } from "./hooks/useAgentRun";
 import { useManualStats } from "./hooks/useManualStats";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
-import type { LeaderboardItem } from "./components/LeaderboardPanel";
 import { TopBar } from "./components/TopBar";
 import { AgentPanel } from "./components/AgentPanel";
 import { AgentResultPanel } from "./components/AgentResultPanel";
@@ -34,6 +33,12 @@ export default function App() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
+  useEffect(() => {
+    if (!globalStatus.transient) return undefined;
+    const timer = window.setTimeout(() => setGlobalStatus({ label: "准备就绪" }), 2800);
+    return () => window.clearTimeout(timer);
+  }, [globalStatus]);
+
   function setView(nextView: ViewName) {
     setViewState(nextView);
     const nextHash = nextView === "manual" ? "manual" : "agent";
@@ -41,10 +46,6 @@ export default function App() {
   }
 
   const shellClass = `agent-home view ${view === "agent" ? "" : "hidden"} split-layout`;
-
-  const handleLoadUser = useCallback((item: LeaderboardItem) => {
-    window.location.href = `/u/${item.platform}/${encodeURIComponent(item.username)}`;
-  }, []);
 
   const showResult = agent.result.kind !== "none" || agent.running;
 
@@ -57,13 +58,29 @@ export default function App() {
           {showResult ? (
             <AgentResultPanel agent={agent} config={manual.config} applyRecipe={manual.applyRecipe} setView={setView} setGlobalStatus={setGlobalStatus} />
           ) : (
-            <LeaderboardPanel onLoadUser={handleLoadUser} />
+            <LeaderboardPanel />
           )}
         </section>
         <section className={`workspace view ${view === "manual" ? "" : "hidden"}`}>
           <ManualOptions config={manual.config} updateConfig={manual.updateConfig} setPlatform={manual.setPlatform} resetOptions={manual.resetOptions} />
-          <PreviewPanel previewUrl={manual.previewUrl} markdown={manual.markdown} setGlobalStatus={setGlobalStatus} />
+          <PreviewPanel
+            previewUrl={manual.previewUrl}
+            markdown={manual.markdown}
+            pending={manual.previewPending}
+            validationMessage={manual.validationMessage}
+            setGlobalStatus={setGlobalStatus}
+          />
         </section>
+        {globalStatus.transient ? (
+          <div
+            className={`status-toast visible ${globalStatus.tone || ""}`}
+            role={globalStatus.tone === "is-error" ? "alert" : "status"}
+            aria-live={globalStatus.tone === "is-error" ? "assertive" : "polite"}
+            aria-atomic="true"
+          >
+            {globalStatus.label}
+          </div>
+        ) : null}
       </main>
       <Footer />
     </>

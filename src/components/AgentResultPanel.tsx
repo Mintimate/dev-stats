@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAgentRun } from "../hooks/useAgentRun";
 import { useImagePreview } from "../hooks/useImagePreview";
 import { ReadmeReport } from "./ReadmeReport";
@@ -93,7 +93,7 @@ function StatsRecipeDashboard({
         <div className="recipe-right">
           <div className="card-title">卡片实时预览</div>
           <div className={`recipe-preview-box image-preview-frame ${preview.loading ? "is-loading" : ""}`} aria-busy={preview.loading}>
-            <img alt="Recommended stats preview" {...preview.imageProps} />
+            <img key={preview.imageKey} alt="Recommended stats preview" {...preview.imageProps} />
             <div className={`image-loading-overlay ${preview.loading ? "" : "hidden"}`} aria-hidden={!preview.loading}>加载预览中</div>
             <div className="recipe-preview-meta">
               <span className="preview-url-label">实时 API 地址:</span>
@@ -144,6 +144,7 @@ export function AgentResultPanel({
   const [tab, setTab] = useState<"report" | "readme">("report");
   const [editorTab, setEditorTab] = useState<"preview" | "source" | "html">("preview");
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const moreActionsRef = useRef<HTMLDivElement | null>(null);
   const [humorQuote] = useState(() => humorQuotes[Math.floor(Math.random() * humorQuotes.length)]);
   const resultVisible = agent.result.kind !== "none" || agent.running;
   const readme = agent.result.kind === "readme" ? agent.result.data : null;
@@ -157,14 +158,30 @@ export function AgentResultPanel({
     ? `https://cnb.cool/u/${encodeURIComponent(config.username)}`
     : `https://github.com/${config.username}`;
 
+  useEffect(() => {
+    if (!moreActionsOpen) return undefined;
+    function closeOnOutsidePointer(event: MouseEvent) {
+      if (!moreActionsRef.current?.contains(event.target as Node)) setMoreActionsOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setMoreActionsOpen(false);
+    }
+    document.addEventListener("mousedown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [moreActionsOpen]);
+
   if (!resultVisible) return null;
 
   async function copy(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setGlobalStatus({ label: `${label}已复制` });
+      setGlobalStatus({ label: `${label}已复制`, transient: true });
     } catch {
-      setGlobalStatus({ label: "复制失败", tone: "is-error" });
+      setGlobalStatus({ label: "复制失败", tone: "is-error", transient: true });
     }
   }
 
@@ -187,7 +204,7 @@ export function AgentResultPanel({
         </div>
         <div className="result-actions">
           {readme && !readme.is_ghost && (
-            <button className="btn primary" type="button" onClick={() => void copy(readme.markdown, "README 代码")}>复制 README</button>
+            <ShareModal result={readme} platform={config.platform} username={config.username} prominent />
           )}
           {!readme && recipe && (
             <button className="btn primary" type="button" onClick={() => void copy(recipeMarkdown, "整套 README 卡片")}>复制整套 README 卡片</button>
@@ -196,23 +213,32 @@ export function AgentResultPanel({
             <button className="btn" type="button" onClick={() => {
               applyRecipe(recipeToApply);
               setView("manual");
-              setGlobalStatus({ label: "已载入配方首张卡片；整套 Markdown 可直接复制到 README" });
+              setGlobalStatus({ label: "已载入配方首张卡片；整套 Markdown 可直接复制到 README", transient: true });
             }}>
               微调首张卡片
             </button>
           )}
-          <div className="result-more-actions">
+          <div className="result-more-actions" ref={moreActionsRef}>
             <button
               className="btn"
               type="button"
               aria-expanded={moreActionsOpen}
+              aria-haspopup="true"
               aria-controls="result-more-actions-menu"
               onClick={() => setMoreActionsOpen((open) => !open)}
             >
               更多操作
             </button>
             {moreActionsOpen && (
-              <div className="result-more-menu" id="result-more-actions-menu">
+              <div className="result-more-menu" id="result-more-actions-menu" aria-label="结果更多操作">
+                {readme && !readme.is_ghost && (
+                  <button className="result-more-menu-item" type="button" onClick={() => {
+                    setMoreActionsOpen(false);
+                    void copy(readme.markdown, "README 代码");
+                  }}>
+                    复制 README
+                  </button>
+                )}
                 {recipeToApply && readme && (
                   <button className="result-more-menu-item" type="button" onClick={() => {
                     applyRecipe(recipeToApply);
@@ -235,7 +261,6 @@ export function AgentResultPanel({
                   setMoreActionsOpen(false);
                 }}>前往平台主页</button>
                 <span className="result-more-menu-meta">本轮消耗 {agent.usage?.total || "--"} tokens</span>
-                <ShareModal result={readme} platform={config.platform} username={config.username} />
                 <button className="result-more-menu-item" type="button" onClick={() => {
                   agent.resetAgent();
                   setMoreActionsOpen(false);
@@ -250,16 +275,16 @@ export function AgentResultPanel({
         {readme && (
           <>
             <div className="tab-header">
-              <div className="segmented result-tabs">
-                <button type="button" className={tab === "report" ? "active" : ""} onClick={() => setTab("report")}>画像报告</button>
-                <button type="button" className={tab === "readme" ? "active" : ""} onClick={() => setTab("readme")}>README 草稿</button>
+              <div className="segmented result-tabs" role="tablist" aria-label="结果视图">
+                <button type="button" role="tab" aria-selected={tab === "report"} className={tab === "report" ? "active" : ""} onClick={() => setTab("report")}>画像报告</button>
+                <button type="button" role="tab" aria-selected={tab === "readme"} className={tab === "readme" ? "active" : ""} onClick={() => setTab("readme")}>README 草稿</button>
               </div>
             </div>
             <div className="result-tab-panel">
-              <div className={`result-tab-content ${tab === "report" ? "active" : ""}`}>
+              <div className={`result-tab-content ${tab === "report" ? "active" : ""}`} role="tabpanel" hidden={tab !== "report"}>
                 <ReadmeReport result={readme} config={config} />
               </div>
-              <div className={`result-tab-content ${tab === "readme" ? "active" : ""}`}>
+              <div className={`result-tab-content ${tab === "readme" ? "active" : ""}`} role="tabpanel" hidden={tab !== "readme"}>
                 <div className="mock-editor-window">
                   <div className="editor-header">
                     <div className="editor-window-controls">

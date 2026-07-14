@@ -2,7 +2,7 @@
   "name": "dev-stats",
   "type": "module",
   "scripts": {
-    "dev": "npm run sync:agent-skill && vite",
+    "dev": "npm run sync:agent-skill && node scripts/run-vite-dev.mjs",
     "sync:agent-skill": "node scripts/sync-dev-stats-agent-skill.mjs",
     "check:agent-skill": "node scripts/sync-dev-stats-agent-skill.mjs --check",
     "build": "npm run sync:agent-skill && vite build",

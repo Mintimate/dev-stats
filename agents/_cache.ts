@@ -190,6 +190,7 @@ const PUBLIC_REPLAY_EVENT_TYPES = new Set([
  */
 export function sanitizeEventsForPublicReplay(events: string[]): string[] {
   const sanitized: string[] = [];
+  const seen = new Set<string>();
   for (const raw of events) {
     if (typeof raw !== 'string' || !raw.startsWith('data: ')) continue;
     let parsed: any;
@@ -203,11 +204,22 @@ export function sanitizeEventsForPublicReplay(events: string[]): string[] {
     let picked: Record<string, unknown> | null = null;
     switch (parsed.type) {
       case 'agent_status':
-        picked = { type: parsed.type, status: parsed.status, protocol: parsed.protocol, model: parsed.model, message: parsed.message };
+        picked = {
+          type: parsed.type,
+          status: parsed.status,
+          protocol: parsed.protocol,
+          model: parsed.model,
+          message: parsed.message,
+          score: Number(parsed.score || 0),
+          rating: parsed.rating,
+          cached_at: parsed.cached_at,
+          expires_at: parsed.expires_at,
+        };
         break;
       case 'tool_call':
       case 'tool_called':
-        picked = { type: parsed.type, name: parsed.name };
+        // 两种事件名是运行时兼容别名；公开回放只保留一条规范化的开始事件。
+        picked = { type: 'tool_call', name: parsed.name };
         break;
       case 'tool_result':
         picked = { type: parsed.type, name: parsed.name };
@@ -227,7 +239,12 @@ export function sanitizeEventsForPublicReplay(events: string[]): string[] {
       default:
         picked = null;
     }
-    if (picked) sanitized.push(sseEvent(picked));
+    if (picked) {
+      const fingerprint = JSON.stringify(picked);
+      if (seen.has(fingerprint)) continue;
+      seen.add(fingerprint);
+      sanitized.push(sseEvent(picked));
+    }
   }
   return sanitized;
 }

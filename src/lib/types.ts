@@ -121,6 +121,7 @@ export type AgentStatus = "idle" | "running" | "done" | "error" | "stopped";
 export type GlobalStatus = {
   label: string;
   tone?: "is-running" | "is-error";
+  transient?: boolean;
 };
 
 export type ShareData = {
