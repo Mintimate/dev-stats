@@ -26,6 +26,7 @@ export function AgentPanel({
     error: { cls: "error", text: "运行出错" },
   };
   const led = ledMeta[agent.status] || { cls: "", text: "未启动" };
+  const hasTarget = Boolean(agent.agentUsername.trim());
 
   return (
     <aside className="panel agent-left">
@@ -41,6 +42,7 @@ export function AgentPanel({
             <label>平台</label>
             <PlatformSegment
               platform={config.platform}
+              ariaLabel="AI 分析目标平台"
               disabled={agent.running}
               onChange={(platform) => {
                 setPlatform(platform);
@@ -50,7 +52,19 @@ export function AgentPanel({
           </div>
           <div className="field">
             <label htmlFor="agent-username">用户名 / 组织</label>
-            <input id="agent-username" value={agent.agentUsername} disabled={agent.running} autoComplete="off" onChange={(event) => agent.setAgentUsername(event.target.value)} />
+            <input
+              id="agent-username"
+              value={agent.agentUsername}
+              disabled={agent.running}
+              required
+              autoComplete="off"
+              placeholder="例如 Mintimate"
+              aria-describedby="agent-username-help"
+              onChange={(event) => agent.setAgentUsername(event.target.value)}
+            />
+            <span className={`field-help ${hasTarget ? "" : "is-error"}`} id="agent-username-help">
+              {hasTarget ? "支持 GitHub 用户、组织或 CNB 用户名" : "请输入用户名后再启动分析"}
+            </span>
           </div>
         </div>
         <div className="task-grid">
@@ -58,7 +72,7 @@ export function AgentPanel({
             { mode: "readme" as AgentMode, title: "生成主页 README", text: "浏览主页、读取 Profile README，并输出可复制 Markdown", cached: agent.cacheBadges.readme },
             { mode: "stats" as AgentMode, title: "推荐卡片配方", text: "分析公开资料，生成可应用到手动面板的卡片方案", cached: agent.cacheBadges.stats },
           ].map((item) => (
-            <button key={item.mode} className="task-btn" type="button" disabled={agent.running} onClick={() => void agent.runAgent(item.mode)}>
+            <button key={item.mode} className="task-btn" type="button" disabled={agent.running || !hasTarget} onClick={() => void agent.runAgent(item.mode)}>
               <div className="task-btn-content">
                 <div className="task-btn-header">
                   <strong>{item.title}</strong>
@@ -102,7 +116,7 @@ export function AgentPanel({
 
       <div className="terminal">
         <div className="terminal-head">
-          <div className={`status-led ${led.cls}`}>{led.text}</div>
+          <div className={`status-led ${led.cls}`} role="status" aria-live="polite">{led.text}</div>
           <div className="run-meta">
             <span className={`run-loader ${agent.running ? "" : "hidden"}`}>运行中</span>
             <span>运行 ID: {agent.runId ? agent.runId.slice(0, 8) : "--"}</span>
@@ -115,7 +129,7 @@ export function AgentPanel({
           <div className="run-kicker">分析简报</div>
           <p className="progress-copy">{agent.progress}</p>
         </div>
-        <div className="event-stream" ref={eventStreamRef}>
+        <div className="event-stream" ref={eventStreamRef} role="log" aria-live="polite" aria-relevant="additions text">
           {agent.events.map((event) => (
             <div key={event.id} className={`event-line ${event.type || ""}`}>
               <code>{event.command}</code>

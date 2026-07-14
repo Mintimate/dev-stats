@@ -27,10 +27,10 @@ export function TopBar({
       </div>
       <div className="topbar-tools">
         <nav className="primary-nav" aria-label="主视图">
-          <button className={`nav-btn ${view === "agent" ? "active" : ""}`} type="button" onClick={() => setView("agent")}>
+          <button className={`nav-btn ${view === "agent" ? "active" : ""}`} type="button" aria-pressed={view === "agent"} onClick={() => setView("agent")}>
             AI 分析
           </button>
-          <button className={`nav-btn ${view === "manual" ? "active" : ""}`} type="button" onClick={() => setView("manual")}>
+          <button className={`nav-btn ${view === "manual" ? "active" : ""}`} type="button" aria-pressed={view === "manual"} onClick={() => setView("manual")}>
             手动配置
           </button>
         </nav>
@@ -43,7 +43,7 @@ export function TopBar({
             <span className="context-label">卡片</span>
             <span className="context-value">{selectedCard}</span>
           </span>
-          <span className={`context-chip status ${status.tone || ""}`}>
+          <span className={`context-chip status ${status.tone || ""}`} role="status" aria-live="polite" aria-atomic="true">
             <span className="context-label">状态</span>
             <span className="context-value">{status.label}</span>
           </span>

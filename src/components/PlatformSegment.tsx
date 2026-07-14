@@ -6,18 +6,20 @@ import type { ManualConfig } from "../lib/types";
 export function PlatformSegment({
   platform,
   disabled,
+  ariaLabel = "目标平台",
   onChange,
 }: {
   platform: ManualConfig["platform"];
   disabled?: boolean;
+  ariaLabel?: string;
   onChange: (platform: ManualConfig["platform"]) => void;
 }) {
   return (
-    <div className="segmented">
-      <button type="button" data-platform="github" disabled={disabled} className={platform === "github" ? "active" : ""} onClick={() => onChange("github")}>
+    <div className="segmented" role="group" aria-label={ariaLabel}>
+      <button type="button" data-platform="github" disabled={disabled} aria-pressed={platform === "github"} className={platform === "github" ? "active" : ""} onClick={() => onChange("github")}>
         GitHub
       </button>
-      <button type="button" data-platform="cnb" disabled={disabled} className={platform === "cnb" ? "active" : ""} onClick={() => onChange("cnb")}>
+      <button type="button" data-platform="cnb" disabled={disabled} aria-pressed={platform === "cnb"} className={platform === "cnb" ? "active" : ""} onClick={() => onChange("cnb")}>
         CNB
       </button>
     </div>

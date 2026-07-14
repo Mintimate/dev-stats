@@ -14,10 +14,6 @@ export interface LeaderboardItem {
   expiresAt?: number;
 }
 
-interface LeaderboardPanelProps {
-  onLoadUser: (item: LeaderboardItem) => void;
-}
-
 function handleAvatarError(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget;
   // 用绝对路径 + 一次性标记兜底，避免相对路径在非根路径页面下解析出错而无限触发 onError。
@@ -43,7 +39,7 @@ export function getHumorousTitle(rating: string) {
 
 const PAGE_SIZE = 10;
 
-function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
+function LeaderboardPanelInner() {
   const [list, setList] = useState<LeaderboardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -105,16 +101,17 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
           <h2 className="panel-title">开发者荣誉榜</h2>
           <span className="panel-note">榜单保留最近一次成功结果，超过 24h 的画像会在进入后自动更新</span>
         </div>
-        <button className="btn" type="button" onClick={() => void fetchRankings()}>
-          刷新
+        <button className="btn" type="button" disabled={loading} aria-busy={loading} onClick={() => void fetchRankings()}>
+          {loading ? "刷新中…" : "刷新"}
         </button>
       </div>
 
-      <div className="leaderboard-body">
+      <div className="leaderboard-body" aria-busy={loading}>
         <div className="leaderboard-tabs-wrapper" style={{ marginBottom: 12 }}>
-          <div className="segmented">
+          <div className="segmented" role="group" aria-label="榜单平台">
             <button
               type="button"
+              aria-pressed={activeTab === "github"}
               className={activeTab === "github" ? "active" : ""}
               onClick={() => setActiveTab("github")}
             >
@@ -122,6 +119,7 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
             </button>
             <button
               type="button"
+              aria-pressed={activeTab === "cnb"}
               className={activeTab === "cnb" ? "active" : ""}
               onClick={() => setActiveTab("cnb")}
             >
@@ -170,11 +168,10 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
                 : "/favicon.svg";
 
               return (
-                <button
-                  type="button"
+                <a
+                  href={`/u/${item.platform}/${encodeURIComponent(item.username)}`}
                   key={`${item.platform}-${item.username}`}
                   className="leaderboard-row"
-                  onClick={() => onLoadUser(item)}
                   title={isStale ? `载入 ${item.username} 的旧快照，并自动重新分析` : `点击快速载入 ${item.username} 的完整画像`}
                 >
                   <div className={`leaderboard-rank ${isTopRank ? `rank-top rank-${rank}` : ""}`}>
@@ -236,7 +233,7 @@ function LeaderboardPanelInner({ onLoadUser }: LeaderboardPanelProps) {
                       <span className="action-arrow">→</span>
                     </div>
                   </div>
-                </button>
+                </a>
               );
             })}
           </div>
