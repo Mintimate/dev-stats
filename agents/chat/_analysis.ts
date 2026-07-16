@@ -195,6 +195,19 @@ export function replaceReadmeStatsCards(markdown: string, target: ReadmeCardTarg
   return output.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/**
+ * README Markdown is rendered with `dangerouslySetInnerHTML` in the web client and
+ * stored in a shared public cache. Standard Markdown provides all required
+ * formatting, so raw HTML is removed before an untrusted model output is stored.
+ */
+export function stripRawHtmlFromMarkdown(value: unknown): string {
+  return textOf(value)
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<\/?[a-zA-Z][^>]*>/g, '')
+    .replace(/\u0000/g, '')
+    .trim();
+}
+
 export function createDeterministicAnalysis(
   platform: AnalysisPlatform,
   inspected: Record<string, any>,
@@ -327,7 +340,9 @@ export function validateReadmeDraft(
   return {
     ok: true,
     title: textOf(input.title) || `${analysis.username} README Draft`,
-    markdown: cardTarget ? replaceReadmeStatsCards(textOf(input.markdown), cardTarget) : textOf(input.markdown),
+    markdown: cardTarget
+      ? replaceReadmeStatsCards(stripRawHtmlFromMarkdown(input.markdown), cardTarget)
+      : stripRawHtmlFromMarkdown(input.markdown),
     summary: textOf(input.summary),
     promotional_summary: textOf(input.promotional_summary) || textOf(input.summary),
     objective_rating: analysis.objective_rating,

@@ -176,6 +176,7 @@ To use the **AI Stats Agent** feature, you also need to configure LLM credential
 - **`OPENAI_API_KEY`**: LLM API key (supports any OpenAI-compatible API) ✅ **Required for Agent**
 - **`OPENAI_BASE_URL`**: Custom model API base URL, supports third-party or domestic model providers (optional)
 - **`OPENAI_MODEL`**: Specifies the model name to use (optional)
+- **`PUBLIC_SITE_URL`**: Public HTTPS origin of the deployed site, for example `https://your-project.pages.dev`. Agent-exported Stats cards prefer this configured origin. Without it, only a same-origin browser request is accepted as a safe fallback; configure it in production.
 
 > **Note**: EdgeOne Makers loads environment variables after deployment. After changing environment variables, you need to trigger a new deployment for the changes to take effect.
 

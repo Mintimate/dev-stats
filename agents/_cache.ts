@@ -9,8 +9,10 @@ export const CACHE_SCHEMA_VERSION = 'v1';
 export const LEADERBOARD_KEY = 'leaderboard/readme_rankings.json';
 export const LEADERBOARD_ITEM_PREFIX = 'leaderboard/items/';
 export const REFRESH_LEASE_PREFIX = 'refresh-leases/';
+export const PUBLIC_ANALYSIS_RATE_LIMIT_PREFIX = 'rate-limits/analysis/';
 export const DEFAULT_ANALYSIS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const DEFAULT_REFRESH_LEASE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+export const DEFAULT_PUBLIC_ANALYSIS_RATE_LIMIT_MS = 2 * 60 * 1000; // 2 minutes
 
 export interface CacheEntry {
   cachedAt: number;
@@ -90,6 +92,44 @@ export async function releaseRefreshLease(store: any, lease: RefreshLease): Prom
   const key = buildRefreshLeaseKey(lease.platform, lease.username, lease.mode);
   const current = await store.get(key, { type: 'json', consistency: 'strong' });
   if (current?.runId === lease.runId) await store.delete(key);
+}
+
+async function hashedRateLimitIdentity(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Allow one cache-miss analysis per public client in the configured window. The
+ * identifier is SHA-256 hashed before it becomes a Blob key, so raw IP addresses
+ * are never stored in the cache namespace.
+ */
+export async function acquirePublicAnalysisRateLimit(
+  store: any,
+  clientId: string,
+  now = Date.now(),
+  ttlMs = DEFAULT_PUBLIC_ANALYSIS_RATE_LIMIT_MS,
+): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  const key = `${PUBLIC_ANALYSIS_RATE_LIMIT_PREFIX}${await hashedRateLimitIdentity(clientId)}.json`;
+  const existing = await store.get(key, { type: 'json', consistency: 'strong' });
+  const existingExpiry = Number(existing?.expiresAt);
+  if (Number.isFinite(existingExpiry) && existingExpiry > now) {
+    return { allowed: false, retryAfterMs: existingExpiry - now };
+  }
+
+  if (existing) await store.delete(key);
+  const entry = { expiresAt: now + ttlMs };
+  try {
+    await store.setJSON(key, entry, { onlyIfNew: true, cacheControl: 'no-store' });
+    return { allowed: true, retryAfterMs: 0 };
+  } catch {
+    const winner = await store.get(key, { type: 'json', consistency: 'strong' });
+    const winnerExpiry = Number(winner?.expiresAt);
+    if (Number.isFinite(winnerExpiry) && winnerExpiry > now) {
+      return { allowed: false, retryAfterMs: winnerExpiry - now };
+    }
+    throw new Error('Failed to acquire public analysis rate limit');
+  }
 }
 
 export function resolveAnalysisCacheTtlMs(env?: Record<string, string | undefined>): number {
