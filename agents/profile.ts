@@ -9,6 +9,7 @@ import {
   resolveAnalysisCacheTtlMs,
   sanitizeEventsForPublicReplay,
 } from './_cache';
+import { stripRawHtmlFromMarkdown } from './chat/_analysis';
 
 const logger = createLogger('profile-agent');
 
@@ -43,6 +44,13 @@ export async function onRequest(context: any) {
 
     const expiresAt = getCacheExpiresAt(entry.cachedAt, entry.expiresAt, cacheTtlMs);
 
+    // Cache entries written before the sanitization fix may still exist briefly.
+    // Never replay their raw HTML through the public profile API.
+    const safeReadmeDraft = {
+      ...readmeDraft,
+      markdown: stripRawHtmlFromMarkdown(readmeDraft.markdown),
+    };
+
     return jsonResponse({
       found: true,
       platform,
@@ -51,7 +59,7 @@ export async function onRequest(context: any) {
       expiresAt,
       stale: expiresAt <= Date.now(),
       refresh,
-      readmeDraft,
+      readmeDraft: safeReadmeDraft,
       userProfile,
       // 仅回放前端终端 UI 实际渲染用得到的精简事件，避免把原始工具入参/输出透传给公开只读接口。
       events: sanitizeEventsForPublicReplay(entry.events),

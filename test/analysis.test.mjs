@@ -16,6 +16,7 @@ async function importTypeScriptModule(entryPoint) {
 
 const analysis = await importTypeScriptModule("agents/chat/_analysis.ts");
 const statsUrl = await importTypeScriptModule("src/lib/statsUrl.ts");
+const markdown = await importTypeScriptModule("src/lib/markdown.ts");
 
 const githubEvidence = {
   user: {
@@ -66,6 +67,25 @@ test("README validation overrides all model-controlled rating fields", () => {
   assert.deepEqual(draft.dimension_scores, trusted.dimension_scores);
   assert.deepEqual(draft.top_repos, trusted.top_repos);
   assert.equal(draft.analysis_version, "v1");
+});
+
+test("README validation removes raw HTML before a shared cache can persist it", () => {
+  const trusted = analysis.createDeterministicAnalysis("github", githubEvidence, "exampledev");
+  const draft = analysis.validateReadmeDraft({
+    markdown: '<div style="background:red" onclick="alert(1)">poison</div>\n<script>alert(1)</script>\n# Safe heading',
+  }, trusted);
+
+  assert.doesNotMatch(draft.markdown, /<\/?(?:div|script)\b/i);
+  assert.match(draft.markdown, /poison/);
+  assert.match(draft.markdown, /# Safe heading/);
+});
+
+test("Markdown preview escapes raw HTML from legacy cached entries", () => {
+  const rendered = markdown.renderMarkdown('<img src=x onerror="alert(1)">\n<div style="background:red">poison</div>');
+
+  assert.match(rendered, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/);
+  assert.match(rendered, /&lt;div style=&quot;background:red&quot;&gt;poison&lt;\/div&gt;/);
+  assert.doesNotMatch(rendered, /<img src=x|<div style=/);
 });
 
 test("README card normalization replaces known third-party cards but preserves unrelated badges", () => {

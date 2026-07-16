@@ -303,7 +303,7 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
         },
         body: JSON.stringify({
           message: buildAgentMessage(activeConfig, mode),
-          state: { ...activeConfig, site_origin: window.location.origin },
+          state: activeConfig,
           force_reanalyze: forceReanalyze,
         }),
         signal: controller.signal,

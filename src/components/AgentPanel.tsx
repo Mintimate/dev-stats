@@ -151,7 +151,7 @@ export function AgentPanel({
         <button className="btn warn" type="button" disabled={!agent.running} onClick={() => void agent.stopAgent()}>
           停止分析
         </button>
-        <button className={`btn ghost ${agent.cacheBadges.visible ? "" : "hidden"}`} type="button" title="忽略缓存，重新调用 Agent 分析" disabled={agent.running} onClick={agent.reanalyze}>
+        <button className={`btn ghost ${agent.cacheBadges.visible ? "" : "hidden"}`} type="button" title="重新采集公开资料并更新缓存；为防滥用会受限流保护" disabled={agent.running} onClick={agent.reanalyze}>
           重新分析
         </button>
       </div>

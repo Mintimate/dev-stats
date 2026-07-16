@@ -60,6 +60,20 @@ test("only the current lease owner can release the lock", async () => {
   assert.equal(await cacheModule.readRefreshLease(store, "github", "Mintimate", "readme"), null);
 });
 
+test("public cache-miss analysis rate limit accepts one concurrent client request", async () => {
+  const store = new MemoryBlobStore();
+  const now = 1_800_000_000_000;
+  const results = await Promise.all([
+    cacheModule.acquirePublicAnalysisRateLimit(store, "203.0.113.17", now),
+    cacheModule.acquirePublicAnalysisRateLimit(store, "203.0.113.17", now),
+  ]);
+
+  assert.equal(results.filter((result) => result.allowed).length, 1);
+  assert.equal(results.filter((result) => !result.allowed).length, 1);
+  const next = await cacheModule.acquirePublicAnalysisRateLimit(store, "203.0.113.17", now + 2 * 60 * 1000);
+  assert.equal(next.allowed, true);
+});
+
 test("per-user leaderboard changes keep newer entries and apply tombstones", () => {
   const base = [
     { platform: "github", username: "alice", score: 70, updatedAt: 100 },
