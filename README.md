@@ -180,6 +180,24 @@ GitHub 数据源需要令牌，CNB 公开数据源无需令牌：
 
 > **注意**：EdgeOne Makers 在部署后加载环境变量，每次更改环境变量后需要重新触发部署使变量生效。
 
+### TDP OIDC 快捷账号导入（可选）
+
+配置后，AI 分析台会显示“从 TDP 获取账号”入口。该功能只通过一次性 OIDC 流程读取用户在 `tdp.fan` 绑定的 GitHub / CNB 用户名，用于快速填充分析目标；不会创建站内登录态，也不会持久化 OIDC Token。
+
+- **`TDP_OIDC_CLIENT_ID`**：TDP 开放平台分配的 Client ID
+- **`TDP_OIDC_CLIENT_SECRET`**：TDP 开放平台分配的 Client Secret，仅配置在服务端
+- **`TDP_OIDC_COOKIE_SECRET`**：至少 32 个字符的独立随机值，用于签名短期 OIDC Cookie
+- **`TDP_OIDC_ISSUER`**：可选，默认 `https://tdp.fan/oidc`
+- **`TDP_OIDC_REDIRECT_URI`**：可选，默认根据 `PUBLIC_SITE_URL` 生成 `/api/auth/tdp/callback`
+
+在 TDP 开放平台登记的生产回调地址必须与以下地址完全一致：
+
+```text
+https://your-domain.example/api/auth/tdp/callback
+```
+
+本地开发可登记 `http://127.0.0.1:8088/api/auth/tdp/callback`，并通过 `openssl rand -base64 32` 生成独立的 Cookie Secret。应用只请求 `openid tdp:social` Scope，并使用 Authorization Code、PKCE S256、`state` 与 `nonce` 校验。
+
 ## 缓存策略
 
 本项目会在函数响应中返回 `Cache-Control`，并在 `edgeone.json` 中为主要卡片接口配置 Pages 缓存：

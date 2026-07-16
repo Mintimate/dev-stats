@@ -179,6 +179,24 @@ To use the **AI Stats Agent** feature, you also need to configure LLM credential
 
 > **Note**: EdgeOne Makers loads environment variables after deployment. After changing environment variables, you need to trigger a new deployment for the changes to take effect.
 
+### TDP OIDC Account Import (Optional)
+
+When configured, the AI analysis panel shows a “Get accounts from TDP” shortcut. It uses a one-shot OIDC flow to read the GitHub and CNB usernames linked to the user's `tdp.fan` account and prefill the analysis target. It does not create an application login session or persist OIDC tokens.
+
+- **`TDP_OIDC_CLIENT_ID`**: Client ID issued by the TDP Open Platform
+- **`TDP_OIDC_CLIENT_SECRET`**: Client Secret issued by TDP; configure it only on the server
+- **`TDP_OIDC_COOKIE_SECRET`**: Independent random value of at least 32 characters for signing short-lived OIDC cookies
+- **`TDP_OIDC_ISSUER`**: Optional; defaults to `https://tdp.fan/oidc`
+- **`TDP_OIDC_REDIRECT_URI`**: Optional; defaults to `/api/auth/tdp/callback` under `PUBLIC_SITE_URL`
+
+Register the exact production callback URL in TDP:
+
+```text
+https://your-domain.example/api/auth/tdp/callback
+```
+
+For local development, register `http://127.0.0.1:8088/api/auth/tdp/callback`. Generate a separate cookie secret with `openssl rand -base64 32`. The app requests only the `openid tdp:social` scopes and validates Authorization Code flow, PKCE S256, `state`, and `nonce`.
+
 ## Cache Strategy
 
 This project returns `Cache-Control` headers from the functions and configures Pages caching for the main card endpoints in `edgeone.json`:
