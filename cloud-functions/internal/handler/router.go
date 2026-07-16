@@ -42,6 +42,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		handlePATInfo(w, r)
 	case "/avatar":
 		handleAvatarProxy(w, r)
+	case "/auth/tdp/start":
+		handleTDPOIDCStart(w, r)
+	case "/auth/tdp/status":
+		handleTDPOIDCStatus(w, r)
+	case "/auth/tdp/callback":
+		handleTDPOIDCCallback(w, r)
+	case "/auth/tdp/identity":
+		handleTDPOIDCIdentity(w, r)
 	default:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusNotFound)
