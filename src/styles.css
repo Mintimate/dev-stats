@@ -579,10 +579,11 @@
 
       .tdp-identity-import {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(220px, 1fr) auto;
         align-items: center;
-        gap: 10px 14px;
-        padding: 12px;
+        gap: 8px 12px;
+        width: min(100%, 760px);
+        padding: 10px 12px;
         border: 1px solid #bfdbfe;
         border-radius: 8px;
         background: #f8fbff;
@@ -594,15 +595,8 @@
       }
 
       .tdp-import-copy {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-width: 0;
-      }
-
-      .tdp-import-copy > div {
         display: grid;
-        gap: 2px;
+        gap: 3px;
         min-width: 0;
       }
 
@@ -611,36 +605,41 @@
         font-size: 13px;
       }
 
-      .tdp-import-copy > div > span {
+      .tdp-import-copy > span {
         color: var(--muted);
         font-size: 11px;
         line-height: 1.45;
-      }
-
-      .tdp-import-logo {
-        display: block;
-        width: 118px;
-        height: auto;
-        flex: 0 0 auto;
       }
 
       .tdp-import-button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 4px;
+        gap: 9px;
+        min-height: 38px;
+        padding-inline: 15px 17px;
         white-space: nowrap;
         border-color: #93c5fd;
-        color: #1d4ed8;
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+        font-weight: 760;
+        line-height: 1;
         background: #fff;
+      }
+
+      .tdp-button-text {
+        display: inline-flex;
+        align-items: center;
+        height: 18px;
       }
 
       .tdp-button-mark {
         display: block;
-        width: 28px;
-        height: 28px;
+        width: 34px;
+        height: auto;
         flex: 0 0 auto;
-        color: #6d4aff;
+        opacity: 0.9;
       }
 
       .tdp-import-status {
@@ -2295,6 +2294,7 @@
 
         .tdp-identity-import {
           grid-template-columns: 1fr;
+          width: 100%;
         }
 
         .tdp-import-button {
