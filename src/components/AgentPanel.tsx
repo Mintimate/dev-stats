@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useAgentRun } from "../hooks/useAgentRun";
 import { toolchainItems } from "../lib/constants";
 import { PlatformSegment } from "./PlatformSegment";
+import { TdpIdentityImport } from "./TdpIdentityImport";
 import type { AgentMode, ManualConfig } from "../lib/types";
 
 export function AgentPanel({
@@ -67,6 +68,14 @@ export function AgentPanel({
             </span>
           </div>
         </div>
+        <TdpIdentityImport
+          disabled={agent.running}
+          onSelect={(identity) => {
+            setPlatform(identity.platform);
+            agent.setAgentUsername(identity.username);
+            agent.clearCacheBadges();
+          }}
+        />
         <div className="task-grid">
           {[
             { mode: "readme" as AgentMode, title: "生成主页 README", text: "浏览主页、读取 Profile README，并输出可复制 Markdown", cached: agent.cacheBadges.readme },

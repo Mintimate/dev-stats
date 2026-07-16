@@ -577,6 +577,148 @@
         gap: 10px;
       }
 
+      .tdp-identity-import {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px 14px;
+        padding: 12px;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        background: #f8fbff;
+      }
+
+      .tdp-identity-import.is-error {
+        border-color: #fecaca;
+        background: #fffafa;
+      }
+
+      .tdp-import-copy {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .tdp-import-copy > div {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .tdp-import-copy strong {
+        color: var(--ink);
+        font-size: 13px;
+      }
+
+      .tdp-import-copy > div > span {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .tdp-import-logo {
+        display: block;
+        width: 118px;
+        height: auto;
+        flex: 0 0 auto;
+      }
+
+      .tdp-import-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        white-space: nowrap;
+        border-color: #93c5fd;
+        color: #1d4ed8;
+        background: #fff;
+      }
+
+      .tdp-button-mark {
+        display: block;
+        width: 28px;
+        height: 28px;
+        flex: 0 0 auto;
+        color: #6d4aff;
+      }
+
+      .tdp-import-status {
+        grid-column: 1 / -1;
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .tdp-identity-import.is-error .tdp-import-status {
+        color: #b91c1c;
+      }
+
+      .tdp-identity-list {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .tdp-identity-option {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 9px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #fff;
+        color: var(--ink);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .tdp-identity-option:hover,
+      .tdp-identity-option:focus-visible,
+      .tdp-identity-option.selected {
+        border-color: #60a5fa;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      .tdp-identity-option > span:nth-child(2) {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .tdp-identity-option small {
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .tdp-identity-option strong {
+        overflow: hidden;
+        color: var(--ink);
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tdp-platform-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #24292f;
+      }
+
+      .tdp-platform-dot.cnb {
+        background: #f76945;
+      }
+
+      .tdp-identity-action {
+        color: #2563eb;
+        font-size: 11px;
+        font-weight: 750;
+      }
+
       .task-btn {
         display: flex;
         align-items: center;
@@ -2145,9 +2287,18 @@
 
         .launch-grid,
         .task-grid,
+        .tdp-identity-list,
         .stats-preview,
         .result-insights {
           grid-template-columns: 1fr;
+        }
+
+        .tdp-identity-import {
+          grid-template-columns: 1fr;
+        }
+
+        .tdp-import-button {
+          width: 100%;
         }
 
         .insight-card.wide {
