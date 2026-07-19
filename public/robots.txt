@@ -1,2 +1,9 @@
 User-agent: *
-Disallow: /
+Allow: /
+Disallow: /api
+Disallow: /chat
+Disallow: /profile
+Disallow: /leaderboard
+Disallow: /stop
+
+Sitemap: https://dev-stats.mintimate.cn/sitemap.xml
