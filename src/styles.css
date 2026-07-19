@@ -132,6 +132,14 @@
         min-width: 0;
       }
 
+      .topbar-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+      }
+
       .primary-nav {
         display: inline-grid;
         grid-template-columns: repeat(2, minmax(86px, 1fr));
@@ -159,6 +167,32 @@
         background: var(--surface);
         color: var(--green);
         box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+      }
+
+      .tutorial-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        min-height: 38px;
+        padding: 0 14px;
+        border: 1px solid #fb7299;
+        border-radius: 8px;
+        background: #fff1f5;
+        color: #d94675;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 12px;
+        font-weight: 800;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .tutorial-link:hover {
+        background: #fb7299;
+        color: #ffffff;
+        box-shadow: 0 5px 14px rgba(251, 114, 153, 0.24);
+        transform: translateY(-1px);
       }
 
       .context-strip {
@@ -2206,6 +2240,10 @@
           justify-items: start;
         }
 
+        .topbar-actions {
+          justify-content: flex-start;
+        }
+
         .context-strip {
           justify-content: flex-start;
         }
@@ -2232,6 +2270,16 @@
         .app {
           width: min(100% - 20px, 1480px);
           padding-top: 12px;
+        }
+
+        .topbar-actions {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          width: 100%;
+        }
+
+        .tutorial-link {
+          min-height: 44px;
         }
 
         .workspace {

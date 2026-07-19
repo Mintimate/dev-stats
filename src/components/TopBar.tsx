@@ -26,14 +26,26 @@ export function TopBar({
         </div>
       </div>
       <div className="topbar-tools">
-        <nav className="primary-nav" aria-label="主视图">
-          <button className={`nav-btn ${view === "agent" ? "active" : ""}`} type="button" aria-pressed={view === "agent"} onClick={() => setView("agent")}>
-            AI 分析
-          </button>
-          <button className={`nav-btn ${view === "manual" ? "active" : ""}`} type="button" aria-pressed={view === "manual"} onClick={() => setView("manual")}>
-            手动配置
-          </button>
-        </nav>
+        <div className="topbar-actions">
+          <nav className="primary-nav" aria-label="主视图">
+            <button className={`nav-btn ${view === "agent" ? "active" : ""}`} type="button" aria-pressed={view === "agent"} onClick={() => setView("agent")}>
+              AI 分析
+            </button>
+            <button className={`nav-btn ${view === "manual" ? "active" : ""}`} type="button" aria-pressed={view === "manual"} onClick={() => setView("manual")}>
+              手动配置
+            </button>
+          </nav>
+          <a
+            className="tutorial-link"
+            href="https://www.bilibili.com/video/BV1YPKB61EN7"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="在哔哩哔哩观看 DevStats 视频教程（新窗口打开）"
+          >
+            <span aria-hidden="true">▶</span>
+            视频教程
+          </a>
+        </div>
         <div className="context-strip" aria-label="当前上下文">
           <span className="context-chip">
             <span className="context-label">平台</span>
