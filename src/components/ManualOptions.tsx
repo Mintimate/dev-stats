@@ -28,8 +28,8 @@ export function ManualOptions({
   setPlatform: (platform: ManualConfig["platform"]) => void;
   resetOptions: () => void;
 }) {
-  const needsRepo = config.card === "pin" || config.card === "repo-languages";
-  const availableCardOptions = cardOptions.filter((option) => config.platform !== "cnb" || option.value !== "org");
+  const needsRepo = config.card === "pin" || config.card === "repo-languages" || config.card === "star-history";
+  const availableCardOptions = cardOptions.filter((option) => config.platform !== "cnb" || (option.value !== "org" && option.value !== "star-history"));
   // top-langs 与 repo-languages 都需要 layout 与 langs_count，合并为单一判定。
   const needsLangLayout = config.card === "top-langs" || config.card === "repo-languages";
   const needsActivityCount = config.card === "recent-activity";
@@ -132,7 +132,7 @@ export function ManualOptions({
               <span className="code-keyword">const</span> <span className="code-var">TARGET_REPOSITORY</span> = <span className="code-string">"</span>
               <label className="sr-only" htmlFor="repo">目标仓库名</label>
               <input id="repo" value={config.repo} placeholder="e.g. dev-stats" autoComplete="off" onChange={(event) => updateConfig({ repo: event.target.value })} />
-              <span className="code-string">"</span><span className="code-operator">;</span> <span className="code-comment">// 关联的具体项目仓库名</span>
+              <span className="code-string">"</span><span className="code-operator">;</span> <span className="code-comment">// {config.card === "star-history" ? "仅支持部署环境 STAR_HISTORY_OWNER 的仓库" : "关联的具体项目仓库名"}</span>
             </div>
           </div>
         )}

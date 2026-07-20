@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -232,6 +233,60 @@ func handleRepoLanguages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["repoLanguages"]), card.RenderRepoLanguagesCard(data, card.OptionsFromQuery(q)))
+}
+
+func handleStarHistory(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	username, repo := strings.TrimSpace(q.Get("username")), strings.TrimSpace(q.Get("repo"))
+	if username == "" || repo == "" {
+		writeSVGError(w, "Missing username or repo", "Use /api/star-history?username=OWNER&repo=REPO")
+		return
+	}
+	configuredOwner := strings.TrimSpace(os.Getenv("STAR_HISTORY_OWNER"))
+	if configuredOwner == "" {
+		writeSVGError(w, "Star History is not configured", "Self-host and set STAR_HISTORY_OWNER")
+		return
+	}
+	if !strings.EqualFold(username, configuredOwner) {
+		writeSVGError(w, "Star History is owner-only", "This deployment only serves "+configuredOwner+" repositories")
+		return
+	}
+	if !validGitHubOwner(username) || !validGitHubRepository(repo) {
+		writeSVGError(w, "Invalid repository", "Use a valid GitHub owner and repository name")
+		return
+	}
+
+	maxRequests := parseIntDefault(os.Getenv("STAR_HISTORY_MAX_REQUESTS"), 12)
+	data, err := service.NewClient().FetchStarHistory(r.Context(), username, repo, maxRequests)
+	if err != nil {
+		writeSVGError(w, err.Error(), "GitHub Star History request failed")
+		return
+	}
+	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["starHistory"]), card.RenderStarHistoryCard(data, card.OptionsFromQuery(q)))
+}
+
+func validGitHubOwner(value string) bool {
+	if len(value) < 1 || len(value) > 39 || value[0] == '-' || value[len(value)-1] == '-' || strings.Contains(value, "--") {
+		return false
+	}
+	for _, char := range value {
+		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-') {
+			return false
+		}
+	}
+	return true
+}
+
+func validGitHubRepository(value string) bool {
+	if len(value) < 1 || len(value) > 100 || value == "." || value == ".." || strings.Contains(value, "/") {
+		return false
+	}
+	for _, char := range value {
+		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-' || char == '_' || char == '.') {
+			return false
+		}
+	}
+	return true
 }
 
 func handleOrganization(w http.ResponseWriter, r *http.Request) {

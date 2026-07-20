@@ -14,13 +14,13 @@ export function useManualStats() {
 
   const validationMessage = useMemo(() => {
     if (!config.username.trim()) return "请输入开发者或组织用户名后再生成预览。";
-    if ((config.card === "pin" || config.card === "repo-languages") && !config.repo.trim()) {
+    if ((config.card === "pin" || config.card === "repo-languages" || config.card === "star-history") && !config.repo.trim()) {
       return "当前卡片需要填写目标仓库名。";
     }
     return "";
   }, [config.card, config.repo, config.username]);
   const previewIsValid = previewConfig.username.trim()
-    && (!(previewConfig.card === "pin" || previewConfig.card === "repo-languages") || previewConfig.repo.trim());
+    && (!(previewConfig.card === "pin" || previewConfig.card === "repo-languages" || previewConfig.card === "star-history") || previewConfig.repo.trim());
   const previewUrl = useMemo(() => previewIsValid ? buildStatsUrl(previewConfig) : "", [previewConfig, previewIsValid]);
   const markdown = useMemo(() => previewUrl ? buildMarkdown(previewConfig, previewUrl) : "", [previewConfig, previewUrl]);
   const profileUrl = useMemo(() => profileUrlFor(config), [config]);
@@ -33,7 +33,7 @@ export function useManualStats() {
     setConfig((current) => ({
       ...current,
       platform,
-      card: platform === "cnb" && current.card === "org" ? "stats" : current.card,
+      card: platform === "cnb" && (current.card === "org" || current.card === "star-history") ? "stats" : current.card,
     }));
   }
 

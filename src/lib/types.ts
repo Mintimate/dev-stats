@@ -13,6 +13,7 @@ export type CardType =
   | "recent-activity"
   | "pin"
   | "repo-languages"
+  | "star-history"
   | "org";
 
 export type ManualConfig = {

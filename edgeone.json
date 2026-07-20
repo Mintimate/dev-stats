@@ -50,6 +50,10 @@
       "cacheTtl": 86400
     },
     {
+      "source": "/api/star-history",
+      "cacheTtl": 86400
+    },
+    {
       "source": "/api/org",
       "cacheTtl": 86400
     },

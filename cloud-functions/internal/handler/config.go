@@ -15,5 +15,6 @@ var cachePolicies = map[string]cachePolicy{
 	"contributionCalendar": {Default: 12 * 60 * 60, Min: 60 * 60, Max: 2 * 24 * 60 * 60},
 	"recentActivity":       {Default: 60 * 60, Min: 5 * 60, Max: 12 * 60 * 60},
 	"repoLanguages":        {Default: 24 * 60 * 60, Min: 6 * 60 * 60, Max: 3 * 24 * 60 * 60},
+	"starHistory":          {Default: 24 * 60 * 60, Min: 60 * 60, Max: 7 * 24 * 60 * 60},
 	"organization":         {Default: 24 * 60 * 60, Min: 6 * 60 * 60, Max: 3 * 24 * 60 * 60},
 }

@@ -142,7 +142,7 @@ Click the button below to deploy:
 
 See [Tencent EdgeOne Makers Documentation](https://pages.edgeone.ai/en/document/product-introduction) for more details.
 
-> **Note**: GitHub requires `PAT_1`; public CNB data does not require a token. See [Environment Variables](#environment-variables).
+> **Note**: GitHub requires `GITHUB_TOKEN`; public CNB data does not require a token. See [Environment Variables](#environment-variables).
 
 ### Manual Deployment
 
@@ -164,6 +164,10 @@ GitHub requires a token; public CNB data does not:
 
 ### Optional Variables
 
+- **`STAR_HISTORY_OWNER`**: The only GitHub user or organization that `/api/star-history` may query, for example `Mintimate`
+  - The endpoint checks this owner before contacting GitHub, so a public deployment never queries arbitrary third-party stargazer details
+  - After forking, set it to your own GitHub user or organization and ensure `GITHUB_TOKEN` has admin or collaborator access to each target repository
+- **`STAR_HISTORY_MAX_REQUESTS`**: Maximum stargazer pages sampled for one Star History card; defaults to `12` and is clamped to `2`–`20`
 - **`CNB_API_TOKEN`**: CNB access token
   - Public cards use CNB's web JSON endpoints and do not require a token
   - The token is only a fallback for future restricted Open API features and is never sent to public web endpoints
@@ -209,7 +213,7 @@ This project returns `Cache-Control` headers from the functions and configures P
 - `/api/wakatime`: cached for 1 day by default
 - `/api/streak` and `/api/contribution-calendar`: cached for 12 hours by default
 - `/api/recent-activity`: cached for 1 hour by default
-- `/api/profile-summary`, `/api/repo-languages`, and `/api/org`: cached for 1 day by default
+- `/api/profile-summary`, `/api/repo-languages`, `/api/star-history`, and `/api/org`: cached for 1 day by default
 
 Status endpoints are not configured for platform caching, so PAT health and availability checks do not get cached for too long. High-traffic public instances can still place EdgeOne CDN / Cloudflare or another CDN layer in front of the custom domain for more cache control, purge support, and observability.
 
@@ -240,6 +244,7 @@ This project is a full-stack Web application:
 - `/api/contribution-calendar` - Contribution Calendar Card
 - `/api/recent-activity` - Recent Public Activity Card
 - `/api/repo-languages` - Repository Languages Card
+- `/api/star-history` - Owner-only Repository Star History Card
 - `/api/org` - GitHub Organization Stats Card
 - `/api/status/up` - PAT availability check
 - `/api/status/pat-info` - PAT status details
@@ -256,7 +261,24 @@ Add `platform=cnb` to a card URL to use CNB. GitHub remains the default, so exis
 ![CNB Repo](https://your-domain.example/api/pin?platform=cnb&username=yourusername&repo=group/repository)
 ```
 
-CNB currently supports `/api`, `/api/top-langs`, `/api/pin`, `/api/streak`, `/api/profile-summary`, `/api/contribution-calendar`, `/api/recent-activity`, and `/api/repo-languages`. Gists and organization stats have no equivalent data source and remain GitHub-only. CNB exposes primary/secondary languages rather than byte counts; language cards are weighted by repository occurrence.
+CNB currently supports `/api`, `/api/top-langs`, `/api/pin`, `/api/streak`, `/api/profile-summary`, `/api/contribution-calendar`, `/api/recent-activity`, and `/api/repo-languages`. Gists, Star History, and organization stats have no equivalent data source and remain GitHub-only. CNB exposes primary/secondary languages rather than byte counts; language cards are weighted by repository occurrence.
+
+### Star History (Owner Only)
+
+Starting in July 2026, GitHub limits [`/repos/{owner}/{repo}/stargazers`](https://github.blog/changelog/2026-06-30-upcoming-access-restrictions-to-public-api-endpoints-and-ui-views/) to repository admins and collaborators. Star History needs the endpoint's `starred_at` timestamps, so this project does not offer unrestricted public lookups. A deployment must set `STAR_HISTORY_OWNER`, and the endpoint only accepts repositories under that owner.
+
+After forking, configure self-hosting as follows:
+
+1. Create a fine-grained PAT, select only the repositories to display, and grant read-only repository **Metadata** permission; old no-scope tokens no longer work for this endpoint
+2. Set `GITHUB_TOKEN` to that token
+3. Set `STAR_HISTORY_OWNER` to your GitHub user or organization
+4. Redeploy, then embed:
+
+```md
+[![Star History](https://your-domain.example/api/star-history?username=yourusername&repo=yourrepo&theme=github_dark)](https://github.com/yourusername/yourrepo)
+```
+
+The server follows the bounded paging approach from [star-history/star-history](https://github.com/star-history/star-history): it reads every stargazer page for small repositories, samples evenly up to `STAR_HISTORY_MAX_REQUESTS` pages for large repositories, and appends the authoritative current star count. Tokens never appear in card URLs or README markup.
 
 ## Get GitHub Token (Classic)
 
@@ -290,6 +312,7 @@ After deployment, visit your EdgeOne Makers domain to see the usage documentatio
 - `/api/contribution-calendar` - Contribution Calendar Card
 - `/api/recent-activity` - Recent Public Activity Card
 - `/api/repo-languages` - Repository Languages Card
+- `/api/star-history` - Owner-only Repository Star History Card
 - `/api/org` - GitHub Organization Stats Card
 
 For detailed parameters, please refer to the [original project documentation](https://github.com/anuraghazra/github-readme-stats/blob/master/readme.md).
@@ -301,6 +324,7 @@ Copy the following code to your README file (replace with your domain and userna
 ```md
 ![GitHub Stats](https://your-project.pages.dev/api?username=yourusername&show_icons=true)
 ![Top Languages](https://your-project.pages.dev/api/top-langs?username=yourusername&layout=compact)
+![Star History](https://your-project.pages.dev/api/star-history?username=yourusername&repo=yourrepo&theme=github_dark)
 ```
 
 For more styling and parameter configurations (environment variables), please refer to the [original project documentation](https://github.com/anuraghazra/github-readme-stats#customization).
@@ -309,6 +333,7 @@ For more styling and parameter configurations (environment variables), please re
 
 - [Original Repository](https://github.com/anuraghazra/github-readme-stats) - anuraghazra/github-readme-stats
 - [ghfind](https://github.com/hikariming/ghfind) - Inspiration for AI Stats Agent developer profile analysis
+- [Star History](https://github.com/star-history/star-history) - Reference for bounded star-history paging and chart design
 - [EdgeOne Makers Documentation](https://pages.edgeone.ai/en/document/product-introduction)
 - [EdgeOne Makers Console](https://console.cloud.tencent.com/edgeone/pages)
 

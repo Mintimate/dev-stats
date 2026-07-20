@@ -31,6 +31,7 @@ export const cardOptions: Array<{ value: CardType; label: string }> = [
   { value: "recent-activity", label: "最近动态 (Recent Activity)" },
   { value: "pin", label: "置顶仓库卡片 (Pinned Repo)" },
   { value: "repo-languages", label: "单仓语言分布 (Repo Languages)" },
+  { value: "star-history", label: "Star 增长曲线 (Star History)" },
   { value: "org", label: "组织机构卡片 (Organization)" },
 ];
 
@@ -71,6 +72,7 @@ export const cardMetadata: Record<string, { name: string; desc: string }> = {
   org: { name: "Organization Card", desc: "组织机构卡片：展示参与/拥有的组织标志与主页概览。" },
   pin: { name: "Pinned Repo", desc: "精品仓库展示：置顶指定项目仓库卡片及基本统计。" },
   "repo-languages": { name: "Repo Languages", desc: "单仓语言分布：细致分析单个仓库的各种语言占比。" },
+  "star-history": { name: "Star History", desc: "作者专属 Star 增长曲线：展示指定仓库的累计 Star 历史。" },
   "contribution-calendar": { name: "Contribution Calendar", desc: "贡献日历：展示近期公开贡献热力分布。" },
 };
 

@@ -42,7 +42,7 @@ export function buildStatsUrl(config: ManualConfig, cardOverride?: CardType) {
 
   if (card === "recent-activity") url.searchParams.set("activity_count", String(config.activity_count || 5));
 
-  if (card === "pin" || card === "repo-languages") {
+  if (card === "pin" || card === "repo-languages" || card === "star-history") {
     url.searchParams.set("repo", config.repo || "dev-stats");
   }
 
@@ -53,8 +53,9 @@ export function buildStatsUrl(config: ManualConfig, cardOverride?: CardType) {
 
 export function buildMarkdown(config: ManualConfig, url: string) {
   const label = `${config.platform} ${config.card}`;
-  const target =
-    config.platform === "cnb"
+  const target = config.platform === "github" && config.card === "star-history"
+    ? `https://github.com/${encodeURIComponent(config.username || "")}/${encodeURIComponent(config.repo || "")}`
+    : config.platform === "cnb"
       ? `https://cnb.cool/u/${encodeURIComponent(config.username || "")}`
       : `https://github.com/${encodeURIComponent(config.username || "")}`;
   return `[![${label}](${url})](${target})`;
@@ -63,7 +64,7 @@ export function buildMarkdown(config: ManualConfig, url: string) {
 export function recipeCards(recipe: StatsRecipe): CardType[] {
   const cards = recipe.cards?.length ? recipe.cards : ["stats" as CardType];
   const platform = recipe.platform || "github";
-  const supported = cards.filter((card) => platform !== "cnb" || card !== "org");
+  const supported = cards.filter((card) => platform !== "cnb" || (card !== "org" && card !== "star-history"));
   const uniqueCards = Array.from(new Set(supported)).slice(0, 4);
   return uniqueCards.length ? uniqueCards : ["stats" as CardType];
 }
@@ -89,7 +90,7 @@ export function recipeToConfig(recipe: StatsRecipe, fallback: ManualConfig): Man
     ...fallback,
     platform,
     username: recipe.username || fallback.username,
-    card: platform === "cnb" && requestedCard === "org" ? "stats" : requestedCard,
+    card: platform === "cnb" && (requestedCard === "org" || requestedCard === "star-history") ? "stats" : requestedCard,
     theme: recipe.theme || fallback.theme,
     repo: String(options.repo || fallback.repo),
     custom_title: String(options.custom_title || fallback.custom_title),

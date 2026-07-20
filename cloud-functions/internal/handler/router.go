@@ -34,6 +34,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		handleRecentActivity(w, r)
 	case "/repo-languages":
 		handleRepoLanguages(w, r)
+	case "/star-history":
+		handleStarHistory(w, r)
 	case "/org":
 		handleOrganization(w, r)
 	case "/status/up":

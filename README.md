@@ -142,7 +142,7 @@ Agent 功能需要额外配置大模型访问令牌：
 
 查看 [腾讯云 EdgeOne Makers 文档](https://pages.edgeone.ai/zh/document/product-introduction) 了解更多详情。
 
-> **注意**：GitHub 数据源需要 `PAT_1`；CNB 公开数据源无需令牌。详见 [环境变量配置](#环境变量配置)。
+> **注意**：GitHub 数据源需要 `GITHUB_TOKEN`；CNB 公开数据源无需令牌。详见 [环境变量配置](#环境变量配置)。
 
 ### 手动部署
 
@@ -164,6 +164,10 @@ GitHub 数据源需要令牌，CNB 公开数据源无需令牌：
 
 ### 可选环境变量
 
+- **`STAR_HISTORY_OWNER`**：启用 Star History 时允许查询的唯一 GitHub 用户或组织，例如 `Mintimate`
+  - `/api/star-history` 会在请求 GitHub 前校验 owner，公共实例不会替任意第三方仓库查询 Stargazer 明细
+  - Fork 自部署后请改为你自己的 GitHub 用户名或组织名，并确保 `GITHUB_TOKEN` 对目标仓库具有管理员或协作者访问权限
+- **`STAR_HISTORY_MAX_REQUESTS`**：单张 Star History 卡片最多采样的 Stargazer 分页数，默认 `12`，范围 `2`–`20`
 - **`CNB_API_TOKEN`**：CNB 访问令牌
   - 公开卡片通过 CNB 主站 Web JSON 接口读取，不要求令牌
   - 令牌仅作为未来受限 Open API 功能的后备，不会随主站公开请求发送
@@ -209,7 +213,7 @@ https://your-domain.example/api/auth/tdp/callback
 - `/api/wakatime`：默认缓存 1 天
 - `/api/streak`、`/api/contribution-calendar`：默认缓存 12 小时
 - `/api/recent-activity`：默认缓存 1 小时
-- `/api/profile-summary`、`/api/repo-languages`、`/api/org`：默认缓存 1 天
+- `/api/profile-summary`、`/api/repo-languages`、`/api/star-history`、`/api/org`：默认缓存 1 天
 
 状态接口不会配置平台缓存，避免 PAT 状态、可用性检查等动态结果被长期缓存。高流量公开实例仍可在自定义域名前增加 EdgeOne CDN / Cloudflare 等 CDN 层，用于更细粒度的缓存命中、清理和观测。
 
@@ -240,6 +244,7 @@ https://your-domain.example/api/auth/tdp/callback
 - `/api/contribution-calendar` - 年度贡献日历卡片
 - `/api/recent-activity` - 最近公开动态卡片
 - `/api/repo-languages` - 指定仓库语言占比卡片
+- `/api/star-history` - 作者专属仓库 Star 历史曲线
 - `/api/org` - GitHub 组织统计卡片
 - `/api/status/up` - PAT 可用性检查
 - `/api/status/pat-info` - PAT 状态详情
@@ -256,7 +261,24 @@ Go Cloud Functions 是当前主实现，Node Functions 已移除。当前 Go 版
 ![CNB Repo](https://your-domain.example/api/pin?platform=cnb&username=yourusername&repo=group/repository)
 ```
 
-CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/profile-summary`、`/api/contribution-calendar`、`/api/recent-activity` 和 `/api/repo-languages`。Gist 与组织统计没有等价数据源，继续仅支持 GitHub。CNB 语言接口只提供主/次语言而非字节数，语言卡按仓库出现次数加权。
+CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/profile-summary`、`/api/contribution-calendar`、`/api/recent-activity` 和 `/api/repo-languages`。Gist、Star History 与组织统计没有等价数据源，继续仅支持 GitHub。CNB 语言接口只提供主/次语言而非字节数，语言卡按仓库出现次数加权。
+
+### Star History（作者专属）
+
+GitHub 自 2026 年 7 月起将 [`/repos/{owner}/{repo}/stargazers`](https://github.blog/changelog/2026-06-30-upcoming-access-restrictions-to-public-api-endpoints-and-ui-views/) 限制为仅仓库管理员和协作者可访问。Star History 依赖该接口返回的 `starred_at` 时间，因此本项目不提供任意仓库的公共查询：部署者必须设置 `STAR_HISTORY_OWNER`，接口只接受这个 owner 下的仓库。
+
+Fork 后自部署的配置步骤：
+
+1. 创建 Fine-grained PAT，只选择需要展示的仓库，并授予只读 **Metadata** 仓库权限；无 scope 的旧 Token 已无法用于该接口
+2. 设置 `GITHUB_TOKEN` 为该 Token
+3. 设置 `STAR_HISTORY_OWNER` 为你的 GitHub 用户或组织名
+4. 重新部署后使用：
+
+```md
+[![Star History](https://your-domain.example/api/star-history?username=yourusername&repo=yourrepo&theme=github_dark)](https://github.com/yourusername/yourrepo)
+```
+
+服务端参考 [star-history/star-history](https://github.com/star-history/star-history) 的有界分页策略：小仓库读取完整 Stargazer 页，大仓库在最多 `STAR_HISTORY_MAX_REQUESTS` 页内均匀采样，并用仓库当前 Star 总数补齐终点。Token 永远不会进入卡片 URL 或 README。
 
 ## 获取 GitHub Token（Classic）
 
@@ -290,6 +312,7 @@ CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/
 - `/api/contribution-calendar` - 年度贡献日历卡片
 - `/api/recent-activity` - 最近公开动态卡片
 - `/api/repo-languages` - 指定仓库语言占比卡片
+- `/api/star-history` - 作者专属仓库 Star 历史曲线
 - `/api/org` - GitHub 组织统计卡片
 
 详细参数请参考 [原项目文档](https://github.com/anuraghazra/github-readme-stats/blob/master/readme.md)。
@@ -301,6 +324,7 @@ CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/
 ```md
 ![GitHub Stats](https://your-project.pages.dev/api?username=yourusername&show_icons=true)
 ![Top Languages](https://your-project.pages.dev/api/top-langs?username=yourusername&layout=compact)
+![Star History](https://your-project.pages.dev/api/star-history?username=yourusername&repo=yourrepo&theme=github_dark)
 ```
 
 更多样式和参数配置(环境变量)请参考 [原项目文档](https://github.com/anuraghazra/github-readme-stats#customization)。
@@ -309,6 +333,7 @@ CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/
 
 - [原项目仓库](https://github.com/anuraghazra/github-readme-stats) - anuraghazra/github-readme-stats
 - [ghfind](https://github.com/hikariming/ghfind) - AI Stats Agent 开发者画像分析灵感来源
+- [Star History](https://github.com/star-history/star-history) - Star 历史分页与图表设计参考
 - [EdgeOne Makers 文档](https://pages.edgeone.ai/zh/document/product-introduction)
 - [EdgeOne Makers 控制台](https://console.cloud.tencent.com/edgeone/pages)
 
