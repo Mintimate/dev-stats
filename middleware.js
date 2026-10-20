@@ -1,12 +1,22 @@
-/**
- * 将 /u/:platform/:username 独立用户主页路径透明重写到 index.html，
- * 由前端 main.tsx 根据 pathname 判断渲染 UserPage 还是主工坊 App。
- * 仅作用于 /u/* 路径，其余路由（静态资源、/chat、/profile、/leaderboard 等）不受影响。
- */
+import { isPrivatePath } from './scripts/static-file-policy.mjs';
+
+// Run before every route, including static files accidentally included in a deployment.
 export const config = {
-  matcher: ['/u/:path*'],
+  matcher: ['/:path*'],
 };
 
 export function middleware(context) {
-  return context.rewrite('/index.html');
+  const { pathname } = new URL(context.request.url);
+  if (isPrivatePath(pathname)) {
+    return new Response('Not Found', {
+      status: 404,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  }
+  if (pathname.startsWith('/u/')) return context.rewrite('/index.html');
+  return context.next();
 }
