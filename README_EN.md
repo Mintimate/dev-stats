@@ -142,7 +142,7 @@ Click the button below to deploy:
 
 See [Tencent EdgeOne Makers Documentation](https://pages.edgeone.ai/en/document/product-introduction) for more details.
 
-> **Note**: GitHub requires `PAT_1`; public CNB data does not require a token. See [Environment Variables](#environment-variables).
+> **Note**: GitHub cards require `GITHUB_TOKEN`. Prefer a fine-grained PAT with read-only access to public repositories; public CNB data does not require a token. See [Environment Variables](#environment-variables).
 
 ### Manual Deployment
 
@@ -153,14 +153,14 @@ See [Tencent EdgeOne Makers Documentation](https://pages.edgeone.ai/en/document/
 
 ## Environment Variables
 
-GitHub requires a token; public CNB data does not:
+GitHub cards use GraphQL and require a token. The Agent's public REST queries can run anonymously with lower rate limits. Public CNB data does not require a token:
 
 ### Required Variables
 
 - **`GITHUB_TOKEN`**: GitHub Personal Access Token
-  - Used to call GitHub API to fetch user statistics
-  - See [Get GitHub Token](#get-github-token-classic) below for how to obtain
-  - Supports multiple tokens (`GITHUB_TOKEN_1`, `GITHUB_TOKEN_2`, etc.) to increase rate limits
+  - Reads public statistics; repository write access and private repository access are unnecessary
+  - See [Get GitHub Token](#get-github-token-minimum-permissions) below
+  - Optional `GITHUB_TOKEN_1`, `GITHUB_TOKEN_2`, etc. provide fallback tokens for the card service after authentication failures or rate limits; the Agent uses the first configured token. Multiple PATs for one account share its quota and do not increase it ([GitHub rate limits](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api))
 
 ### Optional Variables
 
@@ -258,21 +258,33 @@ Add `platform=cnb` to a card URL to use CNB. GitHub remains the default, so exis
 
 CNB currently supports `/api`, `/api/top-langs`, `/api/pin`, `/api/streak`, `/api/profile-summary`, `/api/contribution-calendar`, `/api/recent-activity`, and `/api/repo-languages`. Gists and organization stats have no equivalent data source and remain GitHub-only. CNB exposes primary/secondary languages rather than byte counts; language cards are weighted by repository occurrence.
 
-## Get GitHub Token (Classic)
+## Get GitHub Token (Minimum Permissions)
 
-1. Go to [Account -> Settings -> Developer Settings -> Personal access tokens -> Tokens (classic)](https://github.com/settings/tokens)
-2. Click `Generate new token -> Generate new token (classic)`
-3. Check the required permissions:
-   - `repo`
-   - `read:user`
-4. Generate and copy the token (set `GITHUB_TOKEN` equal to this token value in EdgeOne Makers environment variables)
+Use a **fine-grained PAT with public repository access and no additional permissions** by default:
+
+1. Create a dedicated token in [Fine-grained personal access tokens](https://github.com/settings/personal-access-tokens/new) and set an expiration date.
+2. Set `Repository access` to `Public repositories only`; do not select private repositories.
+3. Add no repository, organization, or account permissions. Keep GitHub's built-in read-only access to public resources.
+4. Save the token as the server-side `GITHUB_TOKEN` environment variable in EdgeOne Makers. Keep it out of frontend code and static deployment directories.
+
+GitHub grants fine-grained PATs read access to all public repositories. Public statistics in this project do not require `repo` or `read:user`. See [PAT management](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) and [GraphQL authentication](https://docs.github.com/en/graphql/guides/forming-calls-with-graphql).
+
+If you must use a Classic PAT, GitHub's GraphQL documentation calls for `public_repo` to access public repositories. This scope also grants public repository write access, so prefer the fine-grained option above. Do not grant full `repo`, organization administration, or `gist` write access. Consider `read:user` separately only if private/internal contribution statistics are needed, subject to GitHub's visibility settings; public statistics do not require it. See [scope definitions](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps) and [contribution fields](https://docs.github.com/en/graphql/reference/users#contributionscollection).
+
+If a deployment exposed `/.env`, immediately revoke and replace every credential it contained, including GitHub PATs, LLM API keys, OIDC client secrets, and cookie secrets. Deleting the file or redeploying does not invalidate old credentials. Update the platform environment variables, redeploy, and purge cached sensitive files and any older deployments that remain accessible.
+
+This hardening leaves the Blob store name, keys, JSON structure, and cache read/write logic unchanged. Existing profiles and rankings retain their original behavior. Public-resource filtering applies to subsequent GitHub API collection; it does not automatically sanitize historical caches. If a historical result is confirmed to contain private data, clear and regenerate that user’s affected data.
 
 ## Deploy to EdgeOne Makers
 
 1. Log in to Tencent EdgeOne console and create a new Pages project
-2. Select GitHub as the code source and link this repository; or directly download the repository and manually upload to EdgeOne Makers (will automatically trigger deployment)
+2. Select GitHub as the code source and link this repository, using `npm run build` as the build command and `dist` as the static output directory
 3. Set `GITHUB_TOKEN` to the GitHub Token obtained in the previous step in the project's environment variables
 4. Since EdgeOne Makers loads environment variables after deployment, you need to trigger another deployment after configuration for the variables to take effect
+
+For local deployment, use `edgeone makers deploy --name dev-stats` so the CLI builds before publishing. Do not pass `.` or the project root, or upload the source directory as static files. `.gitignore` cannot prevent a static server from serving files already published. `npm run build` checks `public/` and `dist/` before and after building and rejects environment files, source directories, private keys, source maps, and symlinks; the middleware also blocks sensitive paths on every route. After `edgeone makers build`, run `npm run check:deployment` to additionally check the generated static artifacts and middleware coverage.
+
+The verified EdgeOne CLI 1.6.42 local development middleware behaves differently from production, so local responses alone do not validate production protection. Check the generated deployment before publishing, then verify that sensitive paths such as `/.env` and `/.git/config` return 404.
 
 ## Usage
 

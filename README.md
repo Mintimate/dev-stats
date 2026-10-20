@@ -142,7 +142,7 @@ Agent 功能需要额外配置大模型访问令牌：
 
 查看 [腾讯云 EdgeOne Makers 文档](https://pages.edgeone.ai/zh/document/product-introduction) 了解更多详情。
 
-> **注意**：GitHub 数据源需要 `PAT_1`；CNB 公开数据源无需令牌。详见 [环境变量配置](#环境变量配置)。
+> **注意**：GitHub 卡片需要 `GITHUB_TOKEN`，推荐只允许读取公开仓库的 fine-grained PAT；CNB 公开数据源无需令牌。详见 [环境变量配置](#环境变量配置)。
 
 ### 手动部署
 
@@ -153,14 +153,14 @@ Agent 功能需要额外配置大模型访问令牌：
 
 ## 环境变量配置
 
-GitHub 数据源需要令牌，CNB 公开数据源无需令牌：
+GitHub 卡片使用 GraphQL，需要令牌；Agent 的公开 REST 查询可以匿名访问，但速率限制更低。CNB 公开数据源无需令牌：
 
 ### 必需环境变量
 
 - **`GITHUB_TOKEN`**：GitHub 个人访问令牌（Personal Access Token）
-  - 用于调用 GitHub API 获取用户统计数据
-  - 获取方式见下方 [获取 GitHub Token](#获取-github-tokenclassic)
-  - 支持配置多个 token（`GITHUB_TOKEN_1`、`GITHUB_TOKEN_2` 等）以提高速率限制
+  - 用于读取公开统计数据，无需仓库写入权限或私有仓库访问权限
+  - 获取方式见下方 [获取 GitHub Token](#获取-github-token最小权限)
+  - 可配置 `GITHUB_TOKEN_1`、`GITHUB_TOKEN_2` 等备用令牌，卡片服务会在认证失效或限流时尝试下一个；Agent 使用第一个已配置的令牌。同一账号的多个 PAT 共享账号限额，不会叠加配额（[GitHub 限流说明](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api)）
 
 ### 可选环境变量
 
@@ -258,21 +258,33 @@ Go Cloud Functions 是当前主实现，Node Functions 已移除。当前 Go 版
 
 CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/profile-summary`、`/api/contribution-calendar`、`/api/recent-activity` 和 `/api/repo-languages`。Gist 与组织统计没有等价数据源，继续仅支持 GitHub。CNB 语言接口只提供主/次语言而非字节数，语言卡按仓库出现次数加权。
 
-## 获取 GitHub Token（Classic）
+## 获取 GitHub Token（最小权限）
 
-1. 进入 [Account -> Settings -> Developer Settings -> Personal access tokens -> Tokens (classic)](https://github.com/settings/tokens)
-2. 点击 `Generate new token -> Generate new token (classic)`
-3. 勾选权限：
-   - `repo`
-   - `read:user`
-4. 生成并复制 token（在 EdgeOne Makers 的环境变量中设置 `GITHUB_TOKEN` 等于这个 token 值）
+默认推荐 **fine-grained PAT，仅访问公开仓库，不添加额外权限**：
+
+1. 进入 [Fine-grained personal access tokens](https://github.com/settings/personal-access-tokens/new)，创建项目专用令牌并设置有效期。
+2. `Repository access` 选择 `Public repositories only`，不要选择私有仓库。
+3. 不添加仓库、组织或账号权限，保留 GitHub 自动提供的公开资源只读访问。
+4. 将令牌保存到 EdgeOne Makers 的服务端环境变量 `GITHUB_TOKEN`。不要将令牌放入前端源码或静态发布目录。
+
+GitHub 官方说明 fine-grained PAT 默认包含所有公开仓库的只读访问；本项目的公开统计无需 `repo` 或 `read:user`。参见 [PAT 权限管理](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) 和 [GraphQL 认证](https://docs.github.com/en/graphql/guides/forming-calls-with-graphql)。
+
+如果必须使用 Classic PAT，GitHub 的 GraphQL 文档要求公开仓库访问使用 `public_repo`；它仍包含公开仓库写入能力，因此优先使用上面的 fine-grained 方案。不要授予完整 `repo`、组织管理或 `gist` 写入权限。`read:user` 仅在确实需要私有/内部贡献统计时另行评估，并受 GitHub 可见性设置限制；它不是公开统计的必需权限。参见 [Scope 定义](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps) 和 [贡献统计字段](https://docs.github.com/en/graphql/reference/users#contributionscollection)。
+
+若部署曾暴露 `/.env`，应立即撤销并更换其中的全部凭据，包括 GitHub PAT、大模型 API Key、OIDC Client Secret 和 Cookie Secret；只删除文件或重新部署无法让旧凭据失效。更新平台环境变量后重新部署，并清理 CDN 中已缓存的敏感文件及仍可访问的旧部署。
+
+本次加固不调整 Blob 存储名称、路径、JSON 结构和缓存读写逻辑，已有画像与榜单沿用原有处理方式。GitHub 公开资源过滤作用于后续 API 采集，不会自动清洗历史缓存。若确认某个历史结果包含私有数据，应针对该用户清理并重新分析。
 
 ## 部署到 EdgeOne Makers
 
 1. 登录腾讯云 EdgeOne 控制台，创建新的 Pages 项目
-2. 选择 GitHub 作为代码源并关联本仓库；或直接下载仓库后在 EdgeOne Makers 手动上传（会自动触发部署）
+2. 选择 GitHub 作为代码源并关联本仓库，构建命令使用 `npm run build`，静态输出目录使用 `dist`
 3. 在项目的环境变量中设置 `GITHUB_TOKEN` 为上一步获取的 GitHub Token
 4. 由于 EdgeOne Makers 在部署后加载环境变量，设置完成后需要再次触发部署使变量生效
+
+本地发布使用 `edgeone makers deploy --name dev-stats`，让 CLI 先构建再发布；不要传入 `.` 或项目根目录，也不要把整个源码目录作为静态文件上传。`.gitignore` 不能阻止静态服务器读取已发布的文件。`npm run build` 会在构建前后检查 `public/` 和 `dist/`，拒绝环境变量文件、源码目录、私钥、source map 和符号链接；全站中间件也会拦截敏感路径。运行 `edgeone makers build` 后，可用 `npm run check:deployment` 额外检查生成的静态产物及中间件覆盖范围。
+
+当前已核对的 EdgeOne CLI 1.6.42 本地开发中间件与生产运行存在差异，本地响应不能证明生产防护已生效。发布前应执行产物检查，发布后确认 `/.env`、`/.git/config` 等敏感路径返回 404。
 
 ## 使用说明
 
