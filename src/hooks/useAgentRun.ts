@@ -3,14 +3,13 @@ import { emptyToolchain } from "../lib/constants";
 import {
   buildAgentMessage,
   captureRecipe,
-  completedToolchain,
   ghostResult,
   narrativeForTool,
   normalizeReadmeResult,
   normalizeToolName,
   parseUserProfileFromTool,
   recipeFromEvent,
-  updateToolchainState,
+  toolchainKey,
 } from "../lib/agentLogic";
 import { profileUrlFor } from "../lib/statsUrl";
 import type {
@@ -35,6 +34,15 @@ const initialEvents: EventLine[] = [
 ];
 
 const cacheTtlMs = 24 * 60 * 60 * 1000;
+type AnalysisTarget = Pick<ManualConfig, "platform" | "username">;
+
+function recipeForTarget(recipe: StatsRecipe, target: AnalysisTarget): StatsRecipe {
+  return {
+    ...recipe,
+    platform: recipe.platform || target.platform,
+    username: recipe.username || target.username,
+  };
+}
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -71,6 +79,9 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
   const [elapsed, setElapsed] = useState("00.0s");
   const [usage, setUsage] = useState<Usage | null>(null);
   const [result, setResult] = useState<AgentResult>({ kind: "none" });
+  const [resultTarget, setResultTarget] = useState<AnalysisTarget | null>(null);
+  const [runTarget, setRunTarget] = useState<AnalysisTarget | null>(null);
+  const [resultRunId, setResultRunId] = useState("");
   const [toolchain, setToolchain] = useState<ToolchainState>(emptyToolchain);
   const [lastRecipe, setLastRecipe] = useState<StatsRecipe | null>(null);
   const [lastMode, setLastMode] = useState<AgentMode | null>(null);
@@ -90,6 +101,9 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
   const profileRef = useRef<UserProfile | null>(null);
   const lastNarrativeRef = useRef("");
   const hasResultRef = useRef(false);
+  const statusRef = useRef<AgentStatus>("idle");
+  const recipeRef = useRef<StatsRecipe | null>(null);
+  const activeRunIdRef = useRef("");
 
   useEffect(() => {
     setAgentUsernameState(config.username);
@@ -106,18 +120,35 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     addEvent(command, text, type, key);
   }
 
-  function resetRunPanel() {
+  function updateStatus(next: AgentStatus) {
+    statusRef.current = next;
+    setStatus(next);
+  }
+
+  function recordToolStatus(name: string, next: "active" | "completed") {
+    const key = toolchainKey(normalizeToolName(name));
+    if (key) setToolchain((current) => ({ ...current, [key]: next }));
+  }
+
+  function resetRunPanel(preserveResult = false) {
     assistantTextRef.current = "";
     profileRef.current = null;
     lastNarrativeRef.current = "";
     hasResultRef.current = false;
+    recipeRef.current = null;
     setEvents(initialEvents);
     setProgress("等待输入目标，别急，终端还没开始发热。");
-    setStatus("idle");
+    updateStatus("idle");
     setRunId("");
     setElapsed("00.0s");
     setUsage(null);
-    setResult({ kind: "none" });
+    if (!preserveResult) {
+      setResult({ kind: "none" });
+      setResultTarget(null);
+      setResultRunId("");
+      setLastRecipe(null);
+      setRunTarget(null);
+    }
     setToolchain(emptyToolchain);
     clearCacheBadges();
   }
@@ -154,6 +185,9 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     const data = normalizeReadmeResult(event, activeConfig, profileRef.current, assistantTextRef.current);
     hasResultRef.current = true;
     setResult({ kind: "readme", data });
+    setResultTarget({ platform: activeConfig.platform, username: activeConfig.username });
+    setResultRunId(activeRunIdRef.current);
+    setLastRecipe(recipeRef.current);
     addNarrative(
       "RENDER",
       data.is_ghost ? "已装配查无此人幽默占位图，请检查拼写。" : "README Markdown 已生成，复制就能塞进仓库门面并支持分享。",
@@ -162,11 +196,13 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     );
   }
 
-  function finishWithStats(recipe: StatsRecipe, summary = "") {
+  function finishWithStats(recipe: StatsRecipe, activeConfig: ManualConfig, summary = "") {
     hasResultRef.current = true;
     setLastRecipe(recipe);
     setResult({ kind: "stats", recipe, summary: summary || recipe.rationale || "Recommended stats configuration ready." });
-    setToolchain(completedToolchain());
+    setResultTarget({ platform: activeConfig.platform, username: activeConfig.username });
+    setResultRunId(activeRunIdRef.current);
+    recordToolStatus("compose_stats_recipe", "completed");
     addNarrative("RENDER", `Stats 预览已装配：${recipe.cards?.join(", ") || "卡片配方"}。`, "ok", "stats:render");
   }
 
@@ -220,23 +256,33 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     } else if (event.type === "thinking") {
       addNarrative("STATUS", "Agent 已上线，正在整理工具箱和上下文。", "ok", "agent:thinking");
     } else if (event.type === "tool_call" || event.type === "tool_called") {
-      setToolchain((current) => updateToolchainState(current, String(event.name || ""), "active"));
+      recordToolStatus(String(event.name || ""), "active");
       addNarrative("RUNNING", narrativeForTool(String(event.name || ""), "start"), "", `tool:${normalizeToolName(String(event.name || ""))}:start`);
     } else if (event.type === "tool_result") {
       const name = String(event.name || "");
-      setToolchain((current) => updateToolchainState(current, name, "completed"));
-      const recipe = captureRecipe({ name, content: String(event.content || "") });
+      recordToolStatus(name, "completed");
+      const capturedRecipe = captureRecipe({ name, content: String(event.content || "") });
+      const recipe = capturedRecipe ? recipeForTarget(capturedRecipe, activeConfig) : null;
       if (recipe) {
-        setLastRecipe(recipe);
+        recipeRef.current = recipe;
+        if (hasResultRef.current) setLastRecipe(recipe);
       }
       const profile = parseUserProfileFromTool({ name, content: String(event.content || "") });
       if (profile) profileRef.current = profile;
       addNarrative("OK", narrativeForTool(name, "done"), "ok", `tool:${normalizeToolName(name)}:done`);
     } else if (event.type === "stats_recipe") {
-      const recipe = recipeFromEvent(event);
-      if (recipe) finishWithStats(recipe, String(event.rationale || recipe.rationale || ""));
+      const eventRecipe = recipeFromEvent(event);
+      const recipe = eventRecipe ? recipeForTarget(eventRecipe, activeConfig) : null;
+      if (recipe) {
+        recipeRef.current = recipe;
+        if (activeConfig.agent_mode === "stats") {
+          finishWithStats(recipe, activeConfig, String(event.rationale || recipe.rationale || ""));
+        } else if (hasResultRef.current) {
+          setLastRecipe(recipe);
+        }
+      }
     } else if (event.type === "readme_draft") {
-      setToolchain(completedToolchain());
+      recordToolStatus("compose_readme_draft", "completed");
       finishWithReadme(event, activeConfig);
     } else if (event.type === "usage") {
       const nextUsage = {
@@ -249,19 +295,21 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     } else if (event.type === "leaderboard_updated") {
       window.dispatchEvent(new CustomEvent("devstats:leaderboard-updated"));
     } else if (event.type === "refresh_joined") {
-      setStatus("stopped");
+      updateStatus("stopped");
+      setGlobalStatus({ label: "已有分析任务运行中" });
       addNarrative("WAIT", "同一目标已有分析任务在运行，本次已自动合并，请稍后重新载入结果。", "ok", "refresh:joined");
     } else if (event.type === "error_message") {
       const message = String(event.content || "Agent error");
       if (hasResultRef.current && /Max turns/i.test(message)) {
-        setStatus("done");
+        updateStatus("done");
         addNarrative("DONE", "结果已经生成，模型多跑的尾巴已忽略。", "ok", "agent:max-turns-soft");
       } else {
-        setStatus("error");
-        addNarrative("ERROR", message, "error", "agent:error");
         if (message.includes("不存在 (404)")) {
           finishWithReadme(ghostResult(activeConfig.username || "GhostDeveloper"), activeConfig);
         }
+        updateStatus("error");
+        addNarrative("ERROR", message, "error", "agent:error");
+        setGlobalStatus({ label: "分析失败", tone: "is-error" });
       }
     }
   }
@@ -271,17 +319,21 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     forceReanalyze = false,
     overrides?: { platform?: ManualConfig["platform"]; username?: string }
   ) {
+    if (controllerRef.current && statusRef.current === "running") return;
+    controllerRef.current?.abort();
     const targetPlatform = overrides?.platform || config.platform;
     const targetUsername = (overrides?.username !== undefined ? overrides.username : agentUsername).trim() || "Mintimate";
     const activeConfig = { ...config, platform: targetPlatform, username: targetUsername, agent_mode: mode };
     syncUsername(activeConfig.username);
     setLastMode(mode);
-    resetRunPanel();
+    resetRunPanel(true);
+    setRunTarget({ platform: activeConfig.platform, username: activeConfig.username });
 
     const activeRunId = crypto.randomUUID();
+    activeRunIdRef.current = activeRunId;
     setRunId(activeRunId);
-    setStatus("running");
-    setGlobalStatus({ label: "Running", tone: "is-running" });
+    updateStatus("running");
+    setGlobalStatus({ label: "正在分析", tone: "is-running" });
     startTimer();
     addNarrative(
       "RUN",
@@ -317,41 +369,51 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
 
       while (true) {
         const { value, done } = await reader.read();
+        if (controllerRef.current !== controller || controller.signal.aborted) return;
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const parts = buffer.split("\n\n");
         buffer = parts.pop() || "";
         parts.forEach((chunk) => handleSsePart(chunk, activeConfig));
       }
+      buffer += decoder.decode();
+      if (buffer.trim()) handleSsePart(buffer, activeConfig);
     } catch (error) {
+      if (controllerRef.current !== controller) return;
       if ((error as Error).name !== "AbortError") {
         const message = (error as Error).message || String(error);
         if (hasResultRef.current && /Max turns/i.test(message)) {
-          setStatus("done");
+          updateStatus("done");
           addNarrative("DONE", "结果已经落盘，后续模型循环已被截断。", "ok", "run:max-turns-soft");
         } else {
-          setStatus("error");
+          updateStatus("error");
           addNarrative("ERROR", message, "error", "run:error");
-          setGlobalStatus({ label: "Error", tone: "is-error" });
+          setGlobalStatus({ label: "分析失败", tone: "is-error" });
         }
       }
     } finally {
-      controllerRef.current = null;
-      stopTimer();
-      setGlobalStatus({ label: "Ready" });
-      setStatus((current) => {
-        if (current === "running") {
-          addNarrative("DONE", "收工。该看的都看了，该吐的槽也吐完了。", "ok", "run:done");
-          return "done";
+      if (controllerRef.current === controller) {
+        controllerRef.current = null;
+        stopTimer();
+        if (statusRef.current === "running") {
+          if (hasResultRef.current) {
+            updateStatus("done");
+            addNarrative("DONE", "分析完成，结果已更新。", "ok", "run:done");
+          } else {
+            updateStatus("error");
+            addNarrative("ERROR", "本次分析结束，但没有返回可展示的结果，请重试。", "error", "run:empty");
+          }
         }
-        return current;
-      });
+        if (statusRef.current === "error") setGlobalStatus({ label: "分析失败", tone: "is-error" });
+        else if (statusRef.current === "done") setGlobalStatus({ label: "分析完成" });
+      }
     }
   }
 
   async function stopAgent() {
     controllerRef.current?.abort();
-    setStatus("stopped");
+    updateStatus("stopped");
+    setGlobalStatus({ label: "分析已停止" });
     addNarrative("STOP", `手动中止 run ${runId ? runId.slice(0, 8) : "--"}，这次先放它一马。`, "error", "run:stop");
     try {
       await fetch("/stop", {
@@ -369,7 +431,11 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
   }
 
   function resetAgent() {
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    stopTimer();
     resetRunPanel();
+    setGlobalStatus({ label: "准备就绪" });
   }
 
   return {
@@ -383,6 +449,9 @@ export function useAgentRun(config: ManualConfig, syncUsername: (username: strin
     elapsed,
     usage,
     result,
+    resultTarget,
+    runTarget,
+    resultRunId,
     toolchain,
     lastRecipe,
     cacheBadges,

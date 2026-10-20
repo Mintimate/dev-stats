@@ -23,8 +23,25 @@ export function ReadmeReport({
   config: Pick<ManualConfig, "platform" | "username">;
   children?: React.ReactNode;
 }) {
+  const roastBreak = result.roast_summary.search(/[。！？\n]/);
+  const roastLead = roastBreak >= 0 ? result.roast_summary.slice(0, roastBreak + 1) : result.roast_summary;
+  const roastDetail = roastBreak >= 0 ? result.roast_summary.slice(roastBreak + 1).trim() : "";
+
   return (
     <div className="dashboard-grid">
+      <div className="roast-section roast-lead">
+        <div className="card-title">毒舌点评</div>
+        <div className="roast-box">
+          <span className="quote-symbol" aria-hidden="true">“</span>
+          <p>{roastLead}</p>
+          {roastDetail && (
+            <details className="roast-more">
+              <summary>继续看吐槽</summary>
+              <p className="roast-detail">{roastDetail}</p>
+            </details>
+          )}
+        </div>
+      </div>
       <div className="db-left-column">
         <div className="db-profile-card">
           <div className="user-header">
@@ -67,15 +84,14 @@ export function ReadmeReport({
           </div>
         </div>
         {children}
-      </div>
-      <div className="db-details-card">
-
         <div className="chart-section">
           <div className="card-title">维度评分</div>
           <div className="radar-container">
             <RadarChart scores={result.dimension_scores} />
           </div>
         </div>
+      </div>
+      <div className="db-details-card">
         <div className="repos-section">
           <div className="card-title">贡献过/拥有的明星项目</div>
           <div className="repos-list">
@@ -111,13 +127,6 @@ export function ReadmeReport({
           ) : <p className="evidence-caveat">这份历史报告未记录覆盖度；重新分析后可查看本次公开证据范围。</p>}
           <p className="evidence-caveat">评分由公开证据的固定规则计算{result.analysis_version ? `（${result.analysis_version}）` : ""}，不代表私有工作、职业能力或个人价值。</p>
         </details>
-        <div className="roast-section">
-          <div className="card-title" style={{ color: "var(--coral)" }}>毒舌吐槽</div>
-          <div className="roast-box">
-            <span className="quote-symbol">“</span>
-            <p>{result.roast_summary}</p>
-          </div>
-        </div>
         <div className="promo-section">
           <div className="card-title">核心人设</div>
           <div className="promo-box">{result.promotional_summary}</div>

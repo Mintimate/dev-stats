@@ -8,8 +8,9 @@ import { AgentResultPanel } from "./components/AgentResultPanel";
 import { ManualOptions } from "./components/ManualOptions";
 import { PreviewPanel } from "./components/PreviewPanel";
 import { Footer } from "./components/Footer";
-import type { GlobalStatus, StatsRecipe, ViewName } from "./lib/types";
+import type { GlobalStatus, ViewName } from "./lib/types";
 import "./styles.css";
+import "./workshop.css";
 
 function viewFromHash(): ViewName {
   return location.hash === "#manual" ? "manual" : "agent";
@@ -45,21 +46,20 @@ export default function App() {
     if (location.hash !== `#${nextHash}`) location.hash = nextHash;
   }
 
-  const shellClass = `agent-home view ${view === "agent" ? "" : "hidden"} split-layout`;
-
-  const showResult = agent.result.kind !== "none" || agent.running;
-
   return (
     <>
-      <main className="app">
+      <main className={`app ${view === "agent" ? "app-agent-workbench" : ""}`}>
         <TopBar view={view} setView={setView} config={manual.config} status={globalStatus} />
-        <section className={shellClass}>
-          <AgentPanel config={manual.config} agent={agent} setPlatform={manual.setPlatform} />
-          {showResult ? (
+        <section className={`agent-home view ${view === "agent" ? "" : "hidden"}`} aria-label="开发者鉴定">
+          <div className="workshop-intro">
+            <h2>代码有记录，<span>吐槽有依据。</span></h2>
+            <p>看公开贡献，认领一份有点扎心的开发者画像。</p>
+          </div>
+          <div className="agent-workbench">
+            <AgentPanel config={manual.config} agent={agent} setPlatform={manual.setPlatform} />
             <AgentResultPanel agent={agent} config={manual.config} applyRecipe={manual.applyRecipe} setView={setView} setGlobalStatus={setGlobalStatus} />
-          ) : (
             <LeaderboardPanel />
-          )}
+          </div>
         </section>
         <section className={`workspace view ${view === "manual" ? "" : "hidden"}`}>
           <ManualOptions config={manual.config} updateConfig={manual.updateConfig} setPlatform={manual.setPlatform} resetOptions={manual.resetOptions} />

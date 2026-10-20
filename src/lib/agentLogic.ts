@@ -1,4 +1,4 @@
-import { emptyToolchain, toolchainItems } from "./constants";
+import { cardOptions, emptyToolchain, toolchainItems } from "./constants";
 import type { AgentMode, ManualConfig, ReadmeResult, StatsRecipe, ToolchainState, UserProfile } from "./types";
 
 export function buildAgentMessage(config: ManualConfig, mode: AgentMode) {
@@ -232,6 +232,29 @@ export function ghostResult(username: string) {
   };
 }
 
-export function recipeFromEvent(event: Record<string, unknown>) {
-  return event.recipe as StatsRecipe | undefined;
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object") return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+export function recipeFromEvent(event: unknown): StatsRecipe | undefined {
+  if (!isPlainObject(event) || event.type !== "stats_recipe" || event.ok === false) return undefined;
+
+  // Tool events wrap the recipe; final-output and fallback events put its fields at the top level.
+  const candidate = Object.hasOwn(event, "recipe") ? event.recipe : event;
+  if (!isPlainObject(candidate)) return undefined;
+  if (
+    !Array.isArray(candidate.cards) ||
+    !candidate.cards.every((card) => cardOptions.some(({ value }) => value === card))
+  ) return undefined;
+  if (candidate.platform !== undefined && candidate.platform !== "github" && candidate.platform !== "cnb") return undefined;
+  if (["username", "theme", "rationale"].some((key) => candidate[key] !== undefined && typeof candidate[key] !== "string")) return undefined;
+  if (candidate.options !== undefined && !isPlainObject(candidate.options)) return undefined;
+
+  return Object.fromEntries(
+    ["platform", "username", "cards", "theme", "rationale", "options"]
+      .filter((key) => Object.hasOwn(candidate, key))
+      .map((key) => [key, candidate[key]]),
+  ) as StatsRecipe;
 }

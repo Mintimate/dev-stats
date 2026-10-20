@@ -35,15 +35,10 @@ export function PreviewPanel({
       <section className="panel">
         <div className="panel-head">
           <div className="panel-title-group">
-            <div className="panel-window-controls">
-              <span className="dot dot-close" />
-              <span className="dot dot-minimize" />
-              <span className="dot dot-expand" />
-            </div>
             <div>
-              <h2 className="panel-title">// Stage.output - 渲染管线输出</h2>
+              <h2 className="panel-title">卡片预览</h2>
               <span className="panel-note">
-                {validationMessage || (pending ? "参数已变化，正在更新预览…" : previewUrl)}
+                {validationMessage || (pending ? "参数已变化，正在更新预览…" : "改完就能看，满意再带走。")}
               </span>
             </div>
           </div>
@@ -65,13 +60,8 @@ export function PreviewPanel({
       <section className="panel output">
         <div className="panel-head">
           <div className="panel-title-group">
-            <div className="panel-window-controls">
-              <span className="dot dot-close" />
-              <span className="dot dot-minimize" />
-              <span className="dot dot-expand" />
-            </div>
             <div>
-              <h2 className="panel-title">// Clipboard.copypasta - 终极大招</h2>
+              <h2 className="panel-title">带回你的 README</h2>
               <span className="panel-note">可直接粘贴至 README.md 中</span>
             </div>
           </div>
@@ -84,7 +74,7 @@ export function PreviewPanel({
         </div>
       </section>
       <div className="mobile-preview-actions" aria-label="预览快捷操作">
-        <button className="btn" type="button" onClick={() => document.getElementById("manual-preview")?.scrollIntoView({ behavior: "smooth", block: "start" })}>查看预览</button>
+        <button className="btn" type="button" onClick={() => document.getElementById("manual-preview")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" })}>查看预览</button>
         <button className="btn primary" type="button" disabled={!markdown || pending || Boolean(validationMessage)} onClick={() => void copy(markdown, "Markdown")}>{copied === "markdown" ? "已复制 ✓" : "复制 Markdown"}</button>
       </div>
     </section>

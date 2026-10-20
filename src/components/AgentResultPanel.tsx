@@ -3,52 +3,10 @@ import { useAgentRun } from "../hooks/useAgentRun";
 import { useImagePreview } from "../hooks/useImagePreview";
 import { ReadmeReport } from "./ReadmeReport";
 import { ShareModal } from "./ShareModal";
-import { cardMetadata } from "../lib/constants";
+import { cardMetadata, toolchainItems } from "../lib/constants";
 import { renderMarkdown } from "../lib/markdown";
 import { buildMarkdownForRecipe, buildUrlForRecipeCard, recipeCards } from "../lib/statsUrl";
-import type { CardType, GlobalStatus, ManualConfig, StatsRecipe, ViewName } from "../lib/types";
-
-const loadingPhases = ["BOOT", "DIG", "ROAST", "POLISH", "SHIP"];
-
-const loadingTips = [
-  "正在敲平台 API 的门，假装自己不是爬虫。",
-  "正在翻 Commit 记录，看看 README 是门面工程还是精神图腾。",
-  "正在清点公开仓库，顺手把多年 TODO 捞出来晒晒。",
-  "正在给评分模型上强度，注释、Star、PR 一个都别想躲。",
-  "正在端详 Profile 门面，Bio 空着也会被认真记录。",
-  "正在分析语言栈：到底是全栈，还是每门都会一点点。",
-  "正在酝酿毒舌吐槽，力度调到刚好扎心但不违法。",
-  "正在把能力雷达压成几何图形，代码人生突然有了边界。",
-  "正在润色 README 草稿，让它像本人但比本人会表达。",
-  "正在收尾装箱，准备把这份开发者画像发射出去。",
-];
-
-function LoadingOverlay({ running }: { running: boolean }) {
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    if (!running) {
-      setIndex(0);
-      return undefined;
-    }
-    const timer = window.setInterval(() => {
-      setIndex((current) => (current + 1) % loadingTips.length);
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, [running]);
-
-  return (
-    <div className={`db-loading-overlay ${running ? "" : "hidden"}`}>
-      <div className="loader-content">
-        <div className="loader-code">{loadingPhases[index % loadingPhases.length]}</div>
-        <p className="loader-tip">{loadingTips[index]}</p>
-        <div className="loader-bar">
-          <div className="loader-progress" />
-        </div>
-      </div>
-    </div>
-  );
-}
+import type { GlobalStatus, ManualConfig, StatsRecipe, ViewName } from "../lib/types";
 
 function StatsRecipeDashboard({
   recipe,
@@ -146,17 +104,31 @@ export function AgentResultPanel({
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const moreActionsRef = useRef<HTMLDivElement | null>(null);
   const [humorQuote] = useState(() => humorQuotes[Math.floor(Math.random() * humorQuotes.length)]);
-  const resultVisible = agent.result.kind !== "none" || agent.running;
+  const hasResult = agent.result.kind !== "none";
   const readme = agent.result.kind === "readme" ? agent.result.data : null;
   const recipe = agent.result.kind === "stats" ? agent.result.recipe : null;
   const recipeToApply = recipe || agent.lastRecipe;
   const recipeMarkdown = recipe ? buildMarkdownForRecipe(recipe) : "";
-  const title = readme?.title || (recipe ? "卡片配方方案" : "分析结果");
-  const summary = readme?.summary || (agent.result.kind === "stats" ? agent.result.summary : "正在等待分析指标数据...");
+  const title = readme?.title || (recipe ? "卡片配方方案" : "开发者鉴定报告");
+  const summary = readme?.summary || (agent.result.kind === "stats" ? agent.result.summary : "毒舌有据，评分有源。你的分析结果会出现在这里。");
+  const resultTarget = agent.resultTarget || config;
+  const targetChanged = resultTarget.platform !== config.platform || (
+    resultTarget.platform === "github"
+      ? resultTarget.username.toLowerCase() !== config.username.trim().toLowerCase()
+      : resultTarget.username !== config.username.trim()
+  );
+  const retainingResult = hasResult && agent.resultRunId !== agent.runId;
+  const showRunStatus = agent.running || agent.status === "error" || agent.status === "stopped";
+  const observedTools = toolchainItems.filter((item) => agent.toolchain[item.key] !== "idle");
 
-  const profileUrl = config.platform === "cnb"
-    ? `https://cnb.cool/u/${encodeURIComponent(config.username)}`
-    : `https://github.com/${config.username}`;
+  const profileUrl = resultTarget.platform === "cnb"
+    ? `https://cnb.cool/u/${encodeURIComponent(resultTarget.username)}`
+    : `https://github.com/${encodeURIComponent(resultTarget.username)}`;
+
+  useEffect(() => {
+    setTab("report");
+    setMoreActionsOpen(false);
+  }, [agent.resultRunId]);
 
   useEffect(() => {
     if (!moreActionsOpen) return undefined;
@@ -173,8 +145,6 @@ export function AgentResultPanel({
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [moreActionsOpen]);
-
-  if (!resultVisible) return null;
 
   async function copy(text: string, label: string) {
     try {
@@ -200,11 +170,18 @@ export function AgentResultPanel({
       <div className="panel-head">
         <div>
           <h2 className="panel-title">{title}</h2>
-          <span className="panel-note">{summary}</span>
+          {readme ? (
+            <details className="result-summary-details" key={agent.resultRunId}>
+              <summary>画像摘要</summary>
+              <p className="panel-note">{summary}</p>
+            </details>
+          ) : (
+            <span className="panel-note">{summary}</span>
+          )}
         </div>
-        <div className="result-actions">
+        {hasResult && <div className="result-actions">
           {readme && !readme.is_ghost && (
-            <ShareModal result={readme} platform={config.platform} username={config.username} prominent />
+            <ShareModal key={agent.resultRunId} result={readme} platform={resultTarget.platform} username={resultTarget.username} prominent />
           )}
           {!readme && recipe && (
             <button className="btn primary" type="button" onClick={() => void copy(recipeMarkdown, "整套 README 卡片")}>复制整套 README 卡片</button>
@@ -260,31 +237,74 @@ export function AgentResultPanel({
                   window.open(profileUrl, "_blank", "noopener,noreferrer");
                   setMoreActionsOpen(false);
                 }}>前往平台主页</button>
-                <span className="result-more-menu-meta">本轮消耗 {agent.usage?.total || "--"} tokens</span>
-                <button className="result-more-menu-item" type="button" onClick={() => {
+                {agent.resultRunId === agent.runId && <span className="result-more-menu-meta">本轮消耗 {agent.usage?.total ?? "--"} tokens</span>}
+                <button className="result-more-menu-item" type="button" disabled={agent.running} onClick={() => {
                   agent.resetAgent();
                   setMoreActionsOpen(false);
-                }}>返回主页</button>
+                }}>清空结果</button>
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </div>
-      <div className={`result-body ${agent.running ? "is-loading" : ""}`}>
-        <LoadingOverlay running={agent.running} />
+      {showRunStatus && (
+        <div className={`result-run-status is-${agent.status}`}>
+          <div className="result-run-heading">
+            <strong>{agent.running ? "正在分析" : agent.status === "error" ? "本次分析未完成" : "分析已暂停"}</strong>
+            {agent.runTarget && <span>{agent.runTarget.platform === "cnb" ? "CNB" : "GitHub"} / @{agent.runTarget.username}</span>}
+            <span>{agent.elapsed}</span>
+          </div>
+          <p role={agent.status === "error" ? "alert" : "status"} aria-live={agent.status === "error" ? "assertive" : "polite"}>{agent.progress}</p>
+          {observedTools.length > 0 && (
+            <div className="result-run-tools" aria-label="已收到的工具执行状态">
+              {observedTools.map((item) => (
+                <span key={item.key} className={`is-${agent.toolchain[item.key]}`}>
+                  {item.name} · {agent.toolchain[item.key] === "completed" ? "已完成" : agent.running ? "执行中" : "未完成"}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {hasResult && (
+        <p className="result-identity-note">
+          当前展示：{resultTarget.platform === "cnb" ? "CNB" : "GitHub"} / @{resultTarget.username}
+          {retainingResult && showRunStatus
+            ? agent.running ? " · 上一份结果保留可用，新结果生成后自动更新。" : " · 本次未替换报告，仍保留上一份结果。"
+            : targetChanged ? " · 输入目标已切换，运行分析后更新这里的报告。" : ""}
+        </p>
+      )}
+      <div className="result-body">
+        {!hasResult && (
+          <div className="result-empty-state">
+            <span className="result-empty-kicker">你的代码，值得被认真吐槽</span>
+            <h3>{agent.running ? "正在准备你的第一份报告" : agent.status === "error" || agent.status === "stopped" ? "这次还没有生成报告" : "留下用户名，让公开作品开口"}</h3>
+            <p className="result-empty-copy">
+              {agent.running
+                ? "分析进度会实时更新，结果生成后在这里展开。"
+                : "选择平台并输入用户名，开始鉴定。毒舌点评、公开证据和 README 草稿都会留在这里。"}
+            </p>
+            <div className="result-empty-features" aria-label="报告内容">
+              <span>毒舌点评</span>
+              <span>公开证据</span>
+              <span>六维评分</span>
+              <span>README 草稿</span>
+            </div>
+          </div>
+        )}
         {readme && (
           <>
             <div className="tab-header">
               <div className="segmented result-tabs" role="tablist" aria-label="结果视图">
-                <button type="button" role="tab" aria-selected={tab === "report"} className={tab === "report" ? "active" : ""} onClick={() => setTab("report")}>画像报告</button>
-                <button type="button" role="tab" aria-selected={tab === "readme"} className={tab === "readme" ? "active" : ""} onClick={() => setTab("readme")}>README 草稿</button>
+                <button id="report-tab" type="button" role="tab" aria-controls="report-panel" aria-selected={tab === "report"} className={tab === "report" ? "active" : ""} onClick={() => setTab("report")}>画像报告</button>
+                <button id="readme-tab" type="button" role="tab" aria-controls="readme-panel" aria-selected={tab === "readme"} className={tab === "readme" ? "active" : ""} onClick={() => setTab("readme")}>README 草稿</button>
               </div>
             </div>
             <div className="result-tab-panel">
-              <div className={`result-tab-content ${tab === "report" ? "active" : ""}`} role="tabpanel" hidden={tab !== "report"}>
-                <ReadmeReport result={readme} config={config} />
+              <div id="report-panel" className={`result-tab-content ${tab === "report" ? "active" : ""}`} role="tabpanel" aria-labelledby="report-tab" hidden={tab !== "report"}>
+                <ReadmeReport key={agent.resultRunId} result={readme} config={resultTarget} />
               </div>
-              <div className={`result-tab-content ${tab === "readme" ? "active" : ""}`} role="tabpanel" hidden={tab !== "readme"}>
+              <div id="readme-panel" className={`result-tab-content ${tab === "readme" ? "active" : ""}`} role="tabpanel" aria-labelledby="readme-tab" hidden={tab !== "readme"}>
                 <div className="mock-editor-window">
                   <div className="editor-header">
                     <div className="editor-window-controls">
@@ -323,7 +343,7 @@ export function AgentResultPanel({
                   <div className="editor-workspace">
                     {editorTab === "preview" && (
                       <div className="readme-preview-body">
-                        <div className="readme-render" dangerouslySetInnerHTML={{ __html: renderMarkdown(readme.markdown, config.platform, config.username) }} />
+                        <div className="readme-render" dangerouslySetInnerHTML={{ __html: renderMarkdown(readme.markdown, resultTarget.platform, resultTarget.username) }} />
                       </div>
                     )}
 
@@ -350,7 +370,7 @@ export function AgentResultPanel({
                     {editorTab === "html" && (
                       <div className="editor-code-container">
                         {(() => {
-                          const rawHtml = renderMarkdown(readme.markdown, config.platform, config.username);
+                          const rawHtml = renderMarkdown(readme.markdown, resultTarget.platform, resultTarget.username);
                           const formattedHtml = rawHtml
                             .replace(/(<\/?(?:div|p|ul|ol|li|h[1-6]|table|thead|tbody|tr|th|td|pre|code)[^>]*>)/gi, "\n$1\n")
                             .split("\n")
@@ -400,7 +420,7 @@ export function AgentResultPanel({
             </div>
           </>
         )}
-        {recipe && <StatsRecipeDashboard recipe={recipe} summary={agent.result.kind === "stats" ? agent.result.summary : ""} />}
+        {recipe && <StatsRecipeDashboard key={agent.resultRunId} recipe={recipe} summary={agent.result.kind === "stats" ? agent.result.summary : ""} />}
       </div>
     </aside>
   );

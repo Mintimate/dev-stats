@@ -1,43 +1,41 @@
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
+
+const previewError = "预览加载失败，请检查用户名、仓库名或稍后重试。";
 
 export function useImagePreview(src: string) {
   const [loading, setLoading] = useState(Boolean(src));
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  // 跟踪当前 src，避免旧图片的 onLoad/onError 回调覆盖新图片的 loading 状态。
-  const srcRef = useRef(src);
+  const imageRef = useRef<HTMLImageElement | null>(null);
 
-  useEffect(() => {
-    srcRef.current = src;
-    setError("");
-    setAttempt(0);
-    if (!src) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-  }, [src]);
+  useLayoutEffect(() => {
+    // 缓存图片可能在 effect 前已经加载；以真实节点状态为准，避免重新开启动画。
+    const image = imageRef.current;
+    setLoading(Boolean(src) && !image?.complete);
+    setError(src && image?.complete && image.naturalWidth === 0 ? previewError : "");
+  }, [src, attempt]);
 
   return {
     loading,
     error,
     retry: () => {
       if (!src) return;
-      setError("");
-      setLoading(true);
       setAttempt((current) => current + 1);
     },
     imageKey: `${src}:${attempt}`,
     imageProps: {
+      ref: imageRef,
       src,
-      onLoad: () => {
-        if (srcRef.current === src) setLoading(false);
+      onLoad: (event: SyntheticEvent<HTMLImageElement>) => {
+        // 同一地址的重试也会换节点，旧请求的事件不能结束新请求的加载。
+        if (event.currentTarget !== imageRef.current) return;
+        setLoading(false);
+        setError("");
       },
-      onError: () => {
-        if (srcRef.current === src) {
-          setLoading(false);
-          setError("预览加载失败，请检查用户名、仓库名或稍后重试。");
-        }
+      onError: (event: SyntheticEvent<HTMLImageElement>) => {
+        if (event.currentTarget !== imageRef.current) return;
+        setLoading(false);
+        setError(previewError);
       },
     },
   };

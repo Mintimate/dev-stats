@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { Platform } from "../lib/types";
 import { getTagColor } from "../lib/constants";
 
@@ -37,7 +37,7 @@ export function getHumorousTitle(rating: string) {
 }
 
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 function LeaderboardPanelInner() {
   const [list, setList] = useState<LeaderboardItem[]>([]);
@@ -45,13 +45,20 @@ function LeaderboardPanelInner() {
   const [loadError, setLoadError] = useState("");
   const [activeTab, setActiveTab] = useState<Platform>("github");
   const [page, setPage] = useState(1);
+  const requestId = useRef(0);
+  const requestController = useRef<AbortController | null>(null);
 
   const fetchRankings = useCallback(async (forceRebuild = false) => {
+    const id = ++requestId.current;
+    requestController.current?.abort();
+    const controller = new AbortController();
+    requestController.current = controller;
     setLoading(true);
     setLoadError("");
     try {
       const res = await fetch("/leaderboard", {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
           "makers-conversation-id": crypto.randomUUID()
@@ -60,19 +67,27 @@ function LeaderboardPanelInner() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (Array.isArray(data.leaderboard)) {
-        setList(data.leaderboard);
-      }
+      if (!Array.isArray(data?.leaderboard)) throw new Error("Invalid leaderboard response");
+      if (id !== requestId.current || controller.signal.aborted) return;
+      setList(data.leaderboard);
     } catch (err) {
+      if (id !== requestId.current || controller.signal.aborted) return;
       console.error("Failed to fetch rankings:", err);
-      setLoadError("排行榜暂时加载失败，已有数据不会被清空。");
+      setLoadError("榜单暂时掉线了，请稍后重试。");
     } finally {
-      setLoading(false);
+      if (id === requestId.current) {
+        requestController.current = null;
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     void fetchRankings();
+    return () => {
+      requestId.current += 1;
+      requestController.current?.abort();
+    };
   }, [fetchRankings]);
 
   useEffect(() => {
@@ -83,23 +98,28 @@ function LeaderboardPanelInner() {
     return () => window.removeEventListener("devstats:leaderboard-updated", refreshAfterAnalysis);
   }, [fetchRankings]);
 
-  // 切换榜单或刷新数据后，避免停留在一个可能已经越界的页码上。
-  useEffect(() => {
-    setPage(1);
-  }, [activeTab, list]);
-
   const filteredList = list.filter((item) => item.platform === activeTab);
   const totalPages = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pagedList = filteredList.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  // 刷新保留当前位置；只有列表缩短导致越界时才收缩页码。
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
+
+  function selectPlatform(platform: Platform) {
+    if (platform === activeTab) return;
+    setActiveTab(platform);
+    setPage(1);
+  }
 
   return (
-    <aside className="panel agent-right leaderboard-panel">
+    <section className="panel leaderboard-panel">
       <div className="panel-head">
         <div>
           <h2 className="panel-title">开发者荣誉榜</h2>
-          <span className="panel-note">榜单保留最近一次成功结果，超过 24h 的画像会在进入后自动更新</span>
+          <span className="panel-note">保留最近成功画像，过期后进入自动更新。</span>
         </div>
         <button className="btn" type="button" disabled={loading} aria-busy={loading} onClick={() => void fetchRankings()}>
           {loading ? "刷新中…" : "刷新"}
@@ -113,7 +133,7 @@ function LeaderboardPanelInner() {
               type="button"
               aria-pressed={activeTab === "github"}
               className={activeTab === "github" ? "active" : ""}
-              onClick={() => setActiveTab("github")}
+              onClick={() => selectPlatform("github")}
             >
               GitHub (大厂门面)
             </button>
@@ -121,14 +141,18 @@ function LeaderboardPanelInner() {
               type="button"
               aria-pressed={activeTab === "cnb"}
               className={activeTab === "cnb" ? "active" : ""}
-              onClick={() => setActiveTab("cnb")}
+              onClick={() => selectPlatform("cnb")}
             >
               CNB (开源劳模)
             </button>
           </div>
         </div>
 
-        {loading ? (
+        {loadError && filteredList.length > 0 && (
+          <p className="panel-note" role="status">{loadError} 当前展示上次加载的荣誉榜。</p>
+        )}
+
+        {loading && list.length === 0 ? (
           <div className="leaderboard-loading">
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="leaderboard-skeleton-row">
@@ -144,7 +168,7 @@ function LeaderboardPanelInner() {
           </div>
         ) : loadError && filteredList.length === 0 ? (
           <div className="leaderboard-empty">
-            <p>{loadError}</p>
+            <p role="status">{loadError}</p>
             <button className="btn subtle" type="button" onClick={() => void fetchRankings()}>重新加载</button>
           </div>
         ) : filteredList.length === 0 ? (
@@ -159,8 +183,8 @@ function LeaderboardPanelInner() {
               const isTopRank = rank <= 3;
               const displayNick = item.nickname || item.username;
               const displayHandle = `@${item.username}`;
-              const displayTags = item.badges.slice(0, 3);
-              const extraTagsCount = Math.max(0, item.badges.length - 3);
+              const displayTags = item.badges.slice(0, 2);
+              const extraTagsCount = Math.max(0, item.badges.length - displayTags.length);
               const isStale = typeof item.expiresAt === "number" && item.expiresAt <= Date.now();
 
               const avatarUrl = (item.username && item.platform)
@@ -261,7 +285,7 @@ function LeaderboardPanelInner() {
           </>
         )}
       </div>
-    </aside>
+    </section>
   );
 }
 

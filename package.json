@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test:concurrency": "node --test test/concurrency.test.mjs",
     "test:security": "node --test test/static-security.test.mjs test/github-public-data.test.mjs",
+    "test:ui": "node --test test/agent-events.test.mjs test/agent-run.test.mjs test/image-preview.test.mjs",
     "typecheck": "npm run check:agent-skill && tsc --noEmit"
   },
   "dependencies": {
