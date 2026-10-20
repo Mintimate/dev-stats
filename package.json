@@ -10,7 +10,7 @@
     "check:deployment": "node scripts/check-public-assets.mjs --edgeone && node scripts/verify-edge-runtime.mjs",
     "preview": "vite preview",
     "test:concurrency": "node --test test/concurrency.test.mjs",
-    "test:security": "node --test test/static-security.test.mjs",
+    "test:security": "node --test test/static-security.test.mjs test/github-public-data.test.mjs",
     "typecheck": "npm run check:agent-skill && tsc --noEmit"
   },
   "dependencies": {

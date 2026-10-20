@@ -34,14 +34,14 @@ query userInfo($login: String!, $includeMergedPullRequests: Boolean!, $includeDi
     followers { totalCount }
     commits: contributionsCollection(from: $startTime) { totalCommitContributions }
     reviews: contributionsCollection { totalPullRequestReviewContributions }
-    repositoriesContributedTo(first: 1, contributionTypes: [COMMIT, ISSUE, PULL_REQUEST, REPOSITORY]) { totalCount }
+    repositoriesContributedTo(first: 1, privacy: PUBLIC, contributionTypes: [COMMIT, ISSUE, PULL_REQUEST, REPOSITORY]) { totalCount }
     pullRequests(first: 1) { totalCount }
     mergedPullRequests: pullRequests(states: MERGED) @include(if: $includeMergedPullRequests) { totalCount }
     openIssues: issues(states: OPEN) { totalCount }
     closedIssues: issues(states: CLOSED) { totalCount }
     repositoryDiscussions @include(if: $includeDiscussions) { totalCount }
     repositoryDiscussionComments(onlyAnswers: true) @include(if: $includeDiscussionsAnswers) { totalCount }
-    repositories(first: 100, ownerAffiliations: OWNER, orderBy: {direction: DESC, field: STARGAZERS}) {
+    repositories(first: 100, privacy: PUBLIC, ownerAffiliations: OWNER, orderBy: {direction: DESC, field: STARGAZERS}) {
       totalCount
       nodes { name stargazers { totalCount } }
     }
@@ -89,7 +89,7 @@ query userInfo($login: String!, $includeMergedPullRequests: Boolean!, $includeDi
 			TotalCount int `json:"total_count"`
 		}
 		// author:<username> 需要整体作为 q 参数值转义，避免用户名中的 &/+/空格等字符篡改查询语义。
-		if err := c.restJSON(ctx, "/search/commits?q="+url.QueryEscape("author:"+q.Username), &rest); err == nil && rest.TotalCount > 0 {
+		if err := c.restJSON(ctx, "/search/commits?q="+url.QueryEscape("author:"+q.Username+" is:public"), &rest); err == nil && rest.TotalCount > 0 {
 			totalCommits = rest.TotalCount
 		}
 	}
@@ -230,8 +230,8 @@ query ProfileSummary($login: String!) {
     name login avatarUrl createdAt
     followers { totalCount }
     following { totalCount }
-    gists(first: 1) { totalCount }
-    repositories(first: 100, ownerAffiliations: OWNER) {
+    gists(first: 1, privacy: PUBLIC) { totalCount }
+    repositories(first: 100, privacy: PUBLIC, ownerAffiliations: OWNER) {
       totalCount
       nodes { stargazerCount forkCount }
     }
@@ -353,7 +353,7 @@ func (c *Client) FetchRepoLanguages(ctx context.Context, username, repo string, 
 	query := `
 query RepoLanguages($owner: String!, $name: String!, $count: Int!) {
   repository(owner: $owner, name: $name) {
-    name nameWithOwner
+    name nameWithOwner isPrivate
     languages(first: $count, orderBy: {field: SIZE, direction: DESC}) {
       totalSize
       edges { size node { name color } }
@@ -363,6 +363,7 @@ query RepoLanguages($owner: String!, $name: String!, $count: Int!) {
 	var response struct {
 		Repository struct {
 			Name, NameWithOwner string
+			IsPrivate           bool `json:"isPrivate"`
 			Languages           struct {
 				TotalSize int `json:"totalSize"`
 				Edges     []struct {
@@ -376,7 +377,7 @@ query RepoLanguages($owner: String!, $name: String!, $count: Int!) {
 	if err := c.graphQL(ctx, query, map[string]any{"owner": username, "name": repo, "count": count}, &response); err != nil {
 		return RepoLanguagesData{}, err
 	}
-	if response.Repository.Name == "" {
+	if response.Repository.Name == "" || response.Repository.IsPrivate {
 		return RepoLanguagesData{}, errors.New("repository not found")
 	}
 	data := RepoLanguagesData{Name: response.Repository.Name, NameWithOwner: response.Repository.NameWithOwner, TotalSize: response.Repository.Languages.TotalSize}
@@ -392,7 +393,7 @@ query OrganizationSummary($login: String!) {
   organization(login: $login) {
     name login avatarUrl description
     membersWithRole(first: 1) { totalCount }
-    repositories(first: 100, orderBy: {field: STARGAZERS, direction: DESC}) {
+    repositories(first: 100, privacy: PUBLIC, orderBy: {field: STARGAZERS, direction: DESC}) {
       totalCount
       nodes { nameWithOwner stargazerCount forkCount issues(first: 1) { totalCount } }
     }

@@ -289,15 +289,16 @@ export async function executeStatsTool(
     const user = options.prefetchedProfile ?? await (tracer
       ? tracer.span('github.fetch_profile', () => fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}`, gitHubHeaders, signal), { 'github.username': username })
       : fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}`, gitHubHeaders, signal));
-    const repos = await (tracer
+    const repoResponse = await (tracer
       ? tracer.span('github.fetch_repos', () => fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?type=owner&sort=updated&per_page=100`, gitHubHeaders, signal), { 'github.username': username })
       : fetchJson(`${GITHUB_API}/users/${encodeURIComponent(username)}/repos?type=owner&sort=updated&per_page=100`, gitHubHeaders, signal));
+    const repos = Array.isArray(repoResponse) ? repoResponse.filter(isPublicGitHubRepository) : [];
 
     let contributions: any[] = [];
     try {
       const prs = await (tracer
-        ? tracer.span('github.search_prs', () => fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr+state:closed&sort=updated&order=desc&per_page=100`, gitHubHeaders, signal), { 'github.username': username })
-        : fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr+state:closed&sort=updated&order=desc&per_page=100`, gitHubHeaders, signal));
+        ? tracer.span('github.search_prs', () => fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr+state:closed+is:public&sort=updated&order=desc&per_page=100`, gitHubHeaders, signal), { 'github.username': username })
+        : fetchJson(`${GITHUB_API}/search/issues?q=author:${encodeURIComponent(username)}+type:pr+state:closed+is:public&sort=updated&order=desc&per_page=100`, gitHubHeaders, signal));
       if (prs && Array.isArray(prs.items)) {
         const repoMap = new Map<string, { prCount: number }>();
         for (const item of prs.items) {
@@ -323,6 +324,7 @@ export async function executeStatsTool(
             topContributed.map(async ([repoName, stats]) => {
               try {
                 const detail = await fetchJson(`${GITHUB_API}/repos/${repoName}`, gitHubHeaders, signal);
+                if (!isPublicGitHubRepository(detail)) return;
                 contributions.push({
                   name: repoName,
                   description: detail.description,
@@ -349,12 +351,10 @@ export async function executeStatsTool(
     return {
       platform: 'github',
       user: pick(user, ['login', 'name', 'bio', 'company', 'blog', 'location', 'public_repos', 'followers', 'following', 'created_at', 'updated_at', 'html_url', 'avatar_url']),
-      repos: Array.isArray(repos)
-        ? repos.map((repo) => pick(repo, ['name', 'description', 'language', 'stargazers_count', 'forks_count', 'updated_at', 'pushed_at', 'created_at', 'html_url', 'topics', 'fork', 'archived', 'size', 'open_issues_count', 'license']))
-        : [],
+      repos: repos.map((repo) => pick(repo, ['name', 'description', 'language', 'stargazers_count', 'forks_count', 'updated_at', 'pushed_at', 'created_at', 'html_url', 'topics', 'fork', 'archived', 'size', 'open_issues_count', 'license'])),
       contributions,
       coverage: {
-        sampled_repos: Array.isArray(repos) ? repos.length : 0,
+        sampled_repos: repos.length,
         searched_closed_prs: Array.isArray(contributions) ? contributions.reduce((total, repo) => total + Number(repo.pr_count || 0), 0) : 0,
       },
     };
@@ -366,16 +366,39 @@ export async function executeStatsTool(
     //     from EdgeOne edge nodes in mainland China, causing 20s tool timeouts
     //     even for users that clearly exist.
     //   - api.github.com/repos/{u}/{u}/readme follows the default branch automatically
-    //     and returns base64-encoded content in one request.
+    //     and returns base64-encoded content after its repository is verified public.
     // A 5s per-request timeout is enforced so a stalled socket can no longer eat
     // the whole 20s tool budget.
     const username = String(input.username || '');
-    const url = `${GITHUB_API}/repos/${encodeURIComponent(username)}/${encodeURIComponent(username)}/readme`;
+    const repoUrl = `${GITHUB_API}/repos/${encodeURIComponent(username)}/${encodeURIComponent(username)}`;
+    const url = `${repoUrl}/readme`;
     const headers: Record<string, string> = { 'User-Agent': 'EdgeOne-Stats-Agent/1.0', Accept: 'application/vnd.github+json' };
     if (gitHubToken) {
       headers['Authorization'] = `token ${gitHubToken}`;
     }
     try {
+      // A deployment token may have private access. Never expose a private
+      // username/username repository as a public profile README.
+      const repositoryResponse = await (tracer
+        ? tracer.span('github.fetch_readme_repository', () => fetchWithTimeout(repoUrl, { headers }, 5_000, signal), { 'github.username': username })
+        : fetchWithTimeout(repoUrl, { headers }, 5_000, signal));
+      if (!repositoryResponse.ok) {
+        return {
+          ok: false,
+          attempts: [{ url: repoUrl, status: repositoryResponse.status }],
+          message: repositoryResponse.status === 404
+            ? 'Public profile README not found.'
+            : `GitHub API returned ${repositoryResponse.status}`,
+        };
+      }
+      const repository: unknown = await repositoryResponse.json();
+      if (!isPublicGitHubRepository(repository)) {
+        return {
+          ok: false,
+          attempts: [{ url, status: 404 }],
+          message: 'Public profile README not found.',
+        };
+      }
       const response = await (tracer
         ? tracer.span(
             'github.fetch_readme_api',
@@ -428,7 +451,7 @@ export async function executeStatsTool(
       return {
         ok: false,
         attempts: [{ url, error: (error as Error).message }],
-        message: 'Failed to fetch profile README within 5s.',
+        message: 'Failed to fetch a verified public profile README.',
       };
     }
   }
@@ -775,4 +798,9 @@ function pick(source: any, keys: string[]) {
   const target: Record<string, unknown> = {};
   for (const key of keys) target[key] = source?.[key];
   return target;
+}
+
+function isPublicGitHubRepository(repository: any): boolean {
+  return repository?.private === false &&
+    (repository.visibility === undefined || repository.visibility === 'public');
 }

@@ -74,6 +74,7 @@ func (c *Client) FetchGist(ctx context.Context, id string) (GistData, error) {
 query gistInfo($gistName: String!) {
   viewer {
     gist(name: $gistName) {
+      isPublic
       description
       owner { login }
       stargazerCount
@@ -85,6 +86,7 @@ query gistInfo($gistName: String!) {
 	var response struct {
 		Viewer struct {
 			Gist struct {
+				IsPublic       bool   `json:"isPublic"`
 				Description    string `json:"description"`
 				StargazerCount int    `json:"stargazerCount"`
 				Owner          struct {
@@ -104,7 +106,7 @@ query gistInfo($gistName: String!) {
 	if err := c.graphQL(ctx, query, map[string]any{"gistName": id}, &response); err != nil {
 		return GistData{}, err
 	}
-	if len(response.Viewer.Gist.Files) == 0 {
+	if !response.Viewer.Gist.IsPublic || len(response.Viewer.Gist.Files) == 0 {
 		return GistData{}, errors.New("gist not found")
 	}
 	first := response.Viewer.Gist.Files[0]
@@ -193,7 +195,7 @@ func (c *Client) FetchTopLanguages(ctx context.Context, username string, exclude
 	query := `
 query userInfo($login: String!) {
   user(login: $login) {
-    repositories(ownerAffiliations: OWNER, isFork: false, first: 100) {
+    repositories(ownerAffiliations: OWNER, privacy: PUBLIC, isFork: false, first: 100) {
       nodes {
         name
         languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
