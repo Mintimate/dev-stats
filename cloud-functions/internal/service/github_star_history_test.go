@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -10,9 +11,10 @@ import (
 func TestFetchStarHistoryPages(t *testing.T) {
 	sunday := time.Date(2025, time.August, 10, 0, 0, 0, 0, time.UTC)
 	var requests []string
-	client := &Client{tokens: []string{"test-token"}, httpClient: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+	client := NewStarHistoryClient()
+	client.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.Method != http.MethodGet || r.URL.Host != "api.github.com" || r.Header.Get("X-GitHub-Api-Version") != "2026-03-10" || r.Header.Get("Authorization") != "" {
-			t.Fatalf("unexpected public GitHub request: %s %s", r.Method, r.URL)
+			return nil, fmt.Errorf("unexpected public GitHub request: %s %s", r.Method, r.URL)
 		}
 		path := r.URL.RequestURI()
 		requests = append(requests, path)
@@ -26,10 +28,9 @@ func TestFetchStarHistoryPages(t *testing.T) {
 		case "/repositories/42/stargazers/history?per_page=30&page=2":
 			return testJSONResponse(http.StatusOK, []starHistoryWeek{{Week: sunday.Unix(), Total: 3, Days: []int{0, 1, 0, 0, 0, 0, 2}}}), nil
 		default:
-			t.Fatalf("unexpected GitHub request: %s", r.URL)
-			return nil, nil
+			return nil, fmt.Errorf("unexpected GitHub request: %s", r.URL)
 		}
-	})}}
+	})}
 	data, err := client.FetchStarHistory(context.Background(), "alice", "example")
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +58,8 @@ func TestFetchStarHistoryVisibility(t *testing.T) {
 		{"unspecified", "", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			client := &Client{httpClient: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			client := NewStarHistoryClient()
+			client.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				if r.URL.Path != "/repos/alice/example" {
 					t.Fatalf("requested history for a non-public repository: %s", r.URL)
 				}
@@ -65,7 +67,7 @@ func TestFetchStarHistoryVisibility(t *testing.T) {
 					ID: 42, FullName: "alice/example", Visibility: test.visibility, Private: test.private,
 					CreatedAt: time.Date(2025, time.August, 10, 0, 0, 0, 0, time.UTC),
 				}), nil
-			})}}
+			})}
 			data, err := client.FetchStarHistory(context.Background(), "alice", "example")
 			if err == nil || err.Error() != "repository not found" || data.FullName != "" || len(data.Points) != 0 {
 				t.Fatalf("non-public repository returned data: %+v, err=%v", data, err)
@@ -88,7 +90,8 @@ func TestFetchStarHistoryValidatesTerminalPage(t *testing.T) {
 		{"zero stars", []starHistoryWeek{{Week: sunday.Unix(), Days: make([]int, 7)}}, ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			client := &Client{httpClient: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			client := NewStarHistoryClient()
+			client.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				switch r.URL.Path {
 				case "/repos/alice/example":
 					return testJSONResponse(http.StatusOK, starHistoryRepository{
@@ -97,10 +100,9 @@ func TestFetchStarHistoryValidatesTerminalPage(t *testing.T) {
 				case "/repositories/42/stargazers/history":
 					return testJSONResponse(http.StatusOK, test.weeks), nil
 				default:
-					t.Fatalf("unexpected request: %s", r.URL)
-					return nil, nil
+					return nil, fmt.Errorf("unexpected request: %s", r.URL)
 				}
-			})}}
+			})}
 			data, err := client.FetchStarHistory(context.Background(), "alice", "example")
 			if test.want != "" {
 				if err == nil || err.Error() != test.want {
@@ -117,7 +119,8 @@ func TestFetchStarHistoryValidatesTerminalPage(t *testing.T) {
 
 func TestFetchStarHistoryStopsAtRateLimit(t *testing.T) {
 	requests := 0
-	client := &Client{tokens: []string{"test-token"}, httpClient: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+	client := NewStarHistoryClient()
+	client.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		requests++
 		if r.Header.Get("Authorization") != "" {
 			t.Fatal("unexpected authorization")
@@ -125,7 +128,7 @@ func TestFetchStarHistoryStopsAtRateLimit(t *testing.T) {
 		response := testJSONResponse(http.StatusForbidden, nil)
 		response.Header.Set("Retry-After", "60")
 		return response, nil
-	})}}
+	})}
 	_, err := client.FetchStarHistory(context.Background(), "alice", "example")
 	if err == nil || err.Error() != "GitHub API rate limited" || requests != 1 {
 		t.Fatalf("expected a single rate-limited request, got %d requests and error %v", requests, err)

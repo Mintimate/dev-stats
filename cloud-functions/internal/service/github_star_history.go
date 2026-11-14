@@ -15,6 +15,7 @@ import (
 const (
 	starHistoryPageSize = 30
 	starHistoryMaxPage  = 100
+	starHistoryTimeout  = 25 * time.Second
 )
 
 type StarHistoryPoint struct {
@@ -48,8 +49,8 @@ type starHistoryWeek struct {
 
 // FetchStarHistory builds a cumulative curve from GitHub's daily counts of
 // stars that are still active. The history API paginates from newest to oldest.
-func (c *Client) FetchStarHistory(ctx context.Context, owner, repo string) (StarHistoryData, error) {
-	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
+func (c *StarHistoryClient) FetchStarHistory(ctx context.Context, owner, repo string) (StarHistoryData, error) {
+	ctx, cancel := context.WithTimeout(ctx, starHistoryTimeout)
 	defer cancel()
 
 	var repository starHistoryRepository
@@ -61,6 +62,10 @@ func (c *Client) FetchStarHistory(ctx context.Context, owner, repo string) (Star
 		return StarHistoryData{}, errors.New("repository not found")
 	}
 
+	return c.loadHistory(ctx, repository)
+}
+
+func (c *StarHistoryClient) fetchHistoryPages(ctx context.Context, repository starHistoryRepository) (StarHistoryData, error) {
 	// Pin all pages to the verified repository even if its name changes mid-request.
 	repositoryPath := fmt.Sprintf("/repositories/%d", repository.ID)
 	var weeks []starHistoryWeek
@@ -89,7 +94,7 @@ func (c *Client) FetchStarHistory(ctx context.Context, owner, repo string) (Star
 		return StarHistoryData{}, errors.New("GitHub returned incomplete star history")
 	}
 
-	return buildStarHistory(repository, weeks, time.Now())
+	return buildStarHistory(repository, weeks, c.now())
 }
 
 func buildStarHistory(repository starHistoryRepository, weeks []starHistoryWeek, now time.Time) (StarHistoryData, error) {
@@ -137,7 +142,7 @@ func buildStarHistory(repository starHistoryRepository, weeks []starHistoryWeek,
 
 // The public history route can fan out into many requests. Keep those requests
 // anonymous to isolate their rate limit from the tokens used by other cards.
-func (c *Client) starHistoryJSON(ctx context.Context, path string, target any) (http.Header, error) {
+func (c *StarHistoryClient) starHistoryJSON(ctx context.Context, path string, target any) (http.Header, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, githubRESTEndpoint+path, nil)
 	if err != nil {
 		return nil, err

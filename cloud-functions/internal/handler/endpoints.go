@@ -238,6 +238,7 @@ func handleRepoLanguages(w http.ResponseWriter, r *http.Request) {
 var (
 	starHistoryOwnerPattern = regexp.MustCompile(`^[a-zA-Z0-9-]{1,39}$`)
 	starHistoryRepoPattern  = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,100}$`)
+	starHistoryClient       = service.NewStarHistoryClient()
 )
 
 func handleStarHistory(w http.ResponseWriter, r *http.Request) {
@@ -262,7 +263,7 @@ func handleStarHistory(w http.ResponseWriter, r *http.Request) {
 		writeSVG(w, 0, renderSVGError("Invalid repository", "Pass the GitHub owner and repository name separately"))
 		return
 	}
-	data, err := service.NewClient().FetchStarHistory(r.Context(), owner, repo)
+	data, err := starHistoryClient.FetchStarHistory(r.Context(), owner, repo)
 	if err != nil {
 		writeSVG(w, 0, renderSVGError(err.Error(), "GitHub Star History request failed"))
 		return

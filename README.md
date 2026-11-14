@@ -212,6 +212,8 @@ https://your-domain.example/api/auth/tdp/callback
 - `/api/profile-summary`、`/api/repo-languages`、`/api/org`：默认缓存 1 天
 - `/api/star-history`：成功响应通过 `Cache-Control` 默认缓存 1 天，错误响应禁止缓存
 
+每次星标历史请求到达 Go 函数时，都会向 GitHub 查询一次仓库元数据，确认仓库仍公开。每个 Go 进程按 GitHub 仓库 ID 在内存中缓存完整的星标历史，最多保留 32 个仓库，每条缓存有效期为 5 分钟。同一进程内，同一仓库的并发缓存未命中请求共用一次分页拉取，深浅主题及其他样式也复用同一份历史数据。
+
 状态接口不会配置平台缓存，避免 PAT 状态、可用性检查等动态结果被长期缓存。高流量公开实例仍可在自定义域名前增加 EdgeOne CDN / Cloudflare 等 CDN 层，用于更细粒度的缓存命中、清理和观测。
 
 例如：我使用 EdgeOne 的站点加速再次代理 EdgeOne Makers，可以获得额外的 CDN 缓存控制：

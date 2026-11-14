@@ -212,6 +212,8 @@ This project returns `Cache-Control` headers from the functions and configures P
 - `/api/profile-summary`, `/api/repo-languages`, and `/api/org`: cached for 1 day by default
 - `/api/star-history`: successful responses set a 1-day default via `Cache-Control`. Error responses specify `no-store`.
 
+Each Star History request that reaches the Go function checks GitHub repository metadata once to confirm the repository is still public. Each Go process keeps complete star histories in memory by GitHub repository ID for 5 minutes, up to 32 repositories. Concurrent cache misses for the same repository in that process share one paginated fetch. Light and dark themes and other styles reuse the same history data.
+
 Status endpoints are not configured for platform caching, so PAT health and availability checks do not get cached for too long. High-traffic public instances can still place EdgeOne CDN / Cloudflare or another CDN layer in front of the custom domain for more cache control, purge support, and observability.
 
 For example: I use EdgeOne site acceleration in front of EdgeOne Makers for extra CDN cache control:
