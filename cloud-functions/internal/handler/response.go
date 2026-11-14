@@ -27,7 +27,12 @@ func writeSVG(w http.ResponseWriter, cacheSeconds int, svg string) {
 }
 
 func writeSVGError(w http.ResponseWriter, message, secondary string) {
-	writeSVG(w, errorCacheSeconds, card.SVG(576, 120, card.OptionsFromQuery(map[string][]string{}), "Something went wrong!", fmt.Sprintf(`<text x="25" y="66" class="label">%s</text><text x="25" y="88" class="muted">%s</text>`, html.EscapeString(message), html.EscapeString(secondary)), ""))
+	writeSVG(w, errorCacheSeconds, renderSVGError(message, secondary))
+}
+
+func renderSVGError(message, secondary string) string {
+	body := fmt.Sprintf(`<text x="25" y="66" class="label">%s</text><text x="25" y="88" class="muted">%s</text>`, html.EscapeString(message), html.EscapeString(secondary))
+	return card.SVG(576, 120, card.OptionsFromQuery(nil), "Something went wrong!", body, "")
 }
 
 func weakETag(body string) string { sum := sha1.Sum([]byte(body)); return fmt.Sprintf(`W/"%x"`, sum) }

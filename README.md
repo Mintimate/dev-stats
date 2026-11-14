@@ -153,7 +153,7 @@ Agent 功能需要额外配置大模型访问令牌：
 
 ## 环境变量配置
 
-GitHub 卡片使用 GraphQL，需要令牌；Agent 的公开 REST 查询可以匿名访问，但速率限制更低。CNB 公开数据源无需令牌：
+使用 GraphQL 的 GitHub 卡片需要令牌。Agent 的公开 REST 查询可以匿名访问，星标历史卡片始终匿名查询。GitHub 对匿名请求按来源 IP 限流。CNB 公开数据源无需令牌。
 
 ### 必需环境变量
 
@@ -210,6 +210,9 @@ https://your-domain.example/api/auth/tdp/callback
 - `/api/streak`、`/api/contribution-calendar`：默认缓存 12 小时
 - `/api/recent-activity`：默认缓存 1 小时
 - `/api/profile-summary`、`/api/repo-languages`、`/api/org`：默认缓存 1 天
+- `/api/star-history`：成功响应通过 `Cache-Control` 默认缓存 1 天，错误响应禁止缓存
+
+每次星标历史请求到达 Go 函数时，都会向 GitHub 查询一次仓库元数据，确认仓库仍公开。每个 Go 进程按 GitHub 仓库 ID 在内存中缓存完整的星标历史，最多保留 32 个仓库，每条缓存有效期为 5 分钟。同一进程内，同一仓库的并发缓存未命中请求共用一次分页拉取，深浅主题及其他样式也复用同一份历史数据。
 
 状态接口不会配置平台缓存，避免 PAT 状态、可用性检查等动态结果被长期缓存。高流量公开实例仍可在自定义域名前增加 EdgeOne CDN / Cloudflare 等 CDN 层，用于更细粒度的缓存命中、清理和观测。
 
@@ -240,6 +243,7 @@ https://your-domain.example/api/auth/tdp/callback
 - `/api/contribution-calendar` - 年度贡献日历卡片
 - `/api/recent-activity` - 最近公开动态卡片
 - `/api/repo-languages` - 指定仓库语言占比卡片
+- `/api/star-history` - GitHub 公开仓库星标历史卡片
 - `/api/org` - GitHub 组织统计卡片
 - `/api/status/up` - PAT 可用性检查
 - `/api/status/pat-info` - PAT 状态详情
@@ -256,7 +260,7 @@ Go Cloud Functions 是当前主实现，Node Functions 已移除。当前 Go 版
 ![CNB Repo](https://your-domain.example/api/pin?platform=cnb&username=yourusername&repo=group/repository)
 ```
 
-CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/profile-summary`、`/api/contribution-calendar`、`/api/recent-activity` 和 `/api/repo-languages`。Gist 与组织统计没有等价数据源，继续仅支持 GitHub。CNB 语言接口只提供主/次语言而非字节数，语言卡按仓库出现次数加权。
+CNB 当前支持 `/api`、`/api/top-langs`、`/api/pin`、`/api/streak`、`/api/profile-summary`、`/api/contribution-calendar`、`/api/recent-activity` 和 `/api/repo-languages`。Gist、星标历史和组织统计仅支持 GitHub。CNB 语言接口只提供主/次语言而非字节数，语言卡按仓库出现次数加权。
 
 ## 获取 GitHub Token（最小权限）
 
@@ -302,9 +306,14 @@ GitHub 官方说明 fine-grained PAT 默认包含所有公开仓库的只读访�
 - `/api/contribution-calendar` - 年度贡献日历卡片
 - `/api/recent-activity` - 最近公开动态卡片
 - `/api/repo-languages` - 指定仓库语言占比卡片
+- `/api/star-history` - GitHub 公开仓库星标历史卡片
 - `/api/org` - GitHub 组织统计卡片
 
 详细参数请参考 [原项目文档](https://github.com/anuraghazra/github-readme-stats/blob/master/readme.md)。
+
+### GitHub 仓库星标历史
+
+在「手动配卡」中选择「星标历史 (Star History)」，或直接调用 `/api/star-history?username=OWNER&repo=REPO`。分别填入仓库所有者和仓库名，可用 `theme` 设置配色，例如 `catppuccin_mocha` 或 `catppuccin_latte`。DevStats 匿名调用 GitHub 的[星标历史接口](https://docs.github.com/en/rest/activity/starring#get-repository-star-history)，仅支持公开仓库。曲线按添加日期累计目前仍保留的星标，已取消的星标不会计入。
 
 ## 示例卡片
 
@@ -313,6 +322,7 @@ GitHub 官方说明 fine-grained PAT 默认包含所有公开仓库的只读访�
 ```md
 ![GitHub Stats](https://your-project.pages.dev/api?username=yourusername&show_icons=true)
 ![Top Languages](https://your-project.pages.dev/api/top-langs?username=yourusername&layout=compact)
+![Star History](https://your-project.pages.dev/api/star-history?username=yourusername&repo=yourrepo&theme=catppuccin_mocha)
 ```
 
 更多样式和参数配置(环境变量)请参考 [原项目文档](https://github.com/anuraghazra/github-readme-stats#customization)。

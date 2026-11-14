@@ -34,3 +34,40 @@ func TestHandlerUnknownRoute(t *testing.T) {
 		t.Fatalf("expected status 404, got %d", recorder.Code)
 	}
 }
+
+func TestStarHistoryRouteRejectsInvalidRequests(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{"missing repository", "username=Mintimate", "Missing username or repo"},
+		{"unsupported platform", "platform=cnb&username=Mintimate&repo=oh-my-rime", "Use platform=github"},
+		{"path in repository", "username=Mintimate&repo=other%2Frepo", "Invalid repository"},
+		{"parent directory", "username=Mintimate&repo=..", "Invalid repository"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			Handler(recorder, httptest.NewRequest(http.MethodGet, "/api/star-history?"+test.query, nil))
+
+			if recorder.Code != http.StatusOK || !strings.HasPrefix(recorder.Header().Get("Content-Type"), "image/svg+xml") {
+				t.Fatalf("expected an SVG error card, got status %d and content type %q", recorder.Code, recorder.Header().Get("Content-Type"))
+			}
+			if !strings.Contains(recorder.Body.String(), test.want) {
+				t.Fatalf("missing error message %q", test.want)
+			}
+			if !strings.Contains(recorder.Header().Get("Cache-Control"), "no-store") {
+				t.Fatalf("error SVG should be non-cacheable, got %q", recorder.Header().Get("Cache-Control"))
+			}
+		})
+	}
+}
+
+func TestStarHistoryRouteRejectsUnsupportedMethod(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	Handler(recorder, httptest.NewRequest(http.MethodPost, "/api/star-history?username=Mintimate&repo=oh-my-rime", nil))
+
+	if recorder.Code != http.StatusMethodNotAllowed || recorder.Header().Get("Allow") != "GET, HEAD" {
+		t.Fatalf("expected 405 with GET and HEAD allowed, got %d and %q", recorder.Code, recorder.Header().Get("Allow"))
+	}
+}

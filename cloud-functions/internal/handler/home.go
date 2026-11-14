@@ -56,6 +56,7 @@ func writeHomePage(w http.ResponseWriter, r *http.Request) {
         <a class="endpoint" href="%[1]s/api/contribution-calendar?username=Mintimate" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/contribution-calendar</span><span class="hint">贡献日历</span></span></a>
         <a class="endpoint" href="%[1]s/api/recent-activity?username=Mintimate" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/recent-activity</span><span class="hint">最近公开动态</span></span></a>
         <a class="endpoint" href="%[1]s/api/repo-languages?username=Mintimate&repo=dev-stats" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/repo-languages</span><span class="hint">仓库语言占比</span></span></a>
+        <a class="endpoint" href="%[1]s/api/star-history?username=Mintimate&repo=oh-my-rime" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/star-history</span><span class="hint">GitHub 仓库星标历史</span></span></a>
         <a class="endpoint" href="%[1]s/api/org?org=github" target="_blank" rel="noreferrer"><span class="method">GET</span><span><span class="path">/api/org</span><span class="hint">组织统计</span></span></a>
       </section>
       <aside>

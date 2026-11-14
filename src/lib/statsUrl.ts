@@ -1,4 +1,4 @@
-import type { CardType, ManualConfig, Platform, StatsRecipe } from "./types";
+import type { CardType, ManualCardType, ManualConfig, Platform, StatsRecipe } from "./types";
 
 export function profileUrlFor(config: Pick<ManualConfig, "platform" | "username">) {
   const name = encodeURIComponent(config.username || "Mintimate");
@@ -11,13 +11,23 @@ export function endpointFor(card: string) {
   return `/api/${card}`;
 }
 
-export function buildStatsUrl(config: ManualConfig, cardOverride?: CardType) {
+export function cardNeedsRepo(card: ManualCardType) {
+  return card === "pin" || card === "repo-languages" || card === "star-history";
+}
+
+export function platformSupportsCard(platform: Platform, card: ManualCardType) {
+  return platform === "github" || (card !== "org" && card !== "star-history");
+}
+
+export function buildStatsUrl(config: ManualConfig, cardOverride?: ManualCardType) {
   const card = cardOverride || config.card;
   const url = new URL(endpointFor(card), window.location.origin);
   const isOrg = card === "org";
+  const isStarHistory = card === "star-history";
+  const username = isStarHistory ? config.username.trim() : config.username;
 
-  if (isOrg) url.searchParams.set("org", config.username || "edgeone");
-  else url.searchParams.set("username", config.username || "Mintimate");
+  if (isOrg) url.searchParams.set("org", username || "edgeone");
+  else url.searchParams.set("username", username || "Mintimate");
 
   if (config.platform !== "github") url.searchParams.set("platform", config.platform);
   if (config.theme) url.searchParams.set("theme", config.theme);
@@ -25,8 +35,8 @@ export function buildStatsUrl(config: ManualConfig, cardOverride?: CardType) {
   if (config.show_icons) url.searchParams.set("show_icons", "true");
   if (config.hide_border) url.searchParams.set("hide_border", "true");
   if (config.hide_title) url.searchParams.set("hide_title", "true");
-  if (config.hide_rank) url.searchParams.set("hide_rank", "true");
-  if (config.disable_animations) url.searchParams.set("disable_animations", "true");
+  if (!isStarHistory && config.hide_rank) url.searchParams.set("hide_rank", "true");
+  if (!isStarHistory && config.disable_animations) url.searchParams.set("disable_animations", "true");
   if (!config.text_bold) url.searchParams.set("text_bold", "false");
   if (config.card_width > 0) url.searchParams.set("card_width", String(config.card_width));
 
@@ -42,8 +52,9 @@ export function buildStatsUrl(config: ManualConfig, cardOverride?: CardType) {
 
   if (card === "recent-activity") url.searchParams.set("activity_count", String(config.activity_count || 5));
 
-  if (card === "pin" || card === "repo-languages") {
-    url.searchParams.set("repo", config.repo || "dev-stats");
+  if (cardNeedsRepo(card)) {
+    const repo = isStarHistory ? config.repo.trim() : config.repo;
+    url.searchParams.set("repo", repo || "dev-stats");
   }
 
   // 手动面板导出的 Markdown 会被粘贴到 GitHub/CNB 等站外 README；必须保留当前部署域名，
@@ -53,6 +64,11 @@ export function buildStatsUrl(config: ManualConfig, cardOverride?: CardType) {
 
 export function buildMarkdown(config: ManualConfig, url: string) {
   const label = `${config.platform} ${config.card}`;
+  if (config.card === "star-history") {
+    const owner = encodeURIComponent(config.username.trim());
+    const repo = encodeURIComponent(config.repo.trim());
+    return `[![${label}](${url})](https://github.com/${owner}/${repo})`;
+  }
   const target =
     config.platform === "cnb"
       ? `https://cnb.cool/u/${encodeURIComponent(config.username || "")}`
@@ -63,7 +79,7 @@ export function buildMarkdown(config: ManualConfig, url: string) {
 export function recipeCards(recipe: StatsRecipe): CardType[] {
   const cards = recipe.cards?.length ? recipe.cards : ["stats" as CardType];
   const platform = recipe.platform || "github";
-  const supported = cards.filter((card) => platform !== "cnb" || card !== "org");
+  const supported = cards.filter((card) => platformSupportsCard(platform, card));
   const uniqueCards = Array.from(new Set(supported)).slice(0, 4);
   return uniqueCards.length ? uniqueCards : ["stats" as CardType];
 }
@@ -89,7 +105,7 @@ export function recipeToConfig(recipe: StatsRecipe, fallback: ManualConfig): Man
     ...fallback,
     platform,
     username: recipe.username || fallback.username,
-    card: platform === "cnb" && requestedCard === "org" ? "stats" : requestedCard,
+    card: platformSupportsCard(platform, requestedCard) ? requestedCard : "stats",
     theme: recipe.theme || fallback.theme,
     repo: String(options.repo || fallback.repo),
     custom_title: String(options.custom_title || fallback.custom_title),
