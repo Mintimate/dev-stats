@@ -1,4 +1,4 @@
-import type { CardType, ManualConfig, ToolchainState } from "./types";
+import type { CardType, ManualCardType, ManualConfig, ToolchainState } from "./types";
 
 export const defaultConfig: ManualConfig = {
   platform: "github",
@@ -34,6 +34,11 @@ export const cardOptions: Array<{ value: CardType; label: string }> = [
   { value: "org", label: "组织机构卡片 (Organization)" },
 ];
 
+export const manualCardOptions: Array<{ value: ManualCardType; label: string }> = [
+  ...cardOptions,
+  { value: "star-history", label: "星标历史 (Star History)" },
+];
+
 export const themes = [
   "github_dark",
   "default",
@@ -41,6 +46,7 @@ export const themes = [
   "tokyonight",
   "dracula",
   "catppuccin_mocha",
+  "catppuccin_latte",
   "rose_pine",
   "vue",
   "vue-dark",

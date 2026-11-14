@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -232,6 +233,41 @@ func handleRepoLanguages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["repoLanguages"]), card.RenderRepoLanguagesCard(data, card.OptionsFromQuery(q)))
+}
+
+var (
+	starHistoryOwnerPattern = regexp.MustCompile(`^[a-zA-Z0-9-]{1,39}$`)
+	starHistoryRepoPattern  = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,100}$`)
+)
+
+func handleStarHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		w.Header().Set("Cache-Control", "no-store")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	q := r.URL.Query()
+	if service.NormalizePlatform(q.Get("platform")) != "github" {
+		writeSVG(w, 0, renderSVGError("Star History is available for GitHub", "Use platform=github"))
+		return
+	}
+	owner, repo := strings.TrimSpace(q.Get("username")), strings.TrimSpace(q.Get("repo"))
+	if owner == "" || repo == "" {
+		writeSVG(w, 0, renderSVGError("Missing username or repo", "Use /api/star-history?username=OWNER&repo=REPO"))
+		return
+	}
+	if !starHistoryOwnerPattern.MatchString(owner) || !starHistoryRepoPattern.MatchString(repo) || repo == "." || repo == ".." {
+		writeSVG(w, 0, renderSVGError("Invalid repository", "Pass the GitHub owner and repository name separately"))
+		return
+	}
+	data, err := service.NewClient().FetchStarHistory(r.Context(), owner, repo)
+	if err != nil {
+		writeSVG(w, 0, renderSVGError(err.Error(), "GitHub Star History request failed"))
+		return
+	}
+	writeSVG(w, resolveCacheSeconds(q.Get("cache_seconds"), cachePolicies["starHistory"]), card.RenderStarHistoryCard(data, card.OptionsFromQuery(q)))
 }
 
 func handleOrganization(w http.ResponseWriter, r *http.Request) {

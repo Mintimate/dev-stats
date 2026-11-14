@@ -15,10 +15,12 @@ export type CardType =
   | "repo-languages"
   | "org";
 
+export type ManualCardType = CardType | "star-history";
+
 export type ManualConfig = {
   platform: Platform;
   username: string;
-  card: CardType;
+  card: ManualCardType;
   repo: string;
   theme: string;
   custom_title: string;

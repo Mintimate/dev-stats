@@ -1,10 +1,11 @@
-import { cardOptions, themes } from "../lib/constants";
+import { manualCardOptions, themes } from "../lib/constants";
+import { cardNeedsRepo, platformSupportsCard } from "../lib/statsUrl";
 import { PlatformSegment } from "./PlatformSegment";
-import type { CardType, ManualConfig } from "../lib/types";
+import type { ManualCardType, ManualConfig } from "../lib/types";
 
 const THEME_DESCRIPTIONS: Record<string, string> = {
   github_dark: "GitHub 经典暗色", default: "默认经典浅色", transparent: "透明背景无边框",
-  tokyonight: "东京之夜", dracula: "德拉科拉", catppuccin_mocha: "摩卡猫",
+  tokyonight: "东京之夜", dracula: "德拉科拉", catppuccin_mocha: "摩卡猫", catppuccin_latte: "拿铁猫",
   rose_pine: "蔷薇松木", vue: "Vue 浅色", "vue-dark": "Vue 暗色",
   radical: "炫红暗色", graywhite: "极简灰白", ambient_gradient: "弥散渐变",
 };
@@ -15,13 +16,17 @@ export function ManualOptions({ config, updateConfig, setPlatform, resetOptions 
   setPlatform: (platform: ManualConfig["platform"]) => void;
   resetOptions: () => void;
 }) {
-  const needsRepo = config.card === "pin" || config.card === "repo-languages";
+  const isStarHistory = config.card === "star-history";
+  const needsRepo = cardNeedsRepo(config.card);
   const needsLangLayout = config.card === "top-langs" || config.card === "repo-languages";
-  const availableCardOptions = cardOptions.filter((option) => config.platform !== "cnb" || option.value !== "org");
+  const availableCardOptions = manualCardOptions.filter((option) => platformSupportsCard(config.platform, option.value));
   const displayOptions = [
     { key: "show_icons", label: "显示图标" }, { key: "hide_border", label: "隐藏外边框" },
-    { key: "hide_title", label: "隐藏卡片标题" }, { key: "hide_rank", label: "隐藏评级排名" },
-    { key: "disable_animations", label: "禁用动画效果" }, { key: "text_bold", label: "加粗文本" },
+    { key: "hide_title", label: "隐藏卡片标题" },
+    ...(!isStarHistory ? [
+      { key: "hide_rank", label: "隐藏评级排名" }, { key: "disable_animations", label: "禁用动画效果" },
+    ] : []),
+    { key: "text_bold", label: "加粗文本" },
     ...(config.card === "stats" ? [
       { key: "include_all_commits", label: "包含所有提交" }, { key: "prs_merged", label: "统计已合并 PR" },
     ] : []),
@@ -36,12 +41,12 @@ export function ManualOptions({ config, updateConfig, setPlatform, resetOptions 
       <div className="manual-fields">
         <div className="field"><span className="field-label">代码平台</span><PlatformSegment platform={config.platform} onChange={setPlatform} /></div>
         <div className="field">
-          <label htmlFor="username">开发者 / 组织用户名</label>
+          <label htmlFor="username">{isStarHistory ? "仓库所有者" : "开发者 / 组织用户名"}</label>
           <input id="username" value={config.username} placeholder="例如 Mintimate" autoComplete="off" onChange={(event) => updateConfig({ username: event.target.value })} />
         </div>
         <div className="field">
           <label htmlFor="card-type">统计卡片</label>
-          <select id="card-type" value={config.card} onChange={(event) => updateConfig({ card: event.target.value as CardType })}>
+          <select id="card-type" value={config.card} onChange={(event) => updateConfig({ card: event.target.value as ManualCardType })}>
             {availableCardOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>
@@ -52,7 +57,7 @@ export function ManualOptions({ config, updateConfig, setPlatform, resetOptions 
           </select>
         </div>
         {needsRepo && <div className="field">
-          <label htmlFor="repo">仓库名</label>
+          <label htmlFor="repo">{isStarHistory ? "公开仓库名" : "仓库名"}</label>
           <input id="repo" value={config.repo} placeholder="例如 dev-stats" autoComplete="off" onChange={(event) => updateConfig({ repo: event.target.value })} />
         </div>}
       </div>

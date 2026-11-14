@@ -153,7 +153,7 @@ See [Tencent EdgeOne Makers Documentation](https://pages.edgeone.ai/en/document/
 
 ## Environment Variables
 
-GitHub cards use GraphQL and require a token. The Agent's public REST queries can run anonymously with lower rate limits. Public CNB data does not require a token:
+GitHub cards that use GraphQL require a token. The Agent's public REST queries can run anonymously, and the Star History card always uses anonymous requests. GitHub limits anonymous requests by source IP. Public CNB data does not require a token.
 
 ### Required Variables
 
@@ -210,6 +210,7 @@ This project returns `Cache-Control` headers from the functions and configures P
 - `/api/streak` and `/api/contribution-calendar`: cached for 12 hours by default
 - `/api/recent-activity`: cached for 1 hour by default
 - `/api/profile-summary`, `/api/repo-languages`, and `/api/org`: cached for 1 day by default
+- `/api/star-history`: successful responses set a 1-day default via `Cache-Control`. Error responses specify `no-store`.
 
 Status endpoints are not configured for platform caching, so PAT health and availability checks do not get cached for too long. High-traffic public instances can still place EdgeOne CDN / Cloudflare or another CDN layer in front of the custom domain for more cache control, purge support, and observability.
 
@@ -240,6 +241,7 @@ This project is a full-stack Web application:
 - `/api/contribution-calendar` - Contribution Calendar Card
 - `/api/recent-activity` - Recent Public Activity Card
 - `/api/repo-languages` - Repository Languages Card
+- `/api/star-history` - Public GitHub Repository Star History Card
 - `/api/org` - GitHub Organization Stats Card
 - `/api/status/up` - PAT availability check
 - `/api/status/pat-info` - PAT status details
@@ -256,7 +258,7 @@ Add `platform=cnb` to a card URL to use CNB. GitHub remains the default, so exis
 ![CNB Repo](https://your-domain.example/api/pin?platform=cnb&username=yourusername&repo=group/repository)
 ```
 
-CNB currently supports `/api`, `/api/top-langs`, `/api/pin`, `/api/streak`, `/api/profile-summary`, `/api/contribution-calendar`, `/api/recent-activity`, and `/api/repo-languages`. Gists and organization stats have no equivalent data source and remain GitHub-only. CNB exposes primary/secondary languages rather than byte counts; language cards are weighted by repository occurrence.
+CNB currently supports `/api`, `/api/top-langs`, `/api/pin`, `/api/streak`, `/api/profile-summary`, `/api/contribution-calendar`, `/api/recent-activity`, and `/api/repo-languages`. Gists, star history, and organization stats are GitHub-only. CNB reports primary and secondary languages. Language cards count how many repositories use each language.
 
 ## Get GitHub Token (Minimum Permissions)
 
@@ -302,9 +304,14 @@ After deployment, visit your EdgeOne Makers domain to see the usage documentatio
 - `/api/contribution-calendar` - Contribution Calendar Card
 - `/api/recent-activity` - Recent Public Activity Card
 - `/api/repo-languages` - Repository Languages Card
+- `/api/star-history` - Public GitHub Repository Star History Card
 - `/api/org` - GitHub Organization Stats Card
 
 For detailed parameters, please refer to the [original project documentation](https://github.com/anuraghazra/github-readme-stats/blob/master/readme.md).
+
+### GitHub Repository Star History
+
+Choose the repository Star History card in the manual editor or call `/api/star-history?username=OWNER&repo=REPO` with the repository owner and name. Set `theme` to a palette such as `catppuccin_mocha` or `catppuccin_latte`. DevStats calls the [GitHub star history API](https://docs.github.com/en/rest/activity/starring#get-repository-star-history) anonymously for public repositories. The curve groups stars that are still active by the date they were added.
 
 ## Example Cards
 
@@ -313,6 +320,7 @@ Copy the following code to your README file (replace with your domain and userna
 ```md
 ![GitHub Stats](https://your-project.pages.dev/api?username=yourusername&show_icons=true)
 ![Top Languages](https://your-project.pages.dev/api/top-langs?username=yourusername&layout=compact)
+![Star History](https://your-project.pages.dev/api/star-history?username=yourusername&repo=yourrepo&theme=catppuccin_mocha)
 ```
 
 For more styling and parameter configurations (environment variables), please refer to the [original project documentation](https://github.com/anuraghazra/github-readme-stats#customization).
