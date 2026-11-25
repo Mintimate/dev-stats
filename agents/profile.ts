@@ -29,7 +29,7 @@ export async function onRequest(context: any) {
     const cacheTtlMs = resolveAnalysisCacheTtlMs(context.env);
     const refreshLease = await readRefreshLease(store, platform, username, 'readme').catch(() => null);
     const refresh = refreshLease
-      ? { status: 'running', runId: refreshLease.runId, startedAt: refreshLease.startedAt, expiresAt: refreshLease.expiresAt }
+      ? { status: 'running', startedAt: refreshLease.startedAt, expiresAt: refreshLease.expiresAt }
       : { status: 'idle' };
     const cached = await readCompatibleAnalysisCacheFromStore(store, platform, username, 'readme', cacheTtlMs, false);
     const entry = cached?.entry ?? null;

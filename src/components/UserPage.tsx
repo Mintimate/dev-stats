@@ -24,7 +24,6 @@ interface ProfileResponse {
   stale?: boolean;
   refresh?: {
     status: "idle" | "running";
-    runId?: string;
     startedAt?: number;
     expiresAt?: number;
   };

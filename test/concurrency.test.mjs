@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { build } from "esbuild";
 
-async function importTypeScriptModule(entryPoint) {
+async function importTypeScriptModule(entryPoint, plugins = []) {
   const result = await build({
     entryPoints: [entryPoint],
     bundle: true,
@@ -10,6 +10,7 @@ async function importTypeScriptModule(entryPoint) {
     platform: "node",
     write: false,
     logLevel: "silent",
+    plugins,
   });
   const source = result.outputFiles[0].text;
   return import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
@@ -35,6 +36,10 @@ class MemoryBlobStore {
   async delete(key) {
     await Promise.resolve();
     this.values.delete(key);
+  }
+
+  async list() {
+    return { blobs: Array.from(this.values.keys(), (key) => ({ key })) };
   }
 }
 
@@ -72,6 +77,53 @@ test("public cache-miss analysis rate limit accepts one concurrent client reques
   assert.equal(results.filter((result) => !result.allowed).length, 1);
   const next = await cacheModule.acquirePublicAnalysisRateLimit(store, "203.0.113.17", now + 2 * 60 * 1000);
   assert.equal(next.allowed, true);
+});
+
+test("public refresh responses hide the owner run ID and rate-limit by the EdgeOne client address", async (t) => {
+  const store = new MemoryBlobStore();
+  const activeRunId = "private-test-identifier";
+  await cacheModule.acquireRefreshLease(store, "github", "Mintimate", "readme", activeRunId);
+  globalThis.__devStatsTestStore = () => store;
+  t.after(() => delete globalThis.__devStatsTestStore);
+  const stubs = {
+    "@edgeone/pages-blob": "export const getStore = () => globalThis.__devStatsTestStore();",
+    "@openai/agents": "export const Agent = {}, OpenAIChatCompletionsModel = {}, run = {}, tool = {};",
+    "openai": "export default class OpenAI {}",
+  };
+  const plugins = [{
+    name: "refresh-test-stubs",
+    setup(builder) {
+      builder.onResolve({ filter: /^(@edgeone\/pages-blob|@openai\/agents|openai)$/ }, ({ path }) => ({ path, namespace: "refresh-stub" }));
+      builder.onLoad({ filter: /.*/, namespace: "refresh-stub" }, ({ path }) => ({ contents: stubs[path] }));
+    },
+  }];
+
+  const [chat, profile] = await Promise.all([
+    importTypeScriptModule("agents/chat/index.ts", plugins),
+    importTypeScriptModule("agents/profile.ts", plugins),
+  ]);
+  const requestRefresh = (headers) => chat.onRequest({
+    conversation_id: "another-test-run",
+    request: {
+      headers,
+      body: { message: "Review public profile", state: { username: "Mintimate" }, force_reanalyze: true },
+    },
+    env: { AI_GATEWAY_API_KEY: "test-key", AI_GATEWAY_BASE_URL: "https://example.test", PUBLIC_SITE_URL: "https://example.test" },
+  });
+
+  const reply = await requestRefresh({ "EO-Connecting-IP": "203.0.113.11", "CF-Connecting-IP": "203.0.113.12" });
+  assert.equal(reply.status, 200);
+  const events = await reply.text();
+  assert.match(events, /"type":"refresh_joined"/);
+  assert.doesNotMatch(events, /private-test-identifier|"run_id"/);
+
+  const limited = await requestRefresh({ "X-Forwarded-For": "203.0.113.13, 203.0.113.11", "X-Real-IP": "203.0.113.14" });
+  assert.equal(limited.status, 429);
+
+  const profileResponse = await profile.onRequest({ request: { body: { username: "Mintimate" } } });
+  const data = await profileResponse.json();
+  assert.equal(data.refresh.status, "running");
+  assert.equal("runId" in data.refresh, false);
 });
 
 test("per-user leaderboard changes keep newer entries and apply tombstones", () => {
