@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -344,6 +345,17 @@ func handlePATInfo(w http.ResponseWriter, r *http.Request) {
 // Any response larger than this is rejected to avoid OOM.
 const maxAvatarSize = 2 << 20
 
+func isAvatarSource(target *url.URL, platform string) bool {
+	if target.Scheme != "https" || target.User != nil {
+		return false
+	}
+	host := strings.ToLower(target.Host)
+	if platform == "github" {
+		return host == "github.com" || host == "avatars.githubusercontent.com"
+	}
+	return host == "cnb.cool"
+}
+
 func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 	username := r.URL.Query().Get("username")
 	platform := r.URL.Query().Get("platform")
@@ -356,6 +368,10 @@ func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 	// Validate inputs to prevent path traversal or abuse
 	if platform != "github" && platform != "cnb" {
 		http.Error(w, "Invalid platform parameter", http.StatusBadRequest)
+		return
+	}
+	if username == "." || username == ".." {
+		http.Error(w, "Invalid username", http.StatusBadRequest)
 		return
 	}
 
@@ -391,9 +407,9 @@ func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 		avatarURL = fallbackURL
 	}
 
-	req, err := http.NewRequestWithContext(r.Context(), "GET", avatarURL, nil)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, avatarURL, nil)
+	if err != nil || !isAvatarSource(req.URL, platform) {
+		http.Redirect(w, r, fallbackURL, http.StatusFound)
 		return
 	}
 	req.Header.Set("User-Agent", "EdgeOne-Stats-Agent/1.0")
@@ -401,6 +417,12 @@ func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 	// Use a 5-second timeout for downloading the image, fallback to 302 on fail
 	client := &http.Client{
 		Timeout: 5 * time.Second,
+		CheckRedirect: func(redirect *http.Request, previous []*http.Request) error {
+			if len(previous) >= 5 || !isAvatarSource(redirect.URL, platform) {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -409,7 +431,10 @@ func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
+	serveAvatarResponse(w, r, resp, fallbackURL)
+}
 
+func serveAvatarResponse(w http.ResponseWriter, r *http.Request, resp *http.Response, fallbackURL string) {
 	if resp.StatusCode != http.StatusOK {
 		// Fallback to 302 redirect if the source returns a non-OK status code
 		http.Redirect(w, r, fallbackURL, http.StatusFound)
@@ -450,17 +475,19 @@ func handleAvatarProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// --- All data received and validated. Now write the response atomically. ---
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-
-	contentType := resp.Header.Get("Content-Type")
-	if contentType != "" {
-		w.Header().Set("Content-Type", contentType)
-	} else {
-		w.Header().Set("Content-Type", "image/png")
+	contentType := http.DetectContentType(body)
+	switch contentType {
+	case "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/x-icon":
+	default:
+		http.Redirect(w, r, fallbackURL, http.StatusFound)
+		return
 	}
 
+	// Serve only recognized raster images from the application origin.
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
 	w.Header().Set("Cache-Control", "public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400")
 

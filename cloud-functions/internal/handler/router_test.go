@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -30,6 +31,35 @@ func TestWakatimeRouteRejectsUnapprovedUpstream(t *testing.T) {
 	Handler(w, httptest.NewRequest(http.MethodGet, "/api/wakatime?username=example&api_domain=unapproved.example", nil))
 	if !strings.Contains(w.Body.String(), "WakaTime API domain is not allowed") {
 		t.Fatal("the request should fail before contacting an unapproved domain")
+	}
+}
+
+func TestAvatarResponseUsesDetectedRasterType(t *testing.T) {
+	const fallback = "https://cnb.cool/users/example/avatar/s"
+	for _, tc := range []struct {
+		name string
+		body string
+		want int
+	}{
+		{"raster", "\x89PNG\r\n\x1a\n", http.StatusOK},
+		{"html", "<html>Unexpected upstream page</html>", http.StatusFound},
+		{"svg", `<svg xmlns="http://www.w3.org/2000/svg"/>`, http.StatusFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(tc.body)), Header: http.Header{"Content-Type": {"text/html"}}}
+			w := httptest.NewRecorder()
+			serveAvatarResponse(w, httptest.NewRequest(http.MethodGet, "/api/avatar", nil), resp, fallback)
+			if w.Code != tc.want {
+				t.Fatalf("status %d, want %d", w.Code, tc.want)
+			}
+			if tc.want == http.StatusFound {
+				if w.Header().Get("Location") != fallback || strings.Contains(w.Body.String(), tc.body) {
+					t.Fatal("unexpected upstream data was served instead of using the avatar fallback")
+				}
+			} else if w.Header().Get("Content-Type") != "image/png" || w.Header().Get("X-Content-Type-Options") != "nosniff" {
+				t.Fatalf("unexpected avatar headers: %v", w.Header())
+			}
+		})
 	}
 }
 
