@@ -1,0 +1,6 @@
+branch:
+  - buttons:
+      - name: 安全扫描
+        description: 全量扫描当前提交的开源组件漏洞，并生成报告附件
+        event: web_trigger_security_scan
+        isDefault: true

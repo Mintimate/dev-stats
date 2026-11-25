@@ -15,3 +15,12 @@
 $:
   push: *sync-to-github
   tag_push: *sync-to-github
+  web_trigger_security_scan:
+    - name: 安全扫描
+      stages:
+        - name: 开源组件漏洞全量扫描
+          image: cnbcool/sca-vulnerability:latest
+          timeout: 15m
+          settings:
+            scanMode: full
+            publish: true
