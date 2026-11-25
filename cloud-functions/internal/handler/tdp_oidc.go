@@ -147,8 +147,6 @@ func handleTDPOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "TDP account import is not configured"})
 		return
 	}
-	clearTDPCookie(w, tdpOIDCFlowCookie, config.SecureCookie)
-
 	flowCookie, err := r.Cookie(tdpOIDCFlowCookie)
 	if err != nil {
 		redirectTDPOIDCResult(w, r, "/", "error")
@@ -159,13 +157,18 @@ func handleTDPOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		redirectTDPOIDCResult(w, r, "/", "error")
 		return
 	}
+	if !hmac.Equal([]byte(flow.State), []byte(r.URL.Query().Get("state"))) {
+		redirectTDPOIDCResult(w, r, "/", "error")
+		return
+	}
+	clearTDPCookie(w, tdpOIDCFlowCookie, config.SecureCookie)
 
 	if providerError := r.URL.Query().Get("error"); providerError != "" {
 		log.Printf("TDP OIDC authorization rejected: %q", providerError)
 		redirectTDPOIDCResult(w, r, flow.ReturnTo, "cancelled")
 		return
 	}
-	if !hmac.Equal([]byte(flow.State), []byte(r.URL.Query().Get("state"))) || r.URL.Query().Get("code") == "" {
+	if r.URL.Query().Get("code") == "" {
 		redirectTDPOIDCResult(w, r, flow.ReturnTo, "error")
 		return
 	}
@@ -423,11 +426,12 @@ func randomURLSafeString(bytesLength int) (string, error) {
 }
 
 func sanitizeLocalReturnTo(raw string) string {
-	if raw == "" {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.IsAbs() || parsed.Host != "" {
 		return "/#agent"
 	}
-	parsed, err := url.Parse(raw)
-	if err != nil || parsed.IsAbs() || parsed.Host != "" || !strings.HasPrefix(parsed.Path, "/") || strings.HasPrefix(parsed.Path, "//") {
+	path := parsed.Path
+	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || strings.ContainsRune(path, '\\') {
 		return "/#agent"
 	}
 	return parsed.String()

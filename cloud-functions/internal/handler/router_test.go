@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHandlerMissingUsername(t *testing.T) {
@@ -21,6 +23,82 @@ func TestHandlerMissingUsername(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Body.String(), "Missing username") {
 		t.Fatal("missing-username error card was not rendered")
+	}
+}
+
+func TestWakatimeRouteRejectsUnapprovedUpstream(t *testing.T) {
+	t.Setenv("WAKATIME_API_DOMAINS", "")
+	w := httptest.NewRecorder()
+	Handler(w, httptest.NewRequest(http.MethodGet, "/api/wakatime?username=example&api_domain=unapproved.example", nil))
+	if !strings.Contains(w.Body.String(), "WakaTime API domain is not allowed") {
+		t.Fatal("the request should fail before contacting an unapproved domain")
+	}
+}
+
+func TestAvatarResponseUsesDetectedRasterType(t *testing.T) {
+	const fallback = "https://cnb.cool/users/example/avatar/s"
+	for _, tc := range []struct {
+		name string
+		body string
+		want int
+	}{
+		{"raster", "\x89PNG\r\n\x1a\n", http.StatusOK},
+		{"html", "<html>Unexpected upstream page</html>", http.StatusFound},
+		{"svg", `<svg xmlns="http://www.w3.org/2000/svg"/>`, http.StatusFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(tc.body)), Header: http.Header{"Content-Type": {"text/html"}}}
+			w := httptest.NewRecorder()
+			serveAvatarResponse(w, httptest.NewRequest(http.MethodGet, "/api/avatar", nil), resp, fallback)
+			if w.Code != tc.want {
+				t.Fatalf("status %d, want %d", w.Code, tc.want)
+			}
+			if tc.want == http.StatusFound {
+				if w.Header().Get("Location") != fallback || strings.Contains(w.Body.String(), tc.body) {
+					t.Fatal("unexpected upstream data was served instead of using the avatar fallback")
+				}
+			} else if w.Header().Get("Content-Type") != "image/png" || w.Header().Get("X-Content-Type-Options") != "nosniff" {
+				t.Fatalf("unexpected avatar headers: %v", w.Header())
+			}
+		})
+	}
+}
+
+func TestTDPOIDCReturnPathStaysLocal(t *testing.T) {
+	for _, raw := range []string{"https://example.test/return", "//example.test/return", `/\example.test/return`, "/%5Cexample.test/return"} {
+		w := httptest.NewRecorder()
+		redirectTDPOIDCResult(w, httptest.NewRequest(http.MethodGet, "/api/auth/tdp/callback", nil), raw, "success")
+		if got := w.Header().Get("Location"); got != "/?tdp_oidc=success#agent" {
+			t.Fatalf("return target %q produced %q", raw, got)
+		}
+	}
+	if got := sanitizeLocalReturnTo("/u/github/example?q=value#agent"); got != "/u/github/example?q=value#agent" {
+		t.Fatalf("valid local target was changed: %q", got)
+	}
+}
+
+func TestTDPOIDCCallbackOnlyConsumesMatchingState(t *testing.T) {
+	const secret = "test-cookie-secret-for-local-requests"
+	t.Setenv("TDP_OIDC_ISSUER", "https://issuer.example")
+	t.Setenv("TDP_OIDC_CLIENT_ID", "test-client")
+	t.Setenv("TDP_OIDC_CLIENT_SECRET", "test-secret")
+	t.Setenv("TDP_OIDC_COOKIE_SECRET", secret)
+	t.Setenv("TDP_OIDC_REDIRECT_URI", "https://app.example/api/auth/tdp/callback")
+	signed, err := encodeSignedValue(secret, tdpOIDCFlow{State: "expected-state", ReturnTo: "/#agent", ExpiresAt: time.Now().Add(time.Minute).Unix()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ state, result string }{{"different-state", "error"}, {"expected-state", "cancelled"}} {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/api/auth/tdp/callback?error=access_denied&state="+tc.state, nil)
+		r.AddCookie(&http.Cookie{Name: tdpOIDCFlowCookie, Value: signed})
+		Handler(w, r)
+		if !strings.Contains(w.Header().Get("Location"), "tdp_oidc="+tc.result) {
+			t.Fatalf("unexpected callback location: %q", w.Header().Get("Location"))
+		}
+		if consumed := w.Header().Get("Set-Cookie") != ""; consumed != (tc.state == "expected-state") {
+			t.Fatalf("unexpected cookie consumption for state %q: %t", tc.state, consumed)
+		}
 	}
 }
 

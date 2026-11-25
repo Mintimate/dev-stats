@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import OpenAI from 'openai';
 import {
   Agent,
@@ -66,11 +67,13 @@ function headerValue(headers: Record<string, string>, name: string): string {
 }
 
 function publicClientAddress(headers: Record<string, string>): string | null {
-  const candidate = headerValue(headers, 'cf-connecting-ip') ||
-    headerValue(headers, 'x-real-ip') ||
-    headerValue(headers, 'x-forwarded-for').split(',')[0].trim();
-  // Only accept a syntactically plausible address from platform proxy headers.
-  return /^[0-9a-f:.]{3,64}$/i.test(candidate) ? candidate : null;
+  const connectingIP = headerValue(headers, 'eo-connecting-ip').trim();
+  if (isIP(connectingIP)) return connectingIP;
+
+  // EdgeOne appends the address it observed to any client-supplied XFF values.
+  const forwardedFor = headerValue(headers, 'x-forwarded-for');
+  const peerIP = forwardedFor.slice(forwardedFor.lastIndexOf(',') + 1).trim();
+  return isIP(peerIP) ? peerIP : null;
 }
 
 function validHttpOrigin(value: string | undefined): string | null {
@@ -415,7 +418,6 @@ export async function onRequest(context: AgentContext) {
           platform,
           username,
           mode: agentMode,
-          run_id: leaseResult.lease.runId,
           started_at: leaseResult.lease.startedAt,
           expires_at: leaseResult.lease.expiresAt,
         });
