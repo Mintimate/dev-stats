@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHandlerMissingUsername(t *testing.T) {
@@ -60,6 +61,44 @@ func TestAvatarResponseUsesDetectedRasterType(t *testing.T) {
 				t.Fatalf("unexpected avatar headers: %v", w.Header())
 			}
 		})
+	}
+}
+
+func TestTDPOIDCReturnPathStaysLocal(t *testing.T) {
+	for _, raw := range []string{"https://example.test/return", "//example.test/return", `/\example.test/return`, "/%5Cexample.test/return"} {
+		w := httptest.NewRecorder()
+		redirectTDPOIDCResult(w, httptest.NewRequest(http.MethodGet, "/api/auth/tdp/callback", nil), raw, "success")
+		if got := w.Header().Get("Location"); got != "/?tdp_oidc=success#agent" {
+			t.Fatalf("return target %q produced %q", raw, got)
+		}
+	}
+	if got := sanitizeLocalReturnTo("/u/github/example?q=value#agent"); got != "/u/github/example?q=value#agent" {
+		t.Fatalf("valid local target was changed: %q", got)
+	}
+}
+
+func TestTDPOIDCCallbackOnlyConsumesMatchingState(t *testing.T) {
+	const secret = "test-cookie-secret-for-local-requests"
+	t.Setenv("TDP_OIDC_ISSUER", "https://issuer.example")
+	t.Setenv("TDP_OIDC_CLIENT_ID", "test-client")
+	t.Setenv("TDP_OIDC_CLIENT_SECRET", "test-secret")
+	t.Setenv("TDP_OIDC_COOKIE_SECRET", secret)
+	t.Setenv("TDP_OIDC_REDIRECT_URI", "https://app.example/api/auth/tdp/callback")
+	signed, err := encodeSignedValue(secret, tdpOIDCFlow{State: "expected-state", ReturnTo: "/#agent", ExpiresAt: time.Now().Add(time.Minute).Unix()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ state, result string }{{"different-state", "error"}, {"expected-state", "cancelled"}} {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/api/auth/tdp/callback?error=access_denied&state="+tc.state, nil)
+		r.AddCookie(&http.Cookie{Name: tdpOIDCFlowCookie, Value: signed})
+		Handler(w, r)
+		if !strings.Contains(w.Header().Get("Location"), "tdp_oidc="+tc.result) {
+			t.Fatalf("unexpected callback location: %q", w.Header().Get("Location"))
+		}
+		if consumed := w.Header().Get("Set-Cookie") != ""; consumed != (tc.state == "expected-state") {
+			t.Fatalf("unexpected cookie consumption for state %q: %t", tc.state, consumed)
+		}
 	}
 }
 
