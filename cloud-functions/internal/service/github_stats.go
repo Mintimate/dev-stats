@@ -43,7 +43,7 @@ query userInfo($login: String!, $includeMergedPullRequests: Boolean!, $includeDi
     repositoryDiscussionComments(onlyAnswers: true) @include(if: $includeDiscussionsAnswers) { totalCount }
     repositories(first: 100, privacy: PUBLIC, ownerAffiliations: OWNER, orderBy: {direction: DESC, field: STARGAZERS}) {
       totalCount
-      nodes { name stargazers { totalCount } }
+      nodes { name stargazerCount }
     }
   }
 }`
@@ -69,8 +69,8 @@ query userInfo($login: String!, $includeMergedPullRequests: Boolean!, $includeDi
 			Repositories                 struct {
 				TotalCount int `json:"totalCount"`
 				Nodes      []struct {
-					Name       string `json:"name"`
-					Stargazers count  `json:"stargazers"`
+					Name           string `json:"name"`
+					StargazerCount int    `json:"stargazerCount"`
 				} `json:"nodes"`
 			} `json:"repositories"`
 		} `json:"user"`
@@ -99,7 +99,7 @@ query userInfo($login: String!, $includeMergedPullRequests: Boolean!, $includeDi
 	totalStars := 0
 	for _, repo := range response.User.Repositories.Nodes {
 		if !excluded[repo.Name] {
-			totalStars += repo.Stargazers.TotalCount
+			totalStars += repo.StargazerCount
 		}
 	}
 
@@ -230,7 +230,6 @@ query ProfileSummary($login: String!) {
     name login avatarUrl createdAt
     followers { totalCount }
     following { totalCount }
-    gists(first: 1, privacy: PUBLIC) { totalCount }
     repositories(first: 100, privacy: PUBLIC, ownerAffiliations: OWNER) {
       totalCount
       nodes { stargazerCount forkCount }
@@ -245,9 +244,9 @@ query ProfileSummary($login: String!) {
 }`
 	var response struct {
 		User struct {
-			Name, Login, AvatarURL, CreatedAt                 string
-			Followers, Following, Gists, PullRequests, Issues count
-			Repositories                                      struct {
+			Name, Login, AvatarURL, CreatedAt          string
+			Followers, Following, PullRequests, Issues count
+			Repositories                               struct {
 				TotalCount int `json:"totalCount"`
 				Nodes      []struct {
 					StargazerCount int `json:"stargazerCount"`
@@ -266,10 +265,19 @@ query ProfileSummary($login: String!) {
 	if response.User.Login == "" {
 		return ProfileSummaryData{}, errors.New("user not found")
 	}
+	var profile struct {
+		PublicGists *int `json:"public_gists"`
+	}
+	if err := c.restJSON(ctx, "/users/"+url.PathEscape(response.User.Login), &profile); err != nil {
+		return ProfileSummaryData{}, err
+	}
+	if profile.PublicGists == nil {
+		return ProfileSummaryData{}, errors.New("GitHub user data is missing public_gists")
+	}
 	data := ProfileSummaryData{
 		Name: response.User.Name, Login: response.User.Login, AvatarURL: response.User.AvatarURL,
 		Followers: response.User.Followers.TotalCount, Following: response.User.Following.TotalCount,
-		Repositories: response.User.Repositories.TotalCount, Gists: response.User.Gists.TotalCount,
+		Repositories: response.User.Repositories.TotalCount, Gists: *profile.PublicGists,
 		TotalCommits: response.User.ContributionsCollection.TotalCommitContributions,
 		TotalPRs:     response.User.PullRequests.TotalCount, TotalIssues: response.User.Issues.TotalCount,
 		ActiveYears: response.User.ContributionsCollection.ContributionYears, MemberSince: response.User.CreatedAt,
@@ -295,6 +303,7 @@ func (c *Client) FetchRecentActivity(ctx context.Context, username string, count
 		CreatedAt string `json:"created_at"`
 		Payload   struct {
 			Action  string `json:"action"`
+			Ref     string `json:"ref"`
 			Size    int    `json:"size"`
 			Commits []struct {
 				Message string `json:"message"`
@@ -324,9 +333,16 @@ func (c *Client) FetchRecentActivity(ctx context.Context, username string, count
 		switch event.Type {
 		case "PushEvent":
 			item.Type, item.Action = "commit", "pushed"
-			item.Title = fmt.Sprintf("Pushed %d commit(s)", event.Payload.Size)
-			if len(event.Payload.Commits) > 0 && event.Payload.Commits[0].Message != "" {
+			switch {
+			case len(event.Payload.Commits) > 0 && event.Payload.Commits[0].Message != "":
 				item.Title = strings.Split(event.Payload.Commits[0].Message, "\n")[0]
+			case event.Payload.Size > 0:
+				item.Title = fmt.Sprintf("Pushed %d commit(s)", event.Payload.Size)
+			case event.Payload.Ref != "":
+				ref := strings.TrimPrefix(event.Payload.Ref, "refs/heads/")
+				item.Title = "Pushed to " + strings.TrimPrefix(ref, "refs/tags/")
+			default:
+				item.Title = "Pushed changes"
 			}
 			item.URL = "https://github.com/" + event.Repo.Name
 		case "PullRequestEvent":
