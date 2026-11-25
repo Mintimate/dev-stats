@@ -25,7 +25,7 @@ fragment RepoInfo on Repository {
   isPrivate
   isArchived
   isTemplate
-  stargazers { totalCount }
+  stargazerCount
   description
   primaryLanguage { color name }
   forkCount
@@ -40,7 +40,7 @@ query getRepo($login: String!, $repo: String!) {
 			IsPrivate       bool   `json:"isPrivate"`
 			IsArchived      bool   `json:"isArchived"`
 			IsTemplate      bool   `json:"isTemplate"`
-			Stargazers      count  `json:"stargazers"`
+			StargazerCount  int    `json:"stargazerCount"`
 			Description     string `json:"description"`
 			PrimaryLanguage struct {
 				Color string `json:"color"`
@@ -62,7 +62,7 @@ query getRepo($login: String!, $repo: String!) {
 		Description:   source.Description,
 		PrimaryLang:   source.PrimaryLanguage.Name,
 		LanguageColor: defaultColor(source.PrimaryLanguage.Color, "#858585"),
-		Stars:         source.Stargazers.TotalCount,
+		Stars:         source.StargazerCount,
 		Forks:         source.ForkCount,
 		IsArchived:    source.IsArchived,
 		IsTemplate:    source.IsTemplate,
@@ -143,23 +143,6 @@ func calculatePrimaryGistLanguage(files []struct {
 		}
 	}
 	return bestName
-}
-
-type repoOwner struct {
-	Repository struct {
-		Name            string `json:"name"`
-		NameWithOwner   string `json:"nameWithOwner"`
-		IsPrivate       bool   `json:"isPrivate"`
-		IsArchived      bool   `json:"isArchived"`
-		IsTemplate      bool   `json:"isTemplate"`
-		Stargazers      count  `json:"stargazers"`
-		Description     string `json:"description"`
-		PrimaryLanguage struct {
-			Color string `json:"color"`
-			Name  string `json:"name"`
-		} `json:"primaryLanguage"`
-		ForkCount int `json:"forkCount"`
-	} `json:"repository"`
 }
 
 func FetchWakatime(ctx context.Context, username string, apiDomain string) ([]WakatimeLanguage, error) {

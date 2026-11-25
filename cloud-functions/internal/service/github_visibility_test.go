@@ -40,11 +40,15 @@ func TestGitHubRepositoryVisibility(t *testing.T) {
 					if !strings.Contains(query, "isPrivate") {
 						t.Fatal("repository query must request its visibility")
 					}
+					if method == "repo" && (strings.Contains(query, "stargazers") || !strings.Contains(query, "stargazerCount")) {
+						t.Fatal("repository card must request the scalar star count")
+					}
 					if visibility == "missing" {
 						return map[string]any{"repository": nil}
 					}
 					return map[string]any{"repository": map[string]any{
 						"name": "example", "nameWithOwner": "alice/example", "isPrivate": visibility == "private",
+						"stargazerCount":  9,
 						"primaryLanguage": map[string]any{"name": "Go"},
 						"languages": map[string]any{"totalSize": 100, "edges": []any{
 							map[string]any{"size": 100, "node": map[string]any{"name": "Go"}},
@@ -69,7 +73,7 @@ func TestGitHubRepositoryVisibility(t *testing.T) {
 				}
 				switch result := data.(type) {
 				case RepoData:
-					if result.NameWithOwner != "alice/example" || result.PrimaryLang != "Go" {
+					if result.NameWithOwner != "alice/example" || result.PrimaryLang != "Go" || result.Stars != 9 {
 						t.Fatalf("unexpected public repository: %#v", result)
 					}
 				case RepoLanguagesData:
@@ -145,10 +149,13 @@ func TestGitHubTopLanguagesExcludePrivateRepositories(t *testing.T) {
 
 func TestGitHubStatsCountOnlyPublicRepositoriesAndCommitSearch(t *testing.T) {
 	client := visibilityTestClient(t, func(query string) any {
+		if strings.Contains(query, "stargazers") || !strings.Contains(query, "stargazerCount") {
+			t.Fatal("stats must query the repository star count without accessing the stargazers connection")
+		}
 		return map[string]any{"user": map[string]any{
 			"login": "alice",
 			"repositories": map[string]any{"totalCount": visibilityCount(query, "repositories"), "nodes": []any{
-				map[string]any{"name": "example", "stargazers": map[string]any{"totalCount": 5 * visibilityCount(query, "repositories")}},
+				map[string]any{"name": "example", "stargazerCount": 5 * visibilityCount(query, "repositories")},
 			}},
 			"repositoriesContributedTo": map[string]any{"totalCount": visibilityCount(query, "repositoriesContributedTo")},
 		}}
@@ -166,17 +173,46 @@ func TestGitHubStatsCountOnlyPublicRepositoriesAndCommitSearch(t *testing.T) {
 
 func TestGitHubProfileSummaryCountsOnlyPublicResources(t *testing.T) {
 	client := visibilityTestClient(t, func(query string) any {
+		if strings.Contains(query, "gists") {
+			t.Fatal("profile GraphQL query must not request the permission-restricted gists field")
+		}
 		return map[string]any{"user": map[string]any{
 			"login": "alice",
-			"gists": map[string]any{"totalCount": visibilityCount(query, "gists")},
 			"repositories": map[string]any{"totalCount": visibilityCount(query, "repositories"), "nodes": []any{
 				map[string]any{"stargazerCount": 5 * visibilityCount(query, "repositories"), "forkCount": 2 * visibilityCount(query, "repositories")},
 			}},
 		}}
-	}, nil)
+	}, func(r *http.Request) any {
+		if r.URL.Path != "/users/alice" {
+			t.Fatalf("expected public user metadata for the requested account: %s", r.URL)
+		}
+		return map[string]any{"public_gists": 1, "private_gists": 9}
+	})
 	data, err := client.FetchProfileSummary(context.Background(), "alice")
 	if err != nil || data.Repositories != 1 || data.Gists != 1 || data.TotalStars != 5 || data.TotalForks != 2 {
 		t.Fatalf("private resource counts included: data=%#v err=%v", data, err)
+	}
+}
+
+func TestGitHubRecentActivityUsesPushRefWhenCommitDetailsAreMissing(t *testing.T) {
+	client := visibilityTestClient(t, nil, func(r *http.Request) any {
+		if r.URL.Path != "/users/alice/events/public" {
+			t.Fatalf("expected public events for the requested account: %s", r.URL)
+		}
+		return []any{
+			map[string]any{
+				"type": "PushEvent", "repo": map[string]string{"name": "alice/example"},
+				"payload": map[string]string{"ref": "refs/heads/main"},
+			},
+			map[string]any{
+				"type": "PushEvent", "repo": map[string]string{"name": "alice/example"},
+				"payload": map[string]any{"commits": []any{map[string]string{"message": "Update README\nMore detail"}}},
+			},
+		}
+	})
+	items, err := client.FetchRecentActivity(context.Background(), "alice", 2)
+	if err != nil || len(items) != 2 || items[0].Title != "Pushed to main" || items[1].Title != "Update README" {
+		t.Fatalf("unexpected activity: items=%#v err=%v", items, err)
 	}
 }
 
