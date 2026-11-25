@@ -2,15 +2,10 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"math"
-	"net/http"
 	"os"
 	"sort"
-	"strings"
-	"time"
 )
 
 type count struct {
@@ -143,35 +138,6 @@ func calculatePrimaryGistLanguage(files []struct {
 		}
 	}
 	return bestName
-}
-
-func FetchWakatime(ctx context.Context, username string, apiDomain string) ([]WakatimeLanguage, error) {
-	if apiDomain == "" {
-		apiDomain = "wakatime.com"
-	}
-	apiDomain = strings.TrimRight(apiDomain, "/")
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+apiDomain+"/api/v1/users/"+username+"/stats?is_including_today=true", nil)
-	if err != nil {
-		return nil, err
-	}
-	client := &http.Client{Timeout: 12 * time.Second}
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode > 299 {
-		return nil, fmt.Errorf("could not resolve WakaTime user %q", username)
-	}
-	var payload struct {
-		Data struct {
-			Languages []WakatimeLanguage `json:"languages"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
-		return nil, err
-	}
-	return payload.Data.Languages, nil
 }
 
 func (c *Client) FetchTopLanguages(ctx context.Context, username string, excludeRepos []string, sizeWeight float64, countWeight float64) ([]LanguageStat, error) {

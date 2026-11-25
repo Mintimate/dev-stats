@@ -24,6 +24,15 @@ func TestHandlerMissingUsername(t *testing.T) {
 	}
 }
 
+func TestWakatimeRouteRejectsUnapprovedUpstream(t *testing.T) {
+	t.Setenv("WAKATIME_API_DOMAINS", "")
+	w := httptest.NewRecorder()
+	Handler(w, httptest.NewRequest(http.MethodGet, "/api/wakatime?username=example&api_domain=unapproved.example", nil))
+	if !strings.Contains(w.Body.String(), "WakaTime API domain is not allowed") {
+		t.Fatal("the request should fail before contacting an unapproved domain")
+	}
+}
+
 func TestHandlerUnknownRoute(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/unknown", nil)
